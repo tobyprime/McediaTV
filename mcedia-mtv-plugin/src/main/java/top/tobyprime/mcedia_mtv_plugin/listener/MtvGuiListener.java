@@ -30,6 +30,7 @@ public class MtvGuiListener implements Listener {
         event.setCancelled(true);
         if (!(event.getWhoClicked() instanceof Player player)) return;
         if (event.getRawSlot() < 0) return;
+        if (event.getCurrentItem() == null) return;
         click(player, holder, event.getRawSlot(), event.isRightClick(), event.isShiftClick());
     }
 
@@ -45,6 +46,7 @@ public class MtvGuiListener implements Listener {
             case WORLD_TRANSFORM -> handleWorldTransform(player, holder, slot, rightClick, shiftClick);
             case SCREEN_SETTINGS -> handleScreenSettings(player, holder, slot, rightClick, shiftClick);
             case SPEAKER_SETTINGS -> handleSpeakerSettings(player, holder, slot, rightClick, shiftClick);
+            case CHANNEL_MENU -> handleChannelMenu(player, holder, slot, rightClick, shiftClick);
         }
     }
 
@@ -74,6 +76,7 @@ public class MtvGuiListener implements Listener {
                         player.performCommand("mtv tp " + snap.getName());
                     }
                 }
+                case 41 -> gui.openChannelMenu(player, snap);
                 case 40 -> {
                     player.closeInventory();
                     player.sendMessage("请输入播放 URL（URL 或 BV 号）。");
@@ -158,6 +161,72 @@ public class MtvGuiListener implements Listener {
             case 49 -> read(player, uuid, snap -> {
                 if (snap != null) gui.openPlayerMenu(player, snap);
             });
+        }
+    }
+
+    private void handleChannelMenu(Player player, MtvGui.MtvHolder holder, int slot, boolean rightClick, boolean shiftClick) {
+        var uuid = holder.getEntityUuid();
+        if (uuid == null) return;
+
+        switch (slot) {
+            case 10 -> read(player, uuid, snap -> {
+                if (snap != null) {
+                    float delta = (rightClick ? 1 : -1) * (shiftClick ? 1.0F : 0.25F);
+                    float speed = Math.max(0.25F, Math.min(4.0F, snap.getSpeed() + delta));
+                    updateAndReopen(player, uuid, done -> playbackController.updateSpeed(uuid, speed, done), GuiType.CHANNEL_MENU, null);
+                }
+            });
+            case 11 -> {
+                player.closeInventory();
+                player.sendMessage("请输入播放 URL（URL 或 BV 号）。");
+                gui.setAwaitingInput(player, GuiType.CHANNEL_MENU, uuid, "channel_media_url");
+            }
+            case 12 -> updateAndReopen(player, uuid, done -> playbackController.cyclePlayOrderMode(uuid, done), GuiType.CHANNEL_MENU, null);
+            case 13 -> updateAndReopen(player, uuid, done -> playbackController.playPreviousManual(uuid, done), GuiType.CHANNEL_MENU, null);
+            case 14 -> updateAndReopen(player, uuid, done -> playbackController.togglePause(uuid, done), GuiType.CHANNEL_MENU, null);
+            case 15 -> updateAndReopen(player, uuid, done -> playbackController.playNextManual(uuid, done), GuiType.CHANNEL_MENU, null);
+            case 16 -> {
+                player.closeInventory();
+                player.sendMessage("请输入跳转位置的微秒值。");
+                gui.setAwaitingInput(player, GuiType.CHANNEL_MENU, uuid, "start_at");
+            }
+            case 19 -> {
+                player.closeInventory();
+                player.sendMessage("请输入要首加的 URL 或 BV 号。");
+                gui.setAwaitingInput(player, GuiType.CHANNEL_MENU, uuid, "channel_prepend");
+            }
+            case 20 -> {
+                player.closeInventory();
+                player.sendMessage("请输入要尾加的 URL 或 BV 号。");
+                gui.setAwaitingInput(player, GuiType.CHANNEL_MENU, uuid, "channel_append");
+            }
+            case 21 -> updateAndReopen(player, uuid, done -> playbackController.updateStartAt(uuid, 0L, done), GuiType.CHANNEL_MENU, null);
+            case 22 -> {
+                long delta = shiftClick ? -10_000_000L : -1_000_000L;
+                updateAndReopen(player, uuid, done -> playbackController.seekRelative(uuid, delta, done), GuiType.CHANNEL_MENU, null);
+            }
+            case 23 -> {
+                long delta = shiftClick ? 10_000_000L : 1_000_000L;
+                updateAndReopen(player, uuid, done -> playbackController.seekRelative(uuid, delta, done), GuiType.CHANNEL_MENU, null);
+            }
+            case 47 -> read(player, uuid, snap -> {
+                if (snap != null) gui.openPlayerMenu(player, snap);
+            });
+            case 49 -> gui.reopenPage(player, GuiType.CHANNEL_MENU, uuid);
+            default -> {
+                int index = indexOf(MtvGui.CHANNEL_PLAYLIST_SLOTS, slot);
+                if (index >= 0) {
+                    if (shiftClick && rightClick) {
+                        updateAndReopen(player, uuid, done -> playbackController.movePlaylistItemToBack(uuid, index, done), GuiType.CHANNEL_MENU, null);
+                    } else if (shiftClick) {
+                        updateAndReopen(player, uuid, done -> playbackController.movePlaylistItemToFront(uuid, index, done), GuiType.CHANNEL_MENU, null);
+                    } else if (rightClick) {
+                        updateAndReopen(player, uuid, done -> playbackController.removePlaylistItem(uuid, index, done), GuiType.CHANNEL_MENU, null);
+                    } else {
+                        updateAndReopen(player, uuid, done -> playbackController.playPlaylistIndex(uuid, index, done), GuiType.CHANNEL_MENU, null);
+                    }
+                }
+            }
         }
     }
 

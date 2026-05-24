@@ -49,6 +49,10 @@ public class MtvCommand implements CommandExecutor, TabCompleter {
                         .executes(ctx -> executeBrigadier(ctx.getSource(), "edit"))
                         .then(Commands.argument("name", StringArgumentType.greedyString())
                                 .executes(ctx -> executeBrigadier(ctx.getSource(), "edit", ctx.getArgument("name", String.class)))))
+                .then(Commands.literal("channel")
+                        .executes(ctx -> executeBrigadier(ctx.getSource(), "channel"))
+                        .then(Commands.argument("name", StringArgumentType.greedyString())
+                                .executes(ctx -> executeBrigadier(ctx.getSource(), "channel", ctx.getArgument("name", String.class)))))
                 .then(Commands.literal("remove")
                         .executes(ctx -> executeBrigadier(ctx.getSource(), "remove"))
                         .then(Commands.argument("name", StringArgumentType.greedyString())
@@ -110,6 +114,7 @@ public class MtvCommand implements CommandExecutor, TabCompleter {
         return switch (args[0].toLowerCase()) {
             case "create" -> handleCreate(sender, args);
             case "edit" -> handleEdit(sender, args);
+            case "channel" -> handleChannel(sender, args);
             case "remove" -> handleRemove(sender, args);
             case "list" -> handleList(sender);
             case "gui" -> handleGui(sender);
@@ -164,6 +169,10 @@ public class MtvCommand implements CommandExecutor, TabCompleter {
     }
 
     private boolean handleEdit(CommandSender sender, String[] args) {
+        return handleChannel(sender, args);
+    }
+
+    private boolean handleChannel(CommandSender sender, String[] args) {
         if (!(sender instanceof Player player)) {
             sender.sendMessage("只能由玩家执行该命令。");
             return true;
@@ -171,7 +180,7 @@ public class MtvCommand implements CommandExecutor, TabCompleter {
         if (!MtvPeripheralController.checkPerm(player, "mcedia.mtv.edit")) return true;
         resolveOne(player, args.length >= 2 ? args[1] : null, target -> {
             if (target != null) {
-                gui.openPlayerMenu(player, target);
+                gui.openChannelMenu(player, target);
             }
         });
         return true;
@@ -686,7 +695,8 @@ public class MtvCommand implements CommandExecutor, TabCompleter {
 
     private boolean showHelp(CommandSender sender) {
         sender.sendMessage("/mtv create — 创建 MTV");
-        sender.sendMessage("/mtv edit [名称] — 编辑最近（或指定名称）的 MTV");
+        sender.sendMessage("/mtv edit [名称] — 打开最近（或指定名称）的频道编辑页");
+        sender.sendMessage("/mtv channel [名称] — 打开最近（或指定名称）的频道编辑页");
         sender.sendMessage("/mtv remove <名称> [--confirm] — 删除 MTV");
         sender.sendMessage("/mtv url <地址> [名称] — 设置 URL");
         sender.sendMessage("/mtv speed <倍速> [名称] — 设置播放速度");

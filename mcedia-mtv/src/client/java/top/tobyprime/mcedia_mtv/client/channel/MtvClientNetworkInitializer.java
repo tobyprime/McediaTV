@@ -22,9 +22,9 @@ public final class MtvClientNetworkInitializer {
     }
 
     public static void onChannelSnapshot(ClientChannelPlaybackSnapshot snapshot) {
-        LOGGER.info("Receive MTV channel snapshot: session={}, channel={}, revision={}, mediaUrl={}, speed={}, startAt={}, baseTime={}, baseOffset={}, paused={}, resolvedDurationUs={}, completed={}",
+        LOGGER.info("Receive MTV channel snapshot: session={}, channel={}, revision={}, mediaUrl={}, speed={}, startAt={}, baseTime={}, baseOffset={}, state={}, paused={}, resolvedDurationUs={}, completed={}",
                 sessionId, snapshot.channelId(), snapshot.revision(), snapshot.mediaUrl(), snapshot.speed(), snapshot.startAt(),
-                snapshot.baseTime(), snapshot.baseOffset(), snapshot.paused(), snapshot.resolvedDurationUs(), snapshot.completed());
+                snapshot.baseTime(), snapshot.baseOffset(), snapshot.state(), snapshot.paused(), snapshot.resolvedDurationUs(), snapshot.completed());
         ClientChannelPlaybackManager.getInstance().onSnapshot(snapshot);
     }
 

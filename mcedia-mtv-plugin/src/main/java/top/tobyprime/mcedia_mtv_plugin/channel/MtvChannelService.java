@@ -58,19 +58,8 @@ public final class MtvChannelService {
     }
 
     public ChannelRuntimeState syncSnapshot(ManagedMtvPlayer player) {
-        var configuredBinding = player.getChannelBinding();
-        if (configuredBinding == null) {
-            configuredBinding = MtvChannelBinding.self();
-        }
-        var runtimeBinding = configuredBinding.resolveRuntime(player.getUuid());
-        player.setChannelBinding(configuredBinding);
-        bindingRegistry.bind(player.getUuid(), runtimeBinding);
-
-        var state = channelStates.computeIfAbsent(runtimeBinding.channelId(), key -> {
-            var loaded = repository.load(runtimeBinding, player);
-            LOGGER.info("Created MTV channel state: channel={}, type={}, entity={}", runtimeBinding.channelId(), runtimeBinding.type(), player.getUuid());
-            return loaded;
-        });
+        var runtimeBinding = bindRuntime(player);
+        var state = loadBoundState(runtimeBinding, player);
         persistState(state);
         applyRuntimeStateToPlayer(player, state);
         LOGGER.info("Synced MTV channel snapshot to player: channel={}, type={}, entity={}, revision={}, mediaUrl={}, paused={}",
@@ -78,9 +67,16 @@ public final class MtvChannelService {
         return state;
     }
 
+    public ChannelRuntimeState previewState(ManagedMtvPlayer player) {
+        var runtimeBinding = bindRuntime(player);
+        var state = loadBoundState(runtimeBinding, player);
+        applyRuntimeStateToPlayer(player, state);
+        return state;
+    }
+
     public boolean mutatePlayback(ManagedMtvPlayer player, Function<ChannelRuntimeState, Boolean> mutation) {
-        var runtimeBinding = resolveBinding(player);
-        var state = syncSnapshot(player);
+        var runtimeBinding = bindRuntime(player);
+        var state = loadBoundState(runtimeBinding, player);
         boolean changed = Boolean.TRUE.equals(mutation.apply(state));
         if (!changed) {
             applyRuntimeStateToPlayer(player, state);
@@ -159,6 +155,140 @@ public final class MtvChannelService {
                 ChannelTimelineCalculator.play(state.getPlayState(), System.currentTimeMillis());
             }
             return true;
+        });
+    }
+
+    public boolean playPlaylistIndex(ManagedMtvPlayer player, int index) {
+        return mutatePlayback(player, state -> selectPlaylistIndex(state, index, System.currentTimeMillis()));
+    }
+
+    public boolean playNextManual(ManagedMtvPlayer player) {
+        return mutatePlayback(player, state -> {
+            long nowMs = System.currentTimeMillis();
+            return selectPlaylistIndex(state, state.getNormalizedPlaylistCursor() + 1, nowMs);
+        });
+    }
+
+    public boolean playPreviousManual(ManagedMtvPlayer player) {
+        return mutatePlayback(player, state -> {
+            long nowMs = System.currentTimeMillis();
+            return selectPlaylistIndex(state, state.getNormalizedPlaylistCursor() - 1, nowMs);
+        });
+    }
+
+    public boolean appendPlaylistItem(ManagedMtvPlayer player, String mediaUrl) {
+        return mutatePlayback(player, state -> addPlaylistItem(state, mediaUrl, false));
+    }
+
+    public boolean prependPlaylistItem(ManagedMtvPlayer player, String mediaUrl) {
+        return mutatePlayback(player, state -> addPlaylistItem(state, mediaUrl, true));
+    }
+
+    public boolean removePlaylistItem(ManagedMtvPlayer player, int index) {
+        return mutatePlayback(player, state -> {
+            if (index < 0 || index >= state.getPlaylist().size()) {
+                return false;
+            }
+            long nowMs = System.currentTimeMillis();
+            int cursor = state.getNormalizedPlaylistCursor();
+            state.getPlaylist().remove(index);
+            if (state.getPlaylist().isEmpty()) {
+                state.setPlaylistCursor(0);
+                state.setDurationMs(0L);
+                ChannelTimelineCalculator.stop(state.getPlayState(), nowMs);
+                state.getPlayState().setMediaUrl("");
+                return true;
+            }
+            if (index < cursor) {
+                state.setPlaylistCursor(cursor - 1);
+            } else if (index == cursor) {
+                int nextCursor = Math.min(cursor, state.getPlaylist().size() - 1);
+                return selectPlaylistIndex(state, nextCursor, nowMs);
+            }
+            return true;
+        });
+    }
+
+    public boolean movePlaylistItemToFront(ManagedMtvPlayer player, int index) {
+        return mutatePlayback(player, state -> movePlaylistItem(state, index, 0));
+    }
+
+    public boolean movePlaylistItemToBack(ManagedMtvPlayer player, int index) {
+        return mutatePlayback(player, state -> movePlaylistItem(state, index, state.getPlaylist().size() - 1));
+    }
+
+    public boolean cyclePlayOrderMode(ManagedMtvPlayer player) {
+        return mutatePlayback(player, state -> {
+            state.setPlayOrderMode(state.getPlayOrderMode().next());
+            return true;
+        });
+    }
+
+    private boolean selectPlaylistIndex(ChannelRuntimeState state, int index, long nowMs) {
+        if (index < 0 || index >= state.getPlaylist().size()) {
+            return false;
+        }
+        var item = state.getPlaylist().get(index);
+        state.setPlaylistCursor(index);
+        state.setDurationMs(0L);
+        ChannelTimelineCalculator.setMedia(state.getPlayState(), item.mediaUrl(), 0L, nowMs, ChannelPlaybackStatus.LOADING);
+        return true;
+    }
+
+    private boolean addPlaylistItem(ChannelRuntimeState state, String mediaUrl, boolean prepend) {
+        var normalized = MediaUrlNormalizer.normalize(mediaUrl);
+        if (normalized.isBlank()) {
+            return false;
+        }
+        long nowMs = System.currentTimeMillis();
+        var item = new ChannelPlaylistItem(normalized);
+        if (prepend) {
+            state.getPlaylist().add(0, item);
+            if (state.getPlaylist().size() > 1) {
+                state.setPlaylistCursor(state.getNormalizedPlaylistCursor() + 1);
+            }
+        } else {
+            state.getPlaylist().add(item);
+        }
+        if (state.getPlaylist().size() == 1 || state.getPlayState().getMediaUrl().isBlank()) {
+            return selectPlaylistIndex(state, 0, nowMs);
+        }
+        return true;
+    }
+
+    private boolean movePlaylistItem(ChannelRuntimeState state, int fromIndex, int toIndex) {
+        if (fromIndex < 0 || fromIndex >= state.getPlaylist().size() || toIndex < 0 || toIndex >= state.getPlaylist().size() || fromIndex == toIndex) {
+            return false;
+        }
+        var item = state.getPlaylist().remove(fromIndex);
+        state.getPlaylist().add(toIndex, item);
+        int cursor = state.getNormalizedPlaylistCursor();
+        if (cursor == fromIndex) {
+            state.setPlaylistCursor(toIndex);
+        } else if (fromIndex < cursor && toIndex >= cursor) {
+            state.setPlaylistCursor(cursor - 1);
+        } else if (fromIndex > cursor && toIndex <= cursor) {
+            state.setPlaylistCursor(cursor + 1);
+        }
+        return true;
+    }
+
+    private MtvChannelBinding bindRuntime(ManagedMtvPlayer player) {
+        var configuredBinding = player.getChannelBinding();
+        if (configuredBinding == null) {
+            configuredBinding = MtvChannelBinding.self();
+        }
+        var runtimeBinding = configuredBinding.resolveRuntime(player.getUuid());
+        player.setChannelBinding(configuredBinding);
+        bindingRegistry.bind(player.getUuid(), runtimeBinding);
+        return runtimeBinding;
+    }
+
+    private ChannelRuntimeState loadBoundState(MtvChannelBinding runtimeBinding, ManagedMtvPlayer player) {
+        return channelStates.computeIfAbsent(runtimeBinding.channelId(), key -> {
+            var loaded = repository.load(runtimeBinding, player);
+            LOGGER.info("Created MTV channel state: channel={}, type={}, entity={}", runtimeBinding.channelId(), runtimeBinding.type(), player.getUuid());
+            return loaded;
         });
     }
 

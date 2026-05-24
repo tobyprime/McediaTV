@@ -25,6 +25,7 @@ public final class MtvChannelProtocol {
                 buffer.readLong(),
                 buffer.readLong(),
                 buffer.readLong(),
+                buffer.readUtf(),
                 buffer.readBoolean(),
                 buffer.readLong(),
                 buffer.readBoolean()
@@ -39,6 +40,7 @@ public final class MtvChannelProtocol {
         buffer.writeLong(snapshot.startAt());
         buffer.writeLong(snapshot.baseTime());
         buffer.writeLong(snapshot.baseOffset());
+        buffer.writeUtf(snapshot.state());
         buffer.writeBoolean(snapshot.paused());
         buffer.writeLong(snapshot.resolvedDurationUs());
         buffer.writeBoolean(snapshot.completed());

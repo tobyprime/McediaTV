@@ -169,6 +169,7 @@ public final class MtvChannelNetworkService implements PluginMessageListener, Li
                 Math.max(0L, heartbeat.durationUs() / 1000L),
                 System.currentTimeMillis()
         );
+        maybeStartLoadedChannel(heartbeat.channelId());
         if (observedState == AudienceObservedState.ENDED) {
             maybePauseCompletedChannel(heartbeat.channelId());
         }
@@ -192,11 +193,12 @@ public final class MtvChannelNetworkService implements PluginMessageListener, Li
                 report.sessionId(),
                 report.channelId(),
                 report.revision(),
-                AudienceObservedState.PLAYING,
+                AudienceObservedState.LOADING,
                 report.loadedMediaId(),
                 Math.max(0L, report.durationUs() / 1000L),
                 System.currentTimeMillis()
         );
+        maybeStartLoadedChannel(report.channelId());
         publishSnapshot(report.channelId());
     }
 
@@ -220,6 +222,21 @@ public final class MtvChannelNetworkService implements PluginMessageListener, Li
     private boolean isCompleted(String channelId) {
         var state = channelService.getChannelState(channelId);
         return state != null && channelService.getAudienceSessionManager().isCompleted(channelId, state.getRevision());
+    }
+
+    private void maybeStartLoadedChannel(String channelId) {
+        var state = channelService.getChannelState(channelId);
+        if (state == null || state.getPlayState().getState() != ChannelPlaybackStatus.LOADING) {
+            return;
+        }
+        if (!channelService.getAudienceSessionManager().isMajorityLoaded(channelId, state.getRevision())) {
+            return;
+        }
+        ChannelTimelineCalculator.play(state.getPlayState(), System.currentTimeMillis());
+        state.touch();
+        channelService.persistState(state);
+        channelService.onChannelChanged(channelId);
+        LOGGER.info("Started MTV channel after majority loaded current revision: channel={}, revision={}", channelId, state.getRevision());
     }
 
     private void maybePauseCompletedChannel(String channelId) {

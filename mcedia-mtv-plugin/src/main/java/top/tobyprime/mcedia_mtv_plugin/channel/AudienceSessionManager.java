@@ -80,6 +80,24 @@ public final class AudienceSessionManager {
         return matched > 0 && completed * 2 > matched;
     }
 
+    public boolean isMajorityLoaded(String channelId, long revision) {
+        var sessions = getSessions(channelId);
+        if (sessions.isEmpty()) {
+            return false;
+        }
+        int total = sessions.size();
+        int loaded = 0;
+        for (var session : sessions) {
+            if (session.getLastRevision() != revision) {
+                continue;
+            }
+            if (!session.getLoadedMediaId().isBlank() && session.getDurationMs() > 0L) {
+                loaded++;
+            }
+        }
+        return loaded > 0 && loaded * 2 > total;
+    }
+
     public void unregisterClient(UUID playerUuid) {
         var sessionId = playerSessions.remove(playerUuid);
         playerSubscriptions.remove(playerUuid);

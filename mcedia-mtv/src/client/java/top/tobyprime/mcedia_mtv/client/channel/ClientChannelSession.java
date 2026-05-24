@@ -172,8 +172,9 @@ public final class ClientChannelSession {
         }
         long resolvedDurationUs = media.getDuration();
         boolean completed = resolvedDurationUs > 0 && localPositionUs >= resolvedDurationUs;
-        LOGGER.info("Report MTV playback state: player={}, channel={}, revision={}, localPositionUs={}, resolvedDurationUs={}, paused={}, completed={}",
-                mc.player.getUUID(), snapshot.channelId(), snapshot.revision(), localPositionUs, resolvedDurationUs, singlePlayer.isPaused(), completed);
+        String observedState = completed ? "ENDED" : ("LOADING".equals(snapshot.state()) ? "LOADING" : (singlePlayer.isPaused() ? "PAUSED" : "PLAYING"));
+        LOGGER.info("Report MTV playback state: player={}, channel={}, revision={}, localPositionUs={}, resolvedDurationUs={}, state={}, paused={}, completed={}",
+                mc.player.getUUID(), snapshot.channelId(), snapshot.revision(), localPositionUs, resolvedDurationUs, observedState, singlePlayer.isPaused(), completed);
         var sessionId = MtvClientNetworkInitializer.getSessionId();
         if (sessionId == null) {
             return;
@@ -182,7 +183,7 @@ public final class ClientChannelSession {
                 snapshot.channelId(),
                 sessionId,
                 snapshot.revision(),
-                completed ? "ENDED" : (singlePlayer.isPaused() ? "PAUSED" : "PLAYING"),
+                observedState,
                 localPositionUs,
                 (float) snapshot.speed(),
                 snapshot.channelId() + ":" + snapshot.revision(),

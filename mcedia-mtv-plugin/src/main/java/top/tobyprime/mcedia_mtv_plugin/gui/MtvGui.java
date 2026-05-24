@@ -9,6 +9,7 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.java.JavaPlugin;
+import top.tobyprime.mcedia_mtv_plugin.channel.ChannelRuntimeState;
 import top.tobyprime.mcedia_mtv_plugin.controller.MtvPeripheralController;
 import top.tobyprime.mcedia_mtv_plugin.controller.MtvPlaybackController;
 import top.tobyprime.mcedia_mtv_plugin.manager.MtvPlayerManager;
@@ -27,7 +28,8 @@ public class MtvGui {
         SCREEN_SETTINGS,
         SPEAKER_SETTINGS,
         ADD_PERIPHERAL,
-        WORLD_TRANSFORM
+        WORLD_TRANSFORM,
+        CHANNEL_MENU
     }
 
     public static class MtvHolder implements InventoryHolder {
@@ -58,6 +60,8 @@ public class MtvGui {
         public Map<String, String> getTemp() { return temp; }
     }
 
+    public static final int[] CHANNEL_PLAYLIST_SLOTS = {28, 29, 30, 31, 32, 33, 34, 37, 38, 39, 40, 41, 42, 43};
+
     private final JavaPlugin plugin;
     private final MtvPlayerManager manager;
     private final MtvPeripheralController controller;
@@ -82,6 +86,7 @@ public class MtvGui {
         inv.setItem(12, item(Material.ITEM_FRAME, "外设列表", "屏幕 / 扬声器"));
         inv.setItem(13, item(Material.COMPASS, "位置与朝向", "移动 / 旋转实体"));
         inv.setItem(15, item(Material.ENDER_PEARL, "传送到实体"));
+        inv.setItem(41, item(Material.JUKEBOX, "频道编辑", "打开 channel 播放与列表页"));
         inv.setItem(40, item(Material.MUSIC_DISC_CAT, "设置播放链接", snapshot.getMediaUrl().isBlank() ? "未设置" : snapshot.getMediaUrl(), "输入 URL 或 BV 号"));
         inv.setItem(47, item(Material.STRUCTURE_VOID, "从头播放"));
         inv.setItem(48, item(Material.STONE_BUTTON, "后退 1 秒", "潜行点击后退 10 秒"));
@@ -103,6 +108,43 @@ public class MtvGui {
         long seconds = totalSec % 60;
         if (hours > 0) return String.format("%d:%02d:%02d", hours, minutes, seconds);
         return String.format("%d:%02d", minutes, seconds);
+    }
+
+    public void openChannelMenu(Player player, ManagedMtvPlayer snapshot) {
+        ChannelRuntimeState state = manager.getChannelService().previewState(snapshot);
+        var binding = manager.getChannelService().resolveBinding(snapshot);
+        var inv = Bukkit.createInventory(new MtvHolder(GuiType.CHANNEL_MENU, snapshot.getUuid(), null), 54, Component.text("频道 - " + snapshot.getName()));
+        inv.setItem(4, item(Material.NAME_TAG, "频道: " + binding.channelId(), "模式: " + formatPlayOrderMode(state), "当前: " + currentPlaylistLabel(state)));
+        inv.setItem(10, item(Material.CLOCK, "速度: " + snapshot.getSpeed() + "x", "左键 -0.25 / 右键 +0.25"));
+        inv.setItem(11, item(Material.MUSIC_DISC_CAT, "设置当前媒体", snapshot.getMediaUrl().isBlank() ? "未设置" : summarize(snapshot.getMediaUrl()), "会替换整个播放列表"));
+        inv.setItem(12, item(Material.COMPARATOR, "播放顺序", formatPlayOrderMode(state), "点击切换"));
+        inv.setItem(13, item(Material.STONE_BUTTON, "上一首", "始终按列表顺序"));
+        var pauseIcon = snapshot.isPaused() ? Material.YELLOW_WOOL : Material.RED_WOOL;
+        var pauseName = snapshot.isPaused() ? "▶ 播放" : "⏸ 暂停";
+        inv.setItem(14, item(pauseIcon, pauseName));
+        inv.setItem(15, item(Material.STONE_BUTTON, "下一首", "始终按列表顺序"));
+        inv.setItem(16, item(Material.COMPASS, "设置到位置: " + formatDurationUs(snapshot.getStartAt()), "点击输入微秒值"));
+        inv.setItem(19, item(Material.HOPPER, "首加播放项", "输入 URL 或 BV 号"));
+        inv.setItem(20, item(Material.CHEST, "尾加播放项", "输入 URL 或 BV 号"));
+        inv.setItem(21, item(Material.STRUCTURE_VOID, "从头播放当前项"));
+        inv.setItem(22, item(Material.STONE_BUTTON, "后退 1 秒", "潜行点击后退 10 秒"));
+        inv.setItem(23, item(Material.STONE_BUTTON, "前进 1 秒", "潜行点击前进 10 秒"));
+        inv.setItem(24, item(Material.BOOK, "列表信息", "项目数: " + state.getPlaylist().size(), "当前位置: " + (state.getPlaylist().isEmpty() ? "无" : (state.getPlaylistCursor() + 1))));
+        inv.setItem(47, item(Material.ARROW, "返回实体页"));
+        inv.setItem(49, item(Material.SPYGLASS, "刷新"));
+
+        for (int i = 0; i < CHANNEL_PLAYLIST_SLOTS.length && i < state.getPlaylist().size(); i++) {
+            var entry = state.getPlaylist().get(i);
+            boolean current = i == state.getPlaylistCursor();
+            inv.setItem(CHANNEL_PLAYLIST_SLOTS[i], item(current ? Material.MUSIC_DISC_11 : Material.PAPER,
+                    (current ? "▶ " : "") + "#" + (i + 1) + " " + summarize(entry.mediaUrl()),
+                    "左键播放 / 右键删除",
+                    "Shift左键移到最前 / Shift右键移到最后"));
+        }
+
+        fillBorder54(inv);
+        setState(player, GuiType.CHANNEL_MENU, snapshot.getUuid());
+        player.openInventory(inv);
     }
 
     public void openPeripheralList(Player player, ManagedMtvPlayer snapshot) {
@@ -253,7 +295,7 @@ public class MtvGui {
             }
 
             switch (awaiting) {
-                case "media_url" -> playbackController.updateMediaUrl(state.getEntityUuid(), input,
+                case "media_url", "channel_media_url" -> playbackController.updateMediaUrl(state.getEntityUuid(), input,
                         success -> runOnPlayer(player, () -> {
                             if (!Boolean.TRUE.equals(success)) {
                                 player.sendMessage("设置播放 URL 失败。");
@@ -286,6 +328,22 @@ public class MtvGui {
                             }
                             reopenPage(player, state.getType(), state.getEntityUuid());
                         }));
+                case "channel_prepend" -> playbackController.prependPlaylistItem(state.getEntityUuid(), input,
+                        success -> runOnPlayer(player, () -> {
+                            if (!Boolean.TRUE.equals(success)) {
+                                player.sendMessage("首加播放项失败。");
+                                return;
+                            }
+                            reopenPage(player, state.getType(), state.getEntityUuid());
+                        }));
+                case "channel_append" -> playbackController.appendPlaylistItem(state.getEntityUuid(), input,
+                        success -> runOnPlayer(player, () -> {
+                            if (!Boolean.TRUE.equals(success)) {
+                                player.sendMessage("尾加播放项失败。");
+                                return;
+                            }
+                            reopenPage(player, state.getType(), state.getEntityUuid());
+                        }));
                 default -> {
                 }
             }
@@ -306,6 +364,7 @@ public class MtvGui {
                 switch (type) {
                     case PERIPHERAL_LIST -> openPeripheralList(player, snapshot);
                     case WORLD_TRANSFORM -> openWorldTransform(player, snapshot);
+                    case CHANNEL_MENU -> openChannelMenu(player, snapshot);
                     case SCREEN_SETTINGS -> {
                         if (periphId != null) {
                             openScreenSettings(player, snapshot, periphId);
@@ -338,6 +397,30 @@ public class MtvGui {
 
     private void runOnPlayer(Player player, Runnable task) {
         player.getScheduler().run(plugin, scheduledTask -> task.run(), null);
+    }
+
+    private static String summarize(String mediaUrl) {
+        if (mediaUrl == null || mediaUrl.isBlank()) {
+            return "未设置";
+        }
+        return mediaUrl.length() > 28 ? mediaUrl.substring(0, 25) + "..." : mediaUrl;
+    }
+
+    private static String currentPlaylistLabel(ChannelRuntimeState state) {
+        if (state.getPlaylist().isEmpty()) {
+            return "空列表";
+        }
+        int cursor = state.getNormalizedPlaylistCursor();
+        return "#" + (cursor + 1) + " " + summarize(state.getPlaylist().get(cursor).mediaUrl());
+    }
+
+    private static String formatPlayOrderMode(ChannelRuntimeState state) {
+        return switch (state.getPlayOrderMode()) {
+            case SEQUENTIAL -> "列表播放";
+            case SHUFFLE -> "随机";
+            case LOOP_ALL -> "列表循环";
+            case LOOP_ONE -> "当前媒体循环";
+        };
     }
 
     private static ItemStack item(Material material, String name, String... lore) {

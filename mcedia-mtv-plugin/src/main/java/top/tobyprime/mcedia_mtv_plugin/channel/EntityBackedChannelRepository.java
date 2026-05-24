@@ -164,7 +164,7 @@ final class FileSystemChannelRepository implements ChannelRepository {
 
     private void writeBucket(Path file, Map<String, ChannelRuntimeState> bucket) throws IOException {
         var root = new JsonObject();
-        root.addProperty("schemaVersion", 1);
+        root.addProperty("schemaVersion", 2);
         var channels = new JsonObject();
         for (var entry : bucket.entrySet()) {
             channels.add(entry.getKey(), toJson(entry.getValue()));
@@ -183,6 +183,7 @@ final class FileSystemChannelRepository implements ChannelRepository {
         root.addProperty("revision", state.getRevision());
         root.addProperty("durationMs", state.getDurationMs());
         root.addProperty("playlistCursor", state.getPlaylistCursor());
+        root.addProperty("playOrderMode", state.getPlayOrderMode().name());
 
         var playState = new JsonObject();
         playState.addProperty("mediaUrl", state.getPlayState().getMediaUrl());
@@ -216,6 +217,7 @@ final class FileSystemChannelRepository implements ChannelRepository {
         state.setRevision(getLong(root, "revision", 0L));
         state.setDurationMs(getLong(root, "durationMs", 0L));
         state.setPlaylistCursor((int) getLong(root, "playlistCursor", 0L));
+        state.setPlayOrderMode(parsePlayOrderMode(getString(root, "playOrderMode", ChannelPlayOrderMode.SEQUENTIAL.name())));
 
         var playState = getObject(root, "playState");
         if (playState != null) {
@@ -303,6 +305,14 @@ final class FileSystemChannelRepository implements ChannelRepository {
             return ChannelPlaybackStatus.valueOf(value.toUpperCase(Locale.ROOT));
         } catch (Exception ignored) {
             return ChannelPlaybackStatus.STOPPED;
+        }
+    }
+
+    private static ChannelPlayOrderMode parsePlayOrderMode(String value) {
+        try {
+            return ChannelPlayOrderMode.valueOf(value.toUpperCase(Locale.ROOT));
+        } catch (Exception ignored) {
+            return ChannelPlayOrderMode.SEQUENTIAL;
         }
     }
 }

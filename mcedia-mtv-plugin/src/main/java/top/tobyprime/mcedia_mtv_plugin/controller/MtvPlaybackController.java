@@ -37,6 +37,42 @@ public final class MtvPlaybackController {
         updatePlayback(uuid, channelService::togglePause, done);
     }
 
+    public void playPlaylistIndex(UUID uuid, int index, Consumer<Boolean> done) {
+        updatePlayback(uuid, player -> channelService.playPlaylistIndex(player, index), done);
+    }
+
+    public void playNextManual(UUID uuid, Consumer<Boolean> done) {
+        updatePlayback(uuid, channelService::playNextManual, done);
+    }
+
+    public void playPreviousManual(UUID uuid, Consumer<Boolean> done) {
+        updatePlayback(uuid, channelService::playPreviousManual, done);
+    }
+
+    public void appendPlaylistItem(UUID uuid, String mediaUrl, Consumer<Boolean> done) {
+        updatePlayback(uuid, player -> channelService.appendPlaylistItem(player, mediaUrl), done);
+    }
+
+    public void prependPlaylistItem(UUID uuid, String mediaUrl, Consumer<Boolean> done) {
+        updatePlayback(uuid, player -> channelService.prependPlaylistItem(player, mediaUrl), done);
+    }
+
+    public void removePlaylistItem(UUID uuid, int index, Consumer<Boolean> done) {
+        updatePlayback(uuid, player -> channelService.removePlaylistItem(player, index), done);
+    }
+
+    public void movePlaylistItemToFront(UUID uuid, int index, Consumer<Boolean> done) {
+        updatePlayback(uuid, player -> channelService.movePlaylistItemToFront(player, index), done);
+    }
+
+    public void movePlaylistItemToBack(UUID uuid, int index, Consumer<Boolean> done) {
+        updatePlayback(uuid, player -> channelService.movePlaylistItemToBack(player, index), done);
+    }
+
+    public void cyclePlayOrderMode(UUID uuid, Consumer<Boolean> done) {
+        updatePlayback(uuid, channelService::cyclePlayOrderMode, done);
+    }
+
     private void updatePlayback(UUID uuid,
                                 Function<ManagedMtvPlayer, Boolean> operation,
                                 Consumer<Boolean> done) {

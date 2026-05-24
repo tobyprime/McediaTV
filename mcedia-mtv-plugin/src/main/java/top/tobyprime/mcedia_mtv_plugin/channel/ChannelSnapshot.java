@@ -8,6 +8,7 @@ public record ChannelSnapshot(
         long startAt,
         long baseTime,
         long baseOffset,
+        String state,
         boolean paused,
         long resolvedDurationUs,
         boolean completed
