@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "id": "mcedia_mtv",
+  "version": "${version}",
+  "name": "Mcedia MTV",
+  "description": "Entity-synced media player mod for Mcedia Core",
+  "authors": [],
+  "contact": {},
+  "license": "All-Rights-Reserved",
+  "environment": "client",
+  "entrypoints": {
+    "client": ["top.tobyprime.mcedia_mtv.client.EntityPlayerClientEntryPoint"]
+  },
+  "mixins": ["mcedia_mtv.client.mixins.json"],
+  "depends": {
+    "minecraft": "${minecraft_version}",
+    "mcedia_core": "*"
+  }
+}

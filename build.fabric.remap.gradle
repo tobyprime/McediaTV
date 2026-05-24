@@ -1,0 +1,243 @@
+import groovy.json.JsonSlurper
+import org.gradle.api.GradleException
+import org.gradle.api.file.DuplicatesStrategy
+import org.gradle.api.tasks.Copy
+import org.gradle.api.tasks.Sync
+import org.gradle.api.tasks.bundling.Jar
+
+plugins {
+    id 'maven-publish'
+    id 'net.fabricmc.fabric-loom-remap' version '1.15-SNAPSHOT'
+}
+
+def mcVersion = project.property('minecraft_version').toString()
+def versionSuffix = "-${mcVersion}"
+if (!project.name.endsWith(versionSuffix)) {
+    throw new GradleException('Version project name must end with the Minecraft version')
+}
+def moduleName = project.name.substring(0, project.name.length() - versionSuffix.length())
+def moduleProject = rootProject.findProject(":${moduleName}")
+if (moduleProject == null) {
+    throw new GradleException("Could not find module project :${moduleName}")
+}
+def moduleRoot = moduleProject.projectDir
+def moduleProp = { String key -> moduleProject.property(key).toString() }
+def loaderVersion = project.property('loader_version').toString()
+def fabricApiVersion = project.property('fabric_api_version').toString()
+def targetJavaVersion = Integer.parseInt(project.property('java_version').toString())
+def targetJavaLauncher = javaToolchains.launcherFor {
+    languageVersion = JavaLanguageVersion.of(targetJavaVersion)
+}
+def artifactBaseName = "${moduleProp('archives_base_name')}-mc${mcVersion}"
+def splitClientSources = moduleName == 'mcedia-mtv'
+def coreGav = "top.tobyprime:mcedia_core-mc${mcVersion}:${rootProject.property('mcedia_core_version')}"
+def apiGav = "top.tobyprime:mcedia-api:${rootProject.property('mcedia_base_version')}"
+def playerGav = "top.tobyprime:mcedia-player:${rootProject.property('mcedia_base_version')}"
+def decoderGav = "top.tobyprime:mcedia-decoder-ffmpeg:${rootProject.property('mcedia_base_version')}"
+def licenseFile = rootProject.file('LICENSE')
+
+def generatedMainJavaDir = file("${buildDir}/generated/versionedSrc/${mcVersion}/main/java")
+def generatedMainResourcesDir = file("${buildDir}/generated/versionedSrc/${mcVersion}/main/resources")
+def generatedClientJavaDir = file("${buildDir}/generated/versionedSrc/${mcVersion}/client/java")
+def generatedClientResourcesDir = file("${buildDir}/generated/versionedSrc/${mcVersion}/client/resources")
+
+def syncVersionedMainSources = tasks.register('syncVersionedMainSources', Sync) {
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    into(file("${buildDir}/generated/versionedSrc/${mcVersion}/main"))
+    from(new File(project.projectDir, 'src/main/java')) {
+        into('java')
+    }
+    from(new File(project.projectDir, 'src/main/resources')) {
+        into('resources')
+    }
+    from(new File(moduleRoot, 'src/main/java')) {
+        into('java')
+    }
+    from(new File(moduleRoot, 'src/main/resources')) {
+        into('resources')
+    }
+}
+
+def syncVersionedClientSources = tasks.register('syncVersionedClientSources', Sync) {
+    onlyIf { splitClientSources }
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    into(file("${buildDir}/generated/versionedSrc/${mcVersion}/client"))
+    from(new File(project.projectDir, 'src/client/java')) {
+        into('java')
+    }
+    from(new File(project.projectDir, 'src/client/resources')) {
+        into('resources')
+    }
+    from(new File(moduleRoot, 'src/client/java')) {
+        into('java')
+    }
+    from(new File(moduleRoot, 'src/client/resources')) {
+        into('resources')
+    }
+}
+
+version = moduleProp('mod_version')
+group = moduleProp('maven_group')
+
+base {
+    archivesName = artifactBaseName
+}
+
+loom {
+    splitEnvironmentSourceSets()
+
+    def commonVmArgs = ['-Dmixin.debug.export=true', '-Dmixin.debug.verbose=true', '-Dmixin.env.remapRefMap=true']
+    def clientProgramArgs = ['--width', '1280', '--height', '720']
+    def profileFile = file('../../profile.json')
+    if (profileFile.exists()) {
+        @SuppressWarnings('unchecked')
+        def profile = (Map<String, Object>) new JsonSlurper().parseText(profileFile.readText())
+        def username = profile['username']?.toString()
+        def uuid = profile['uuid']?.toString()
+        def xuid = profile['xuid']?.toString()
+        def accessToken = profile['accessToken']?.toString()
+        clientProgramArgs += [
+            '--username', username,
+            '--uuid', uuid,
+            '--xuid', xuid,
+            '--accessToken', accessToken,
+            '--userType', 'msa',
+            '--versionType', 'release'
+        ]
+    } else {
+        clientProgramArgs += ['--username', 'McediaTest']
+    }
+
+    runs {
+        named('client') {
+            ideConfigGenerated(true)
+            vmArgs(commonVmArgs)
+            programArgs(clientProgramArgs)
+            runDir = "../../../run/${moduleName}/${mcVersion}"
+        }
+    }
+
+
+    mods {
+        "${moduleProp('archives_base_name')}" {
+            sourceSet sourceSets.main
+            sourceSet sourceSets.client
+        }
+    }
+}
+
+sourceSets.main.java.setSrcDirs([generatedMainJavaDir])
+sourceSets.main.resources.setSrcDirs([generatedMainResourcesDir])
+sourceSets.client.java.setSrcDirs([generatedClientJavaDir])
+sourceSets.client.resources.setSrcDirs([generatedClientResourcesDir])
+
+tasks.named('compileJava') {
+    dependsOn(syncVersionedMainSources)
+}
+tasks.named('processResources') {
+    dependsOn(syncVersionedMainSources)
+}
+tasks.named('compileClientJava') {
+    dependsOn(syncVersionedClientSources)
+}
+tasks.named('processClientResources') {
+    dependsOn(syncVersionedClientSources)
+}
+
+tasks.withType(Jar).configureEach {
+    if (name == 'sourcesJar') {
+        dependsOn(syncVersionedMainSources)
+        dependsOn(syncVersionedClientSources)
+    }
+}
+
+tasks.withType(JavaExec).configureEach {
+    javaLauncher.set(targetJavaLauncher)
+}
+
+fabricApi {
+    configureDataGeneration {
+        client = true
+    }
+}
+
+dependencies {
+    minecraft "com.mojang:minecraft:${mcVersion}"
+    mappings loom.officialMojangMappings()
+    modImplementation "net.fabricmc:fabric-loader:${loaderVersion}"
+    modImplementation "net.fabricmc.fabric-api:fabric-api:${fabricApiVersion}"
+
+    switch (moduleName) {
+        case 'mcedia-mtv':
+            modImplementation coreGav
+            implementation apiGav
+            implementation playerGav
+            runtimeOnly decoderGav
+            break
+        default:
+            throw new GradleException("Unsupported Fabric module: ${moduleName}")
+    }
+}
+
+processResources {
+    inputs.property 'version', project.version
+    inputs.property 'minecraft_version', mcVersion
+    inputs.property 'loader_version', loaderVersion
+    filteringCharset 'UTF-8'
+
+    filesMatching('fabric.mod.json') {
+        expand(
+            version: project.version,
+            minecraft_version: mcVersion,
+            loader_version: loaderVersion
+        )
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    if (targetJavaVersion >= 10 || JavaVersion.current().isJava10Compatible()) {
+        options.release.set(targetJavaVersion)
+    }
+}
+
+java {
+    def javaVersion = JavaVersion.toVersion(targetJavaVersion)
+    if (JavaVersion.current() < javaVersion) {
+        toolchain.languageVersion = JavaLanguageVersion.of(targetJavaVersion)
+    }
+    withSourcesJar()
+}
+
+jar {
+    if (licenseFile.exists()) {
+        from(licenseFile) {
+            rename { "${it}_${artifactBaseName}" }
+        }
+    }
+}
+
+tasks.register('buildAndCollect', Copy) {
+    group = 'build'
+    dependsOn('build')
+    from({ tasks.named('remapJar').get().archiveFile.get().asFile })
+    into(rootProject.layout.buildDirectory.dir("libs/${mcVersion}"))
+}
+
+publishing {
+    publications {
+        def mavenJava = findByName('mavenJava')
+        if (mavenJava == null) {
+            mavenJava = create('mavenJava', MavenPublication)
+            mavenJava.from components.java
+        }
+        mavenJava.artifactId = artifactBaseName
+        mavenJava.version = project.version
+    }
+    repositories {
+        mavenLocal()
+        maven {
+            url = uri("${rootDir}/publish")
+        }
+    }
+}

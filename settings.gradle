@@ -1,0 +1,51 @@
+pluginManagement {
+    repositories {
+        mavenCentral()
+        gradlePluginPortal()
+        maven {
+            name = 'Fabric'
+            url = 'https://maven.fabricmc.net/'
+        }
+        maven {
+            name = 'Paper'
+            url = 'https://repo.papermc.io/repository/maven-public/'
+        }
+    }
+}
+
+rootProject.name = 'McediaTV'
+
+def versionedModules = [
+    'mcedia-mtv'
+]
+def versions = providers.gradleProperty('supported_mc_versions')
+    .orElse('1.21.11')
+    .get()
+    .split(',')
+    .collect { it.trim() }
+    .findAll { !it.isEmpty() }
+
+def parseMcVersionToNumber = { String mcVersion ->
+    def cleanVersion = mcVersion.split('-')[0].replaceAll(/[^0-9.]/, '')
+    def versionParts = cleanVersion.split(/\./).findAll { !it.isEmpty() }
+    def major = versionParts.size() > 0 ? versionParts[0].toInteger() : 0
+    def minor = versionParts.size() > 1 ? versionParts[1].toInteger() : 0
+    def patch = versionParts.size() > 2 ? versionParts[2].toInteger() : 0
+    major * 10000 + minor * 100 + patch
+}
+
+include 'mcedia-mtv-plugin'
+
+versionedModules.each { moduleName ->
+    include moduleName
+    project(":${moduleName}").projectDir = file(moduleName)
+
+    versions.each { mcVersion ->
+        def versionedProjectName = "${moduleName}-${mcVersion}"
+        include versionedProjectName
+        project(":${versionedProjectName}").projectDir = file("${moduleName}/versions/${mcVersion}")
+        project(":${versionedProjectName}").buildFileName = parseMcVersionToNumber(mcVersion) > 260000
+            ? '../../../build.fabric.gradle'
+            : '../../../build.fabric.remap.gradle'
+    }
+}
