@@ -98,6 +98,17 @@ public final class AudienceSessionManager {
         return loaded > 0 && loaded * 2 > total;
     }
 
+    public int countAudience(String channelId) {
+        int sessions = getSessions(channelId).size();
+        int subscribed = 0;
+        for (var entry : playerSubscriptions.entrySet()) {
+            if (entry.getValue().contains(channelId) && playerSessions.containsKey(entry.getKey())) {
+                subscribed++;
+            }
+        }
+        return Math.max(sessions, subscribed);
+    }
+
     public void unregisterClient(UUID playerUuid) {
         var sessionId = playerSessions.remove(playerUuid);
         playerSubscriptions.remove(playerUuid);

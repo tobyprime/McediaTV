@@ -6,7 +6,10 @@ import top.tobyprime.mcedia_mtv_plugin.manager.MtvPlayerManager;
 import top.tobyprime.mcedia_mtv_plugin.model.ManagedMtvPlayer;
 import top.tobyprime.mcedia_mtv_plugin.util.MediaUrlNormalizer;
 
+import org.bukkit.entity.Player;
+
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -222,6 +225,133 @@ public final class MtvChannelService {
             state.setPlayOrderMode(state.getPlayOrderMode().next());
             return true;
         });
+    }
+
+    public ChannelRuntimeState createPublicChannel(Player player, String channelName, String description) {
+        if (player == null) {
+            return null;
+        }
+        String normalizedName = channelName == null ? "" : channelName.trim();
+        if (normalizedName.isBlank()) {
+            return null;
+        }
+        String channelId = "public:" + UUID.randomUUID();
+        var state = new ChannelRuntimeState(channelId, MtvChannelType.BROADCAST);
+        state.setCreatorName(player.getName());
+        state.setCreatorUuid(player.getUniqueId().toString());
+        state.setChannelName(normalizedName);
+        state.setDescription(description == null ? "" : description.trim());
+        state.setDiscoverable(true);
+        state.setCreatedAtMs(System.currentTimeMillis());
+        persistState(state);
+        channelStates.put(channelId, state);
+        return state;
+    }
+
+    public List<ChannelRuntimeState> searchPublicChannels(String query, UUID creatorUuid, boolean ownOnly) {
+        String normalized = query == null ? "" : query.trim().toLowerCase();
+        return channelStates.values().stream()
+                .filter(ChannelRuntimeState::isPublicChannel)
+                .filter(state -> !ownOnly || (creatorUuid != null && creatorUuid.toString().equals(state.getCreatorUuid())))
+                .filter(state -> normalized.isBlank()
+                        || state.getChannelName().toLowerCase().contains(normalized)
+                        || state.getDescription().toLowerCase().contains(normalized)
+                        || state.getCreatorName().toLowerCase().contains(normalized))
+                .sorted(Comparator
+                        .comparing((ChannelRuntimeState state) -> matchRank(state, normalized))
+                        .thenComparing(ChannelRuntimeState::getUpdatedAtMs, Comparator.reverseOrder())
+                        .thenComparing(ChannelRuntimeState::getChannelName, String.CASE_INSENSITIVE_ORDER))
+                .toList();
+    }
+
+    public ChannelRuntimeState getPublicChannel(String channelId) {
+        var state = getChannelState(channelId);
+        if (state == null) {
+            state = repository.load(channelId);
+            if (state != null) {
+                channelStates.put(channelId, state);
+            }
+        }
+        return state != null && state.isPublicChannel() ? state : null;
+    }
+
+    public boolean updatePublicChannelName(Player player, String channelId, String channelName) {
+        return mutatePublicChannel(player, channelId, state -> {
+            String normalized = channelName == null ? "" : channelName.trim();
+            if (normalized.isBlank() || normalized.equals(state.getChannelName())) {
+                return false;
+            }
+            state.setChannelName(normalized);
+            return true;
+        });
+    }
+
+    public boolean updatePublicChannelDescription(Player player, String channelId, String description) {
+        return mutatePublicChannel(player, channelId, state -> {
+            String normalized = description == null ? "" : description.trim();
+            if (normalized.equals(state.getDescription())) {
+                return false;
+            }
+            state.setDescription(normalized);
+            return true;
+        });
+    }
+
+    public boolean deletePublicChannel(Player player, String channelId) {
+        var state = getPublicChannel(channelId);
+        if (state == null || !canManagePublicChannel(player, state) || manager.countPlayersByChannelId(channelId) > 0) {
+            return false;
+        }
+        channelStates.remove(channelId);
+        repository.delete(channelId);
+        removeListener.accept(channelId);
+        audienceSessionManager.invalidateChannel(channelId);
+        return true;
+    }
+
+    public boolean canManagePublicChannel(Player player, ChannelRuntimeState state) {
+        if (state == null || !state.isPublicChannel()) {
+            return true;
+        }
+        if (player == null) {
+            return false;
+        }
+        return player.hasPermission("mcedia.mtv.channel.manage.others")
+                || player.isOp()
+                || player.getUniqueId().toString().equals(state.getCreatorUuid());
+    }
+
+    public int getAudienceCount(String channelId) {
+        return audienceSessionManager.countAudience(channelId);
+    }
+
+    private boolean mutatePublicChannel(Player player, String channelId, Function<ChannelRuntimeState, Boolean> mutation) {
+        var state = getPublicChannel(channelId);
+        if (state == null || !canManagePublicChannel(player, state)) {
+            return false;
+        }
+        boolean changed = Boolean.TRUE.equals(mutation.apply(state));
+        if (!changed) {
+            return false;
+        }
+        state.touch();
+        persistState(state);
+        onChannelChanged(channelId);
+        return true;
+    }
+
+    private int matchRank(ChannelRuntimeState state, String normalizedQuery) {
+        if (normalizedQuery.isBlank()) {
+            return 2;
+        }
+        String name = state.getChannelName().toLowerCase();
+        if (name.equals(normalizedQuery)) {
+            return 0;
+        }
+        if (name.contains(normalizedQuery)) {
+            return 1;
+        }
+        return 2;
     }
 
     private boolean selectPlaylistIndex(ChannelRuntimeState state, int index, long nowMs) {

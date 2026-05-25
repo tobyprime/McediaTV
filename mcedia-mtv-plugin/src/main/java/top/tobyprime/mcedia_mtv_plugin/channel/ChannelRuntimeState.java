@@ -12,6 +12,12 @@ public final class ChannelRuntimeState {
     private long durationMs;
     private int playlistCursor;
     private ChannelPlayOrderMode playOrderMode = ChannelPlayOrderMode.SEQUENTIAL;
+    private String creatorName = "";
+    private String creatorUuid = "";
+    private String channelName = "";
+    private String description = "";
+    private boolean discoverable;
+    private long createdAtMs = System.currentTimeMillis();
     private long updatedAtMs = System.currentTimeMillis();
 
     public ChannelRuntimeState(String channelId, MtvChannelType channelType) {
@@ -80,6 +86,54 @@ public final class ChannelRuntimeState {
         return playlistCursor;
     }
 
+    public String getCreatorName() {
+        return creatorName;
+    }
+
+    public void setCreatorName(String creatorName) {
+        this.creatorName = creatorName == null ? "" : creatorName;
+    }
+
+    public String getCreatorUuid() {
+        return creatorUuid;
+    }
+
+    public void setCreatorUuid(String creatorUuid) {
+        this.creatorUuid = creatorUuid == null ? "" : creatorUuid;
+    }
+
+    public String getChannelName() {
+        return channelName;
+    }
+
+    public void setChannelName(String channelName) {
+        this.channelName = channelName == null ? "" : channelName;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public void setDescription(String description) {
+        this.description = description == null ? "" : description;
+    }
+
+    public boolean isDiscoverable() {
+        return discoverable;
+    }
+
+    public void setDiscoverable(boolean discoverable) {
+        this.discoverable = discoverable;
+    }
+
+    public long getCreatedAtMs() {
+        return createdAtMs;
+    }
+
+    public void setCreatedAtMs(long createdAtMs) {
+        this.createdAtMs = Math.max(0L, createdAtMs);
+    }
+
     public long getUpdatedAtMs() {
         return updatedAtMs;
     }
@@ -113,5 +167,9 @@ public final class ChannelRuntimeState {
 
     public boolean isPaused() {
         return playState.getState() != ChannelPlaybackStatus.PLAYING;
+    }
+
+    public boolean isPublicChannel() {
+        return channelType == MtvChannelType.BROADCAST && discoverable;
     }
 }

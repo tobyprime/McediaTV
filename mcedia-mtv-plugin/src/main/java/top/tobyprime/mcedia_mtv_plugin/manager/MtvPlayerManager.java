@@ -665,6 +665,39 @@ public class MtvPlayerManager {
         return null;
     }
 
+    public int countPlayersByChannelId(String channelId) {
+        if (channelId == null || channelId.isBlank()) {
+            return 0;
+        }
+        int count = 0;
+        for (var world : Bukkit.getWorlds()) {
+            for (var entity : world.getEntitiesByClass(ItemDisplay.class)) {
+                if (!isManagedItemDisplay(entity)) {
+                    continue;
+                }
+                var player = readFromEntity(entity);
+                var binding = channelService.resolveBinding(player);
+                if (channelId.equals(binding.channelId())) {
+                    count++;
+                }
+            }
+        }
+        return count;
+    }
+
+    public void updateChannelBinding(UUID uuid, MtvChannelBinding binding, Consumer<Boolean> done) {
+        withDisplay(uuid, display -> {
+            var player = readFromEntity(display);
+            player.setChannelBinding(binding);
+            if (binding.isBroadcast() && channelService.getPublicChannel(binding.channelId()) == null) {
+                return Boolean.FALSE;
+            }
+            channelService.syncSnapshot(player);
+            applyEntityState(display, player);
+            return Boolean.TRUE;
+        }, result -> done.accept(Boolean.TRUE.equals(result)));
+    }
+
     public void withDisplaySnapshot(UUID uuid, Function<ItemDisplay, Boolean> action, Consumer<Boolean> done) {
         withDisplay(uuid, action, done);
     }

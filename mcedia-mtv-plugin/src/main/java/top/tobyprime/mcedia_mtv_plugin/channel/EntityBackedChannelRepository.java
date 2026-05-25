@@ -164,7 +164,7 @@ final class FileSystemChannelRepository implements ChannelRepository {
 
     private void writeBucket(Path file, Map<String, ChannelRuntimeState> bucket) throws IOException {
         var root = new JsonObject();
-        root.addProperty("schemaVersion", 2);
+        root.addProperty("schemaVersion", 3);
         var channels = new JsonObject();
         for (var entry : bucket.entrySet()) {
             channels.add(entry.getKey(), toJson(entry.getValue()));
@@ -184,6 +184,12 @@ final class FileSystemChannelRepository implements ChannelRepository {
         root.addProperty("durationMs", state.getDurationMs());
         root.addProperty("playlistCursor", state.getPlaylistCursor());
         root.addProperty("playOrderMode", state.getPlayOrderMode().name());
+        root.addProperty("creatorName", state.getCreatorName());
+        root.addProperty("creatorUuid", state.getCreatorUuid());
+        root.addProperty("channelName", state.getChannelName());
+        root.addProperty("description", state.getDescription());
+        root.addProperty("discoverable", state.isDiscoverable());
+        root.addProperty("createdAtMs", state.getCreatedAtMs());
 
         var playState = new JsonObject();
         playState.addProperty("mediaUrl", state.getPlayState().getMediaUrl());
@@ -218,6 +224,12 @@ final class FileSystemChannelRepository implements ChannelRepository {
         state.setDurationMs(getLong(root, "durationMs", 0L));
         state.setPlaylistCursor((int) getLong(root, "playlistCursor", 0L));
         state.setPlayOrderMode(parsePlayOrderMode(getString(root, "playOrderMode", ChannelPlayOrderMode.SEQUENTIAL.name())));
+        state.setCreatorName(getString(root, "creatorName", ""));
+        state.setCreatorUuid(getString(root, "creatorUuid", ""));
+        state.setChannelName(getString(root, "channelName", ""));
+        state.setDescription(getString(root, "description", ""));
+        state.setDiscoverable(getBoolean(root, "discoverable", false));
+        state.setCreatedAtMs(getLong(root, "createdAtMs", System.currentTimeMillis()));
 
         var playState = getObject(root, "playState");
         if (playState != null) {
@@ -290,6 +302,14 @@ final class FileSystemChannelRepository implements ChannelRepository {
         }
         var element = root.get(key);
         return element.isJsonPrimitive() ? element.getAsDouble() : fallback;
+    }
+
+    private static boolean getBoolean(JsonObject root, String key, boolean fallback) {
+        if (root == null || !root.has(key) || root.get(key).isJsonNull()) {
+            return fallback;
+        }
+        var element = root.get(key);
+        return element.isJsonPrimitive() ? element.getAsBoolean() : fallback;
     }
 
     private static MtvChannelType parseChannelType(String value, MtvChannelType fallback) {

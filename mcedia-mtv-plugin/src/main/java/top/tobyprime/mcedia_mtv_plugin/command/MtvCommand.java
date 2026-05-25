@@ -27,6 +27,9 @@ import static com.mojang.brigadier.Command.SINGLE_SUCCESS;
 
 public class MtvCommand implements CommandExecutor, TabCompleter {
     private static final double RANGE = 50.0;
+    private static final String EDIT_SUBCOMMAND = "edit";
+    private static final String PLAYER_SCOPE = "player";
+    private static final String CHANNEL_SCOPE = "channel";
 
     private final MtvPeripheralController controller;
     private final MtvPlaybackController playbackController;
@@ -49,10 +52,8 @@ public class MtvCommand implements CommandExecutor, TabCompleter {
                         .executes(ctx -> executeBrigadier(ctx.getSource(), "edit"))
                         .then(Commands.argument("name", StringArgumentType.greedyString())
                                 .executes(ctx -> executeBrigadier(ctx.getSource(), "edit", ctx.getArgument("name", String.class)))))
-                .then(Commands.literal("channel")
-                        .executes(ctx -> executeBrigadier(ctx.getSource(), "channel"))
-                        .then(Commands.argument("name", StringArgumentType.greedyString())
-                                .executes(ctx -> executeBrigadier(ctx.getSource(), "channel", ctx.getArgument("name", String.class)))))
+                .then(buildScopedEditNode(PLAYER_SCOPE))
+                .then(buildChannelNode())
                 .then(Commands.literal("remove")
                         .executes(ctx -> executeBrigadier(ctx.getSource(), "remove"))
                         .then(Commands.argument("name", StringArgumentType.greedyString())
@@ -114,6 +115,7 @@ public class MtvCommand implements CommandExecutor, TabCompleter {
         return switch (args[0].toLowerCase()) {
             case "create" -> handleCreate(sender, args);
             case "edit" -> handleEdit(sender, args);
+            case "player" -> handlePlayer(sender, args);
             case "channel" -> handleChannel(sender, args);
             case "remove" -> handleRemove(sender, args);
             case "list" -> handleList(sender);
@@ -169,18 +171,76 @@ public class MtvCommand implements CommandExecutor, TabCompleter {
     }
 
     private boolean handleEdit(CommandSender sender, String[] args) {
-        return handleChannel(sender, args);
+        return openPlayerEditor(sender, args.length >= 2 ? joinArgs(args, 1) : null);
+    }
+
+    private boolean handlePlayer(CommandSender sender, String[] args) {
+        return handleScopedEdit(sender, args, PLAYER_SCOPE, player -> gui.openPlayerMenu((Player) sender, player));
     }
 
     private boolean handleChannel(CommandSender sender, String[] args) {
+        if (args.length < 2) {
+            sender.sendMessage("用法: /mtv channel <edit|list|create> ...");
+            return true;
+        }
+        return switch (args[1].toLowerCase()) {
+            case EDIT_SUBCOMMAND -> openChannelEditor(sender, args.length >= 3 ? joinArgs(args, 2) : null);
+            case "list" -> openChannelList(sender);
+            case "create" -> openChannelCreate(sender);
+            default -> {
+                sender.sendMessage("用法: /mtv channel <edit|list|create> ...");
+                yield true;
+            }
+        };
+    }
+
+    private boolean openPlayerEditor(CommandSender sender, String nameFilter) {
+        return openEditor(sender, nameFilter, player -> gui.openPlayerMenu((Player) sender, player));
+    }
+
+    private boolean openChannelEditor(CommandSender sender, String nameFilter) {
+        return openEditor(sender, nameFilter, player -> gui.openChannelMenu((Player) sender, player));
+    }
+
+    private boolean handleScopedEdit(CommandSender sender, String[] args, String scope, Consumer<ManagedMtvPlayer> opener) {
+        if (args.length >= 2 && EDIT_SUBCOMMAND.equalsIgnoreCase(args[1])) {
+            return openEditor(sender, args.length >= 3 ? joinArgs(args, 2) : null, opener);
+        }
+        sender.sendMessage("用法: /mtv " + scope + " edit [名称]");
+        return true;
+    }
+
+    private boolean openChannelList(CommandSender sender) {
+        if (!(sender instanceof Player player)) {
+            sender.sendMessage("只能由玩家执行该命令。");
+            return true;
+        }
+        gui.openPublicChannelList(player, null, "", 0, false);
+        return true;
+    }
+
+    private boolean openChannelCreate(CommandSender sender) {
+        if (!(sender instanceof Player player)) {
+            sender.sendMessage("只能由玩家执行该命令。");
+            return true;
+        }
+        if (!player.hasPermission("mcedia.mtv.channel.create")) {
+            player.sendMessage("你没有权限创建公共频道。");
+            return true;
+        }
+        gui.openPublicChannelCreate(player, null, "", "", "", 0, false);
+        return true;
+    }
+
+    private boolean openEditor(CommandSender sender, String nameFilter, Consumer<ManagedMtvPlayer> opener) {
         if (!(sender instanceof Player player)) {
             sender.sendMessage("只能由玩家执行该命令。");
             return true;
         }
         if (!MtvPeripheralController.checkPerm(player, "mcedia.mtv.edit")) return true;
-        resolveOne(player, args.length >= 2 ? args[1] : null, target -> {
+        resolveOne(player, nameFilter, target -> {
             if (target != null) {
-                gui.openChannelMenu(player, target);
+                opener.accept(target);
             }
         });
         return true;
@@ -695,8 +755,11 @@ public class MtvCommand implements CommandExecutor, TabCompleter {
 
     private boolean showHelp(CommandSender sender) {
         sender.sendMessage("/mtv create — 创建 MTV");
-        sender.sendMessage("/mtv edit [名称] — 打开最近（或指定名称）的频道编辑页");
-        sender.sendMessage("/mtv channel [名称] — 打开最近（或指定名称）的频道编辑页");
+        sender.sendMessage("/mtv edit [名称] — 打开最近（或指定名称）的播放器编辑页");
+        sender.sendMessage("/mtv player edit [名称] — 打开最近（或指定名称）的播放器编辑页");
+        sender.sendMessage("/mtv channel edit [名称] — 打开最近（或指定名称）的频道编辑页");
+        sender.sendMessage("/mtv channel list — 打开公共频道目录");
+        sender.sendMessage("/mtv channel create — 创建公共频道");
         sender.sendMessage("/mtv remove <名称> [--confirm] — 删除 MTV");
         sender.sendMessage("/mtv url <地址> [名称] — 设置 URL");
         sender.sendMessage("/mtv speed <倍速> [名称] — 设置播放速度");
@@ -907,6 +970,26 @@ public class MtvCommand implements CommandExecutor, TabCompleter {
     private int executeBrigadier(CommandSourceStack source, String... args) {
         dispatch(source.getSender(), args);
         return SINGLE_SUCCESS;
+    }
+
+    private LiteralArgumentBuilder<CommandSourceStack> buildScopedEditNode(String scope) {
+        return Commands.literal(scope)
+                .then(Commands.literal(EDIT_SUBCOMMAND)
+                        .executes(ctx -> executeBrigadier(ctx.getSource(), scope, EDIT_SUBCOMMAND))
+                        .then(Commands.argument("name", StringArgumentType.greedyString())
+                                .executes(ctx -> executeBrigadier(ctx.getSource(), scope, EDIT_SUBCOMMAND, ctx.getArgument("name", String.class)))));
+    }
+
+    private LiteralArgumentBuilder<CommandSourceStack> buildChannelNode() {
+        return Commands.literal(CHANNEL_SCOPE)
+                .then(Commands.literal(EDIT_SUBCOMMAND)
+                        .executes(ctx -> executeBrigadier(ctx.getSource(), CHANNEL_SCOPE, EDIT_SUBCOMMAND))
+                        .then(Commands.argument("name", StringArgumentType.greedyString())
+                                .executes(ctx -> executeBrigadier(ctx.getSource(), CHANNEL_SCOPE, EDIT_SUBCOMMAND, ctx.getArgument("name", String.class)))))
+                .then(Commands.literal("list")
+                        .executes(ctx -> executeBrigadier(ctx.getSource(), CHANNEL_SCOPE, "list")))
+                .then(Commands.literal("create")
+                        .executes(ctx -> executeBrigadier(ctx.getSource(), CHANNEL_SCOPE, "create")));
     }
 
     private LiteralArgumentBuilder<CommandSourceStack> buildSizeNode() {
@@ -1189,7 +1272,7 @@ public class MtvCommand implements CommandExecutor, TabCompleter {
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
-            return List.of("create", "edit", "remove", "url", "speed", "size", "offset",
+            return List.of("create", "edit", "player", "channel", "remove", "url", "speed", "size", "offset",
                             "fill", "brightness", "danmaku", "volume", "range", "start", "name", "rotate", "soffset",
                             "snap", "tp", "movehere", "list", "gui").stream()
                     .filter(it -> it.startsWith(args[0].toLowerCase()))
@@ -1197,6 +1280,16 @@ public class MtvCommand implements CommandExecutor, TabCompleter {
         }
         if (args[0].equalsIgnoreCase("snap") && args.length == 2) {
             return List.of("screen", "speaker", "entity").stream()
+                    .filter(it -> it.startsWith(args[1].toLowerCase()))
+                    .toList();
+        }
+        if (args[0].equalsIgnoreCase(PLAYER_SCOPE) && args.length == 2) {
+            return List.of(EDIT_SUBCOMMAND).stream()
+                    .filter(it -> it.startsWith(args[1].toLowerCase()))
+                    .toList();
+        }
+        if (args[0].equalsIgnoreCase(CHANNEL_SCOPE) && args.length == 2) {
+            return List.of(EDIT_SUBCOMMAND, "list", "create").stream()
                     .filter(it -> it.startsWith(args[1].toLowerCase()))
                     .toList();
         }

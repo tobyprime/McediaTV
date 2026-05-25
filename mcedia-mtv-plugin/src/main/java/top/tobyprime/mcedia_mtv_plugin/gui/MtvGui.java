@@ -29,7 +29,10 @@ public class MtvGui {
         SPEAKER_SETTINGS,
         ADD_PERIPHERAL,
         WORLD_TRANSFORM,
-        CHANNEL_MENU
+        CHANNEL_MENU,
+        PUBLIC_CHANNEL_LIST,
+        PUBLIC_CHANNEL_CREATE,
+        PUBLIC_CHANNEL_MANAGE
     }
 
     public static class MtvHolder implements InventoryHolder {
@@ -61,6 +64,7 @@ public class MtvGui {
     }
 
     public static final int[] CHANNEL_PLAYLIST_SLOTS = {28, 29, 30, 31, 32, 33, 34, 37, 38, 39, 40, 41, 42, 43};
+    public static final int[] PUBLIC_CHANNEL_SLOTS = {10, 11, 12, 13, 14, 15, 16, 19, 20, 21, 22, 23, 24, 25, 28, 29, 30, 31, 32, 33, 34};
 
     private final JavaPlugin plugin;
     private final MtvPlayerManager manager;
@@ -87,6 +91,8 @@ public class MtvGui {
         inv.setItem(13, item(Material.COMPASS, "位置与朝向", "移动 / 旋转实体"));
         inv.setItem(15, item(Material.ENDER_PEARL, "传送到实体"));
         inv.setItem(41, item(Material.JUKEBOX, "频道编辑", "打开 channel 播放与列表页"));
+        inv.setItem(42, item(Material.BOOK, "公共频道", "搜索并绑定公共频道"));
+        inv.setItem(43, item(Material.STRUCTURE_VOID, "切回私有频道", "恢复 self 频道绑定"));
         inv.setItem(40, item(Material.MUSIC_DISC_CAT, "设置播放链接", snapshot.getMediaUrl().isBlank() ? "未设置" : snapshot.getMediaUrl(), "输入 URL 或 BV 号"));
         inv.setItem(47, item(Material.STRUCTURE_VOID, "从头播放"));
         inv.setItem(48, item(Material.STONE_BUTTON, "后退 1 秒", "潜行点击后退 10 秒"));
@@ -256,8 +262,99 @@ public class MtvGui {
         player.openInventory(inv);
     }
 
+    public void openPublicChannelList(Player player, UUID entityUuid, String query, int page, boolean ownOnly) {
+        var results = manager.getChannelService().searchPublicChannels(query, player.getUniqueId(), ownOnly);
+        int totalPages = Math.max(1, (results.size() + PUBLIC_CHANNEL_SLOTS.length - 1) / PUBLIC_CHANNEL_SLOTS.length);
+        int normalizedPage = Math.max(0, Math.min(page, totalPages - 1));
+        var inv = Bukkit.createInventory(new MtvHolder(GuiType.PUBLIC_CHANNEL_LIST, entityUuid, null), 54, Component.text("公共频道"));
+        inv.setItem(4, item(Material.BOOK, "公共频道目录", "搜索: " + (query == null || query.isBlank() ? "全部" : query), "页码: " + (normalizedPage + 1) + "/" + totalPages, "结果数: " + results.size()));
+        inv.setItem(45, item(Material.ARROW, "上一页"));
+        inv.setItem(46, item(ownOnly ? Material.LIME_DYE : Material.GRAY_DYE, ownOnly ? "只看我的频道" : "查看全部频道"));
+        inv.setItem(47, item(Material.OAK_SIGN, "输入搜索词"));
+        inv.setItem(48, item(Material.BARRIER, "清空搜索"));
+        inv.setItem(49, item(Material.ANVIL, "创建公共频道"));
+        inv.setItem(50, item(Material.ARROW, entityUuid != null ? "返回播放器页" : "返回主菜单"));
+        inv.setItem(53, item(Material.ARROW, "下一页"));
+
+        int start = normalizedPage * PUBLIC_CHANNEL_SLOTS.length;
+        for (int i = 0; i < PUBLIC_CHANNEL_SLOTS.length && start + i < results.size(); i++) {
+            var state = results.get(start + i);
+            inv.setItem(PUBLIC_CHANNEL_SLOTS[i], item(Material.PAPER,
+                    summarizePublicChannelName(state),
+                    "创建者: " + fallback(state.getCreatorName(), "未知"),
+                    "简介: " + fallback(summarize(state.getDescription()), "无"),
+                    "观看中: " + manager.getChannelService().getAudienceCount(state.getChannelId()),
+                    entityUuid != null ? "左键绑定当前播放器 / 右键管理" : "点击管理"));
+        }
+
+        fillBorder54(inv);
+        var temp = new HashMap<String, String>();
+        temp.put("public_query", query == null ? "" : query);
+        temp.put("public_page", Integer.toString(normalizedPage));
+        temp.put("public_own_only", Boolean.toString(ownOnly));
+        setState(player, GuiType.PUBLIC_CHANNEL_LIST, entityUuid, temp);
+        player.openInventory(inv);
+    }
+
+    public void openPublicChannelCreate(Player player, UUID entityUuid, String channelName, String description, String query, int page, boolean ownOnly) {
+        var inv = Bukkit.createInventory(new MtvHolder(GuiType.PUBLIC_CHANNEL_CREATE, entityUuid, null), 27, Component.text("创建公共频道"));
+        inv.setItem(4, item(Material.BOOK, "创建公共频道", "名称: " + fallback(channelName, "未设置"), "介绍: " + fallback(description, "未设置")));
+        inv.setItem(11, item(Material.NAME_TAG, "设置频道名称"));
+        inv.setItem(13, item(Material.WRITABLE_BOOK, "设置频道介绍"));
+        inv.setItem(15, item(Material.EMERALD_BLOCK, "确认创建"));
+        inv.setItem(22, item(Material.ARROW, "返回列表"));
+        fillBorder27(inv);
+        var temp = new HashMap<String, String>();
+        temp.put("public_channel_name", channelName == null ? "" : channelName);
+        temp.put("public_channel_description", description == null ? "" : description);
+        temp.put("public_query", query == null ? "" : query);
+        temp.put("public_page", Integer.toString(page));
+        temp.put("public_own_only", Boolean.toString(ownOnly));
+        setState(player, GuiType.PUBLIC_CHANNEL_CREATE, entityUuid, temp);
+        player.openInventory(inv);
+    }
+
+    public void openPublicChannelManage(Player player, UUID entityUuid, String channelId, String query, int page, boolean ownOnly) {
+        var state = manager.getChannelService().getPublicChannel(channelId);
+        if (state == null) {
+            player.closeInventory();
+            player.sendMessage("该公共频道不存在。");
+            return;
+        }
+        boolean canManage = manager.getChannelService().canManagePublicChannel(player, state);
+        var inv = Bukkit.createInventory(new MtvHolder(GuiType.PUBLIC_CHANNEL_MANAGE, entityUuid, channelId), 54, Component.text("公共频道管理"));
+        inv.setItem(4, item(Material.BOOK, summarizePublicChannelName(state), "创建者: " + fallback(state.getCreatorName(), "未知"), "简介: " + fallback(state.getDescription(), "无")));
+        inv.setItem(10, item(Material.PLAYER_HEAD, "创建者", fallback(state.getCreatorName(), "未知")));
+        inv.setItem(11, item(Material.WRITABLE_BOOK, "频道介绍", fallback(state.getDescription(), "无")));
+        inv.setItem(12, item(Material.ENDER_EYE, "当前观看人数", Integer.toString(manager.getChannelService().getAudienceCount(channelId))));
+        inv.setItem(13, item(Material.NAME_TAG, "频道 ID", channelId));
+        inv.setItem(14, item(Material.JUKEBOX, "频道播放控制", "打开该公共频道的播放控制页"));
+        if (canManage) {
+            inv.setItem(15, item(Material.NAME_TAG, "编辑频道名称"));
+            inv.setItem(16, item(Material.WRITABLE_BOOK, "编辑频道介绍"));
+            inv.setItem(24, item(Material.TNT, "删除公共频道"));
+        } else {
+            inv.setItem(15, item(Material.BARRIER, "只读", "只有创建者或 OP 可以管理该频道"));
+        }
+        inv.setItem(49, item(Material.ARROW, "返回列表"));
+        fillBorder54(inv);
+        var temp = new HashMap<String, String>();
+        temp.put("channel_id", channelId);
+        temp.put("public_query", query == null ? "" : query);
+        temp.put("public_page", Integer.toString(page));
+        temp.put("public_own_only", Boolean.toString(ownOnly));
+        setState(player, GuiType.PUBLIC_CHANNEL_MANAGE, entityUuid, temp);
+        player.openInventory(inv);
+    }
+
     private void setState(Player player, GuiType type, UUID uuid) {
         playerStates.put(player.getUniqueId(), new GuiState(type, uuid));
+    }
+
+    private void setState(Player player, GuiType type, UUID uuid, Map<String, String> temp) {
+        GuiState state = new GuiState(type, uuid);
+        state.getTemp().putAll(temp);
+        playerStates.put(player.getUniqueId(), state);
     }
 
     public GuiState getState(Player player) { return playerStates.get(player.getUniqueId()); }
@@ -271,6 +368,13 @@ public class MtvGui {
         playerStates.put(player.getUniqueId(), state);
     }
 
+    public void setAwaitingInput(Player player, GuiState baseState, String kind) {
+        GuiState state = new GuiState(baseState.getType(), baseState.getEntityUuid());
+        state.getTemp().putAll(baseState.getTemp());
+        state.getTemp().put("awaiting", kind);
+        playerStates.put(player.getUniqueId(), state);
+    }
+
     public boolean handleChatInput(Player player, String message) {
         GuiState state = playerStates.remove(player.getUniqueId());
         if (state == null) return false;
@@ -278,14 +382,55 @@ public class MtvGui {
         if (awaiting == null) return false;
 
         String input = message.trim();
-        if (state.getEntityUuid() == null) {
-            if (!"create_name".equals(awaiting)) return false;
-            if (input.isBlank()) {
-                runOnPlayer(player, () -> player.sendMessage("名称不能为空。"));
+        switch (awaiting) {
+            case "create_name" -> {
+                if (input.isBlank()) {
+                    runOnPlayer(player, () -> player.sendMessage("名称不能为空。"));
+                    return true;
+                }
+                player.performCommand("mtv create " + input);
                 return true;
             }
-            player.performCommand("mtv create " + input);
-            return true;
+            case "public_channel_search" -> {
+                runOnPlayer(player, () -> openPublicChannelList(player, state.getEntityUuid(), input, 0, isPublicOwnOnly(state)));
+                return true;
+            }
+            case "public_channel_name" -> {
+                runOnPlayer(player, () -> openPublicChannelCreate(player, state.getEntityUuid(), input, state.getTemp().getOrDefault("public_channel_description", ""), state.getTemp().getOrDefault("public_query", ""), parsePage(state), isPublicOwnOnly(state)));
+                return true;
+            }
+            case "public_channel_description" -> {
+                runOnPlayer(player, () -> openPublicChannelCreate(player, state.getEntityUuid(), state.getTemp().getOrDefault("public_channel_name", ""), input, state.getTemp().getOrDefault("public_query", ""), parsePage(state), isPublicOwnOnly(state)));
+                return true;
+            }
+            case "public_channel_edit_name" -> {
+                boolean success = manager.getChannelService().updatePublicChannelName(player, state.getTemp().get("channel_id"), input);
+                runOnPlayer(player, () -> {
+                    if (!success) {
+                        player.sendMessage("更新频道名称失败。");
+                        return;
+                    }
+                    openPublicChannelManage(player, state.getEntityUuid(), state.getTemp().get("channel_id"), state.getTemp().getOrDefault("public_query", ""), parsePage(state), isPublicOwnOnly(state));
+                });
+                return true;
+            }
+            case "public_channel_edit_description" -> {
+                boolean success = manager.getChannelService().updatePublicChannelDescription(player, state.getTemp().get("channel_id"), input);
+                runOnPlayer(player, () -> {
+                    if (!success) {
+                        player.sendMessage("更新频道介绍失败。");
+                        return;
+                    }
+                    openPublicChannelManage(player, state.getEntityUuid(), state.getTemp().get("channel_id"), state.getTemp().getOrDefault("public_query", ""), parsePage(state), isPublicOwnOnly(state));
+                });
+                return true;
+            }
+            default -> {
+            }
+        }
+
+        if (state.getEntityUuid() == null) {
+            return false;
         }
 
         manager.readSnapshot(state.getEntityUuid(), snapshot -> {
@@ -365,6 +510,8 @@ public class MtvGui {
                     case PERIPHERAL_LIST -> openPeripheralList(player, snapshot);
                     case WORLD_TRANSFORM -> openWorldTransform(player, snapshot);
                     case CHANNEL_MENU -> openChannelMenu(player, snapshot);
+                    case PUBLIC_CHANNEL_LIST -> openPublicChannelList(player, uuid, getState(player) != null ? getState(player).getTemp().getOrDefault("public_query", "") : "", getState(player) != null ? parsePage(getState(player)) : 0, getState(player) != null && isPublicOwnOnly(getState(player)));
+                    case PUBLIC_CHANNEL_CREATE -> openPublicChannelCreate(player, uuid, "", "", "", 0, false);
                     case SCREEN_SETTINGS -> {
                         if (periphId != null) {
                             openScreenSettings(player, snapshot, periphId);
@@ -397,6 +544,26 @@ public class MtvGui {
 
     private void runOnPlayer(Player player, Runnable task) {
         player.getScheduler().run(plugin, scheduledTask -> task.run(), null);
+    }
+
+    private static int parsePage(GuiState state) {
+        try {
+            return Integer.parseInt(state.getTemp().getOrDefault("public_page", "0"));
+        } catch (NumberFormatException ignored) {
+            return 0;
+        }
+    }
+
+    private static boolean isPublicOwnOnly(GuiState state) {
+        return Boolean.parseBoolean(state.getTemp().getOrDefault("public_own_only", "false"));
+    }
+
+    private static String summarizePublicChannelName(ChannelRuntimeState state) {
+        return summarize(fallback(state.getChannelName(), state.getChannelId()));
+    }
+
+    private static String fallback(String value, String fallback) {
+        return value == null || value.isBlank() ? fallback : value;
     }
 
     private static String summarize(String mediaUrl) {

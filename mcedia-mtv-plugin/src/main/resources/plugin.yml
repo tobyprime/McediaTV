@@ -15,6 +15,8 @@ permissions:
       mcedia.mtv.movehere: true
       mcedia.mtv.gui: true
       mcedia.mtv.list: true
+      mcedia.mtv.channel.create: true
+      mcedia.mtv.channel.manage.others: true
   mcedia.mtv.create:
     description: 创建 MTV 播放器
     default: op
@@ -36,3 +38,9 @@ permissions:
   mcedia.mtv.list:
     description: 列出附近的 MTV 播放器
     default: true
+  mcedia.mtv.channel.create:
+    description: 创建公共频道
+    default: true
+  mcedia.mtv.channel.manage.others:
+    description: 管理别人创建的公共频道
+    default: op
