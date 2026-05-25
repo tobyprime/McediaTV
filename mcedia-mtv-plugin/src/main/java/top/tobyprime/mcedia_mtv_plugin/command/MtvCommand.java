@@ -110,7 +110,7 @@ public class MtvCommand implements CommandExecutor, TabCompleter {
 
     public boolean dispatch(CommandSender sender, String[] args) {
         if (args.length == 0) {
-            return showHelp(sender);
+            return handleGui(sender);
         }
         return switch (args[0].toLowerCase()) {
             case "create" -> handleCreate(sender, args);
@@ -778,7 +778,7 @@ public class MtvCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage("/mtv tp [名称] — 传送到 MTV");
         sender.sendMessage("/mtv movehere [名称] — 将 MTV 传送到你脚下");
         sender.sendMessage("/mtv list — 列出附近的 MTV");
-        sender.sendMessage("/mtv gui — 打开管理 GUI");
+        sender.sendMessage("/mtv gui — 打开 MTV 主界面");
         return true;
     }
 

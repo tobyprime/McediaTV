@@ -37,10 +37,8 @@ public class MtvGuiListener implements Listener {
 
     private void click(Player player, MtvGui.MtvHolder holder, int slot, boolean rightClick, boolean shiftClick) {
         switch (holder.getType()) {
-            case MAIN_MENU -> {
-                if (slot == 11) { player.closeInventory(); player.performCommand("mtv create"); }
-                else if (slot == 15) player.performCommand("mtv edit");
-            }
+            case MAIN_MENU -> handleMainMenu(player, slot);
+            case NEARBY_PLAYER_LIST -> handleNearbyPlayerList(player, slot);
             case PLAYER_MENU -> handlePlayerMenu(player, holder, slot, rightClick, shiftClick);
             case PERIPHERAL_LIST -> handlePeripheralList(player, holder, slot);
             case ADD_PERIPHERAL -> handleAddPeripheral(player, holder, slot);
@@ -54,12 +52,48 @@ public class MtvGuiListener implements Listener {
         }
     }
 
+    private void handleMainMenu(Player player, int slot) {
+        switch (slot) {
+            case 10 -> gui.openNearestPlayerMenu(player);
+            case 11 -> gui.openNearbyPlayerList(player, 0);
+            case 12 -> gui.openPublicChannelList(player, null, "", 0, false);
+            case 14 -> gui.openPublicChannelList(player, null, "", 0, true);
+            case 15 -> gui.openNearestPlayerChannelMenu(player);
+        }
+    }
+
+    private void handleNearbyPlayerList(Player player, int slot) {
+        var state = gui.getState(player);
+        int page = MtvGui.getNearbyPage(state);
+        switch (slot) {
+            case 45 -> gui.openNearbyPlayerList(player, Math.max(0, page - 1));
+            case 49 -> gui.openNearbyPlayerList(player, page);
+            case 50 -> gui.openMainMenu(player);
+            case 53 -> gui.openNearbyPlayerList(player, page + 1);
+            default -> {
+                if (indexOf(MtvGui.PUBLIC_CHANNEL_SLOTS, slot) < 0) {
+                    return;
+                }
+                UUID uuid = MtvGui.getNearbySlotUuid(state, slot);
+                if (uuid == null) {
+                    return;
+                }
+                read(player, uuid, snap -> {
+                    if (snap != null) {
+                        gui.openPlayerMenu(player, snap);
+                    }
+                });
+            }
+        }
+    }
+
     private void handlePlayerMenu(Player player, MtvGui.MtvHolder holder, int slot, boolean rightClick, boolean shiftClick) {
         var uuid = holder.getEntityUuid();
         if (uuid == null) return;
         read(player, uuid, snap -> {
             if (snap == null) return;
             String name = snap.getName();
+            var binding = gui.getManager().getChannelService().resolveBinding(snap);
 
             switch (slot) {
                 case 4 -> {
@@ -68,6 +102,10 @@ public class MtvGuiListener implements Listener {
                     gui.setAwaitingInput(player, MtvGui.GuiType.PLAYER_MENU, uuid, "rename");
                 }
                 case 11 -> {
+                    if (binding.isBroadcast()) {
+                        gui.openPublicChannelManage(player, uuid, binding.channelId(), "", 0, false);
+                        return;
+                    }
                     float delta = (rightClick ? 1 : -1) * (shiftClick ? 1.0F : 0.25F);
                     float v = Math.max(0.25F, Math.min(4.0F, snap.getSpeed() + delta));
                     player.performCommand("mtv speed " + v + " " + name);
@@ -80,25 +118,52 @@ public class MtvGuiListener implements Listener {
                         player.performCommand("mtv tp " + snap.getName());
                     }
                 }
-                case 41 -> gui.openChannelMenu(player, snap);
+                case 41 -> {
+                    if (binding.isBroadcast()) {
+                        return;
+                    }
+                    gui.openChannelMenu(player, snap);
+                }
                 case 42 -> gui.openPublicChannelList(player, uuid, "", 0, false);
                 case 43 -> updateAndReopen(player, uuid, done -> gui.getManager().updateChannelBinding(uuid, MtvChannelBinding.self(), done), GuiType.PLAYER_MENU, null);
                 case 40 -> {
+                    if (binding.isBroadcast()) {
+                        return;
+                    }
                     player.closeInventory();
                     player.sendMessage("请输入播放 URL（URL 或 BV 号）。");
                     gui.setAwaitingInput(player, MtvGui.GuiType.PLAYER_MENU, uuid, "media_url");
                 }
-                case 47 -> updateAndReopen(player, uuid, done -> playbackController.updateStartAt(uuid, 0L, done), GuiType.PLAYER_MENU, null);
+                case 47 -> {
+                    if (binding.isBroadcast()) {
+                        return;
+                    }
+                    updateAndReopen(player, uuid, done -> playbackController.updateStartAt(uuid, 0L, done), GuiType.PLAYER_MENU, null);
+                }
                 case 48 -> {
+                    if (binding.isBroadcast()) {
+                        return;
+                    }
                     long delta = shiftClick ? -10_000_000L : -1_000_000L;
                     updateAndReopen(player, uuid, done -> playbackController.seekRelative(uuid, delta, done), GuiType.PLAYER_MENU, null);
                 }
-                case 49 -> updateAndReopen(player, uuid, done -> playbackController.togglePause(uuid, done), GuiType.PLAYER_MENU, null);
+                case 49 -> {
+                    if (binding.isBroadcast()) {
+                        return;
+                    }
+                    updateAndReopen(player, uuid, done -> playbackController.togglePause(uuid, done), GuiType.PLAYER_MENU, null);
+                }
                 case 50 -> {
+                    if (binding.isBroadcast()) {
+                        return;
+                    }
                     long delta = shiftClick ? 10_000_000L : 1_000_000L;
                     updateAndReopen(player, uuid, done -> playbackController.seekRelative(uuid, delta, done), GuiType.PLAYER_MENU, null);
                 }
                 case 51 -> {
+                    if (binding.isBroadcast()) {
+                        return;
+                    }
                     player.closeInventory();
                     player.sendMessage("请输入跳转位置的微秒值。");
                     gui.setAwaitingInput(player, MtvGui.GuiType.PLAYER_MENU, uuid, "start_at");
@@ -538,4 +603,5 @@ public class MtvGuiListener implements Listener {
             return 0;
         }
     }
+
 }

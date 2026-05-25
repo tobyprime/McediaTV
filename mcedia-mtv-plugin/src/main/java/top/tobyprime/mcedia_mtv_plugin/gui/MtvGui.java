@@ -23,6 +23,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class MtvGui {
     public enum GuiType {
         MAIN_MENU,
+        NEARBY_PLAYER_LIST,
         PLAYER_MENU,
         PERIPHERAL_LIST,
         SCREEN_SETTINGS,
@@ -63,6 +64,10 @@ public class MtvGui {
         public Map<String, String> getTemp() { return temp; }
     }
 
+    public static final double NEARBY_RANGE = 50.0;
+    private static final String NEARBY_PAGE_KEY = "nearby_page";
+    private static final String NEARBY_SLOT_UUID_PREFIX = "nearby_slot_";
+
     public static final int[] CHANNEL_PLAYLIST_SLOTS = {28, 29, 30, 31, 32, 33, 34, 37, 38, 39, 40, 41, 42, 43};
     public static final int[] PUBLIC_CHANNEL_SLOTS = {10, 11, 12, 13, 14, 15, 16, 19, 20, 21, 22, 23, 24, 25, 28, 29, 30, 31, 32, 33, 34};
 
@@ -76,31 +81,46 @@ public class MtvGui {
 
     public void openMainMenu(Player player) {
         var inv = Bukkit.createInventory(new MtvHolder(GuiType.MAIN_MENU, null, null), 27, Component.text("MTV"));
-        inv.setItem(11, item(Material.ITEM_FRAME, "创建 MTV"));
-        inv.setItem(15, item(Material.ENDER_PEARL, "编辑最近的 MTV", "对着实体潜行右键也可"));
+        inv.setItem(10, item(Material.ENDER_PEARL, "控制最近的播放器", "按当前距离最近的 MTV 打开控制页"));
+        inv.setItem(11, item(Material.COMPASS, "附近的播放器", "分页查看附近 MTV 并选择控制"));
+        inv.setItem(12, item(Material.BOOK, "频道列表", "浏览全部公共频道"));
+        inv.setItem(14, item(Material.PLAYER_HEAD, "我的频道", "只查看我创建的公共频道"));
+        inv.setItem(15, item(Material.JUKEBOX, "控制最近播放器的频道", "按当前距离最近的 MTV 打开频道控制页"));
         fillBorder27(inv);
         setState(player, GuiType.MAIN_MENU, null);
         player.openInventory(inv);
     }
 
     public void openPlayerMenu(Player player, ManagedMtvPlayer snapshot) {
+        var binding = manager.getChannelService().resolveBinding(snapshot);
+        var publicChannel = binding.isBroadcast() ? manager.getChannelService().getPublicChannel(binding.channelId()) : null;
         var inv = Bukkit.createInventory(new MtvHolder(GuiType.PLAYER_MENU, snapshot.getUuid(), null), 54, Component.text("MTV: " + snapshot.getName()));
         inv.setItem(4, item(Material.NAME_TAG, snapshot.getName()));
-        inv.setItem(11, item(Material.CLOCK, "速度: " + snapshot.getSpeed() + "x", "左键 -0.25 / 右键 +0.25"));
         inv.setItem(12, item(Material.ITEM_FRAME, "外设列表", "屏幕 / 扬声器"));
         inv.setItem(13, item(Material.COMPASS, "位置与朝向", "移动 / 旋转实体"));
         inv.setItem(15, item(Material.ENDER_PEARL, "传送到实体"));
-        inv.setItem(41, item(Material.JUKEBOX, "频道编辑", "打开 channel 播放与列表页"));
-        inv.setItem(42, item(Material.BOOK, "公共频道", "搜索并绑定公共频道"));
-        inv.setItem(43, item(Material.STRUCTURE_VOID, "切回私有频道", "恢复 self 频道绑定"));
-        inv.setItem(40, item(Material.MUSIC_DISC_CAT, "设置播放链接", snapshot.getMediaUrl().isBlank() ? "未设置" : snapshot.getMediaUrl(), "输入 URL 或 BV 号"));
-        inv.setItem(47, item(Material.STRUCTURE_VOID, "从头播放"));
-        inv.setItem(48, item(Material.STONE_BUTTON, "后退 1 秒", "潜行点击后退 10 秒"));
-        var pauseIcon = snapshot.isPaused() ? Material.YELLOW_WOOL : Material.RED_WOOL;
-        var pauseName = snapshot.isPaused() ? "▶ 播放" : "⏸ 暂停";
-        inv.setItem(49, item(pauseIcon, pauseName));
-        inv.setItem(50, item(Material.STONE_BUTTON, "前进 1 秒", "潜行点击前进 10 秒"));
-        inv.setItem(51, item(Material.COMPASS, "设置到位置: " + formatDurationUs(snapshot.getStartAt()), "点击输入微秒值"));
+        if (binding.isBroadcast()) {
+            inv.setItem(11, item(Material.BOOK,
+                    "公共频道信息",
+                    "频道: " + fallback(publicChannel != null ? publicChannel.getChannelName() : null, binding.channelId()),
+                    "ID: " + binding.channelId(),
+                    "点击查看频道信息"));
+            inv.setItem(42, item(Material.BOOK, "切换绑定", "重新选择要绑定的公共频道"));
+            inv.setItem(43, item(Material.STRUCTURE_VOID, "取消绑定", "切回私有 self 频道"));
+        } else {
+            inv.setItem(11, item(Material.CLOCK, "速度: " + snapshot.getSpeed() + "x", "左键 -0.25 / 右键 +0.25"));
+            inv.setItem(41, item(Material.JUKEBOX, "频道编辑", "打开 channel 播放与列表页"));
+            inv.setItem(42, item(Material.BOOK, "公共频道", "搜索并绑定公共频道"));
+            inv.setItem(43, item(Material.STRUCTURE_VOID, "切回私有频道", "恢复 self 频道绑定"));
+            inv.setItem(40, item(Material.MUSIC_DISC_CAT, "设置播放链接", snapshot.getMediaUrl().isBlank() ? "未设置" : snapshot.getMediaUrl(), "输入 URL 或 BV 号"));
+            inv.setItem(47, item(Material.STRUCTURE_VOID, "从头播放"));
+            inv.setItem(48, item(Material.STONE_BUTTON, "后退 1 秒", "潜行点击后退 10 秒"));
+            var pauseIcon = snapshot.isPaused() ? Material.YELLOW_WOOL : Material.RED_WOOL;
+            var pauseName = snapshot.isPaused() ? "▶ 播放" : "⏸ 暂停";
+            inv.setItem(49, item(pauseIcon, pauseName));
+            inv.setItem(50, item(Material.STONE_BUTTON, "前进 1 秒", "潜行点击前进 10 秒"));
+            inv.setItem(51, item(Material.COMPASS, "设置到位置: " + formatDurationUs(snapshot.getStartAt()), "点击输入微秒值"));
+        }
         inv.setItem(53, item(Material.TNT, "删除 MTV"));
         fillBorder54(inv);
         setState(player, GuiType.PLAYER_MENU, snapshot.getUuid());
@@ -260,6 +280,58 @@ public class MtvGui {
         fillBorder27(inv);
         setState(player, GuiType.ADD_PERIPHERAL, snapshot.getUuid());
         player.openInventory(inv);
+    }
+
+    public void openNearbyPlayerList(Player player, int page) {
+        manager.findNearbyAsync(player, NEARBY_RANGE, results -> runOnPlayer(player, () -> {
+            int totalPages = Math.max(1, (results.size() + PUBLIC_CHANNEL_SLOTS.length - 1) / PUBLIC_CHANNEL_SLOTS.length);
+            int normalizedPage = Math.max(0, Math.min(page, totalPages - 1));
+            var inv = Bukkit.createInventory(new MtvHolder(GuiType.NEARBY_PLAYER_LIST, null, null), 54, Component.text("附近的播放器"));
+            inv.setItem(4, item(Material.COMPASS, "附近的 MTV", "页码: " + (normalizedPage + 1) + "/" + totalPages, "结果数: " + results.size()));
+            inv.setItem(45, item(Material.ARROW, "上一页"));
+            inv.setItem(49, item(Material.SPYGLASS, "刷新"));
+            inv.setItem(50, item(Material.ARROW, "返回主菜单"));
+            inv.setItem(53, item(Material.ARROW, "下一页"));
+
+            var origin = player.getLocation();
+            int start = normalizedPage * PUBLIC_CHANNEL_SLOTS.length;
+            var temp = new HashMap<String, String>();
+            temp.put(NEARBY_PAGE_KEY, Integer.toString(normalizedPage));
+            for (int i = 0; i < PUBLIC_CHANNEL_SLOTS.length && start + i < results.size(); i++) {
+                int slot = PUBLIC_CHANNEL_SLOTS[i];
+                var snapshot = results.get(start + i);
+                double dist = Math.sqrt(origin.distanceSquared(snapshot.toLocation()));
+                inv.setItem(slot, item(Material.ITEM_FRAME,
+                        snapshot.getName(),
+                        "距离: " + (int) dist + "m",
+                        "频道: " + manager.getChannelService().resolveBinding(snapshot).channelId(),
+                        "点击打开控制页"));
+                temp.put(NEARBY_SLOT_UUID_PREFIX + slot, snapshot.getUuid().toString());
+            }
+
+            fillBorder54(inv);
+            setState(player, GuiType.NEARBY_PLAYER_LIST, null, temp);
+            player.openInventory(inv);
+        }));
+    }
+
+    public void openNearestPlayerMenu(Player player) {
+        openNearestPlayer(player, snapshot -> openPlayerMenu(player, snapshot), "附近 " + (int) NEARBY_RANGE + " 米内没有 MTV 播放器。");
+    }
+
+    public void openNearestPlayerChannelMenu(Player player) {
+        openNearestPlayer(player, snapshot -> openChannelMenu(player, snapshot), "附近 " + (int) NEARBY_RANGE + " 米内没有 MTV 播放器。");
+    }
+
+    private void openNearestPlayer(Player player, java.util.function.Consumer<ManagedMtvPlayer> opener, String emptyMessage) {
+        manager.findNearbyAsync(player, NEARBY_RANGE, candidates -> runOnPlayer(player, () -> {
+            if (candidates.isEmpty()) {
+                player.sendMessage(emptyMessage);
+                openMainMenu(player);
+                return;
+            }
+            opener.accept(candidates.get(0));
+        }));
     }
 
     public void openPublicChannelList(Player player, UUID entityUuid, String query, int page, boolean ownOnly) {
@@ -512,6 +584,7 @@ public class MtvGui {
                     case CHANNEL_MENU -> openChannelMenu(player, snapshot);
                     case PUBLIC_CHANNEL_LIST -> openPublicChannelList(player, uuid, getState(player) != null ? getState(player).getTemp().getOrDefault("public_query", "") : "", getState(player) != null ? parsePage(getState(player)) : 0, getState(player) != null && isPublicOwnOnly(getState(player)));
                     case PUBLIC_CHANNEL_CREATE -> openPublicChannelCreate(player, uuid, "", "", "", 0, false);
+                    case NEARBY_PLAYER_LIST -> openNearbyPlayerList(player, getNearbyPage(getState(player)));
                     case SCREEN_SETTINGS -> {
                         if (periphId != null) {
                             openScreenSettings(player, snapshot, periphId);
@@ -556,6 +629,36 @@ public class MtvGui {
 
     private static boolean isPublicOwnOnly(GuiState state) {
         return Boolean.parseBoolean(state.getTemp().getOrDefault("public_own_only", "false"));
+    }
+
+    public static int getNearbyPage(GuiState state) {
+        return getStateInt(state, NEARBY_PAGE_KEY);
+    }
+
+    public static UUID getNearbySlotUuid(GuiState state, int slot) {
+        if (state == null) {
+            return null;
+        }
+        String value = state.getTemp().get(NEARBY_SLOT_UUID_PREFIX + slot);
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return UUID.fromString(value);
+        } catch (IllegalArgumentException ignored) {
+            return null;
+        }
+    }
+
+    private static int getStateInt(GuiState state, String key) {
+        if (state == null) {
+            return 0;
+        }
+        try {
+            return Integer.parseInt(state.getTemp().getOrDefault(key, "0"));
+        } catch (NumberFormatException ignored) {
+            return 0;
+        }
     }
 
     private static String summarizePublicChannelName(ChannelRuntimeState state) {
