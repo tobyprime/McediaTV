@@ -198,18 +198,19 @@ public class EntityPlayerHandle {
     }
 
     private TransformState computeTransform(PeripheralConfig config) {
-        var baseRotation = new Quaternionf()
+        var hostRotation = new Quaternionf()
                 .rotateY((float) Math.toRadians(-display.getYRot()))
                 .rotateX((float) Math.toRadians(-display.getXRot()));
+        var finalRotation = new Quaternionf(hostRotation);
 
         if (config.offsetRx() != 0.0F || config.offsetRy() != 0.0F || config.offsetRz() != 0.0F || config.offsetRw() != 0.0F) {
             var rotOffset = new Quaternionf(config.offsetRx(), config.offsetRy(), config.offsetRz(), config.offsetRw()).normalize();
-            baseRotation.mul(rotOffset);
+            finalRotation.mul(rotOffset);
         }
 
         var localOffset = new Vector3f(config.offsetX(), config.offsetY(), config.offsetZ());
         if (localOffset.x() != 0.0F || localOffset.y() != 0.0F || localOffset.z() != 0.0F) {
-            baseRotation.transform(localOffset);
+            hostRotation.transform(localOffset);
         }
 
         var pos = display.position();
@@ -219,7 +220,7 @@ public class EntityPlayerHandle {
                         (float) pos.y() + localOffset.y(),
                         (float) pos.z() + localOffset.z()
                 ),
-                baseRotation
+                finalRotation
         );
     }
 
