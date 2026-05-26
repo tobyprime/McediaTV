@@ -114,6 +114,28 @@ public final class MtvChannelService {
         });
     }
 
+    public boolean updateMediaUrlAsCurrentOnly(ManagedMtvPlayer player, String mediaUrl) {
+        return mutatePlayback(player, state -> {
+            var normalized = MediaUrlNormalizer.normalize(mediaUrl);
+            boolean alreadySingle = state.getPlayOrderMode() == ChannelPlayOrderMode.CURRENT_ONLY
+                    && state.getPlaylist().size() == (normalized.isBlank() ? 0 : 1)
+                    && state.getPlaylistCursor() == 0
+                    && normalized.equals(state.getPlayState().getMediaUrl());
+            if (alreadySingle) {
+                return false;
+            }
+            ChannelTimelineCalculator.setMedia(state.getPlayState(), normalized, 0L, System.currentTimeMillis(), normalized.isBlank() ? ChannelPlaybackStatus.STOPPED : ChannelPlaybackStatus.LOADING);
+            state.getPlaylist().clear();
+            if (!normalized.isBlank()) {
+                state.getPlaylist().add(new ChannelPlaylistItem(normalized));
+            }
+            state.setPlaylistCursor(0);
+            state.setPlayOrderMode(ChannelPlayOrderMode.CURRENT_ONLY);
+            state.setDurationMs(0L);
+            return true;
+        });
+    }
+
     public boolean updateSpeed(ManagedMtvPlayer player, float speed) {
         return mutatePlayback(player, state -> {
             float normalized = Math.max(0.25F, Math.min(4.0F, speed));

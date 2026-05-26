@@ -21,6 +21,10 @@ public final class MtvPlaybackController {
         updatePlayback(uuid, player -> channelService.updateMediaUrl(player, mediaUrl), done);
     }
 
+    public void updateMediaUrlAsCurrentOnly(UUID uuid, String mediaUrl, Consumer<Boolean> done) {
+        updatePlayback(uuid, player -> channelService.updateMediaUrlAsCurrentOnly(player, mediaUrl), done);
+    }
+
     public void updateSpeed(UUID uuid, float speed, Consumer<Boolean> done) {
         updatePlayback(uuid, player -> channelService.updateSpeed(player, speed), done);
     }

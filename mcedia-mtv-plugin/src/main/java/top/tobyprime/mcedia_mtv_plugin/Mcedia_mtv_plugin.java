@@ -10,6 +10,7 @@ import top.tobyprime.mcedia_mtv_plugin.controller.MtvPlaybackController;
 import top.tobyprime.mcedia_mtv_plugin.gui.MtvGui;
 import top.tobyprime.mcedia_mtv_plugin.listener.MtvChatListener;
 import top.tobyprime.mcedia_mtv_plugin.listener.MtvGuiListener;
+import top.tobyprime.mcedia_mtv_plugin.listener.MtvRemoteControlListener;
 import top.tobyprime.mcedia_mtv_plugin.manager.MtvPlayerManager;
 
 public final class Mcedia_mtv_plugin extends JavaPlugin {
@@ -41,6 +42,7 @@ public final class Mcedia_mtv_plugin extends JavaPlugin {
         PluginManager pluginManager = getServer().getPluginManager();
         pluginManager.registerEvents(networkService, this);
         pluginManager.registerEvents(new MtvGuiListener(gui, playbackController), this);
+        pluginManager.registerEvents(new MtvRemoteControlListener(gui), this);
         pluginManager.registerEvents(new MtvChatListener(this, gui), this);
     }
 

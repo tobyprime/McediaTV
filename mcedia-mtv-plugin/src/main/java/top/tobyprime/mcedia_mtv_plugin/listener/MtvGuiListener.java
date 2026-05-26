@@ -46,6 +46,7 @@ public class MtvGuiListener implements Listener {
             case SCREEN_SETTINGS -> handleScreenSettings(player, holder, slot, rightClick, shiftClick);
             case SPEAKER_SETTINGS -> handleSpeakerSettings(player, holder, slot, rightClick, shiftClick);
             case CHANNEL_MENU -> handleChannelMenu(player, holder, slot, rightClick, shiftClick);
+            case REMOTE_MENU -> handleRemoteMenu(player, holder, slot, shiftClick);
             case PUBLIC_CHANNEL_LIST -> handlePublicChannelList(player, holder, slot, rightClick);
             case PUBLIC_CHANNEL_CREATE -> handlePublicChannelCreate(player, holder, slot);
             case PUBLIC_CHANNEL_MANAGE -> handlePublicChannelManage(player, holder, slot);
@@ -301,6 +302,46 @@ public class MtvGuiListener implements Listener {
                         }
                     }
                 }
+            }
+        });
+    }
+
+    private void handleRemoteMenu(Player player, MtvGui.MtvHolder holder, int slot, boolean shiftClick) {
+        var uuid = holder.getEntityUuid();
+        if (uuid == null) {
+            gui.openRemoteMenu(player);
+            return;
+        }
+        read(player, uuid, snap -> {
+            if (snap == null) {
+                return;
+            }
+            switch (slot) {
+                case 12 -> {
+                    if (!canManageRemotePlayback(player, snap)) {
+                        return;
+                    }
+                    long delta = shiftClick ? -10_000_000L : -1_000_000L;
+                    updateAndReopen(player, uuid, done -> playbackController.seekRelative(uuid, delta, done), GuiType.REMOTE_MENU, null);
+                }
+                case 13 -> {
+                    if (!canManageRemotePlayback(player, snap)) {
+                        return;
+                    }
+                    player.closeInventory();
+                    player.sendMessage(MtvGui.MEDIA_INPUT_MESSAGE);
+                    gui.setAwaitingInput(player, MtvGui.GuiType.REMOTE_MENU, uuid, "remote_media_url");
+                }
+                case 14 -> {
+                    if (!canManageRemotePlayback(player, snap)) {
+                        return;
+                    }
+                    long delta = shiftClick ? 10_000_000L : 1_000_000L;
+                    updateAndReopen(player, uuid, done -> playbackController.seekRelative(uuid, delta, done), GuiType.REMOTE_MENU, null);
+                }
+                case 20 -> gui.openPlayerMenu(player, snap);
+                case 22 -> gui.openRemoteMenu(player);
+                case 24 -> gui.openChannelMenu(player, snap);
             }
         });
     }
@@ -582,6 +623,15 @@ public class MtvGuiListener implements Listener {
             }
             done.accept(snapshot);
         }));
+    }
+
+    private boolean canManageRemotePlayback(Player player, ManagedMtvPlayer snapshot) {
+        var state = gui.getManager().getChannelService().previewState(snapshot);
+        if (gui.getManager().getChannelService().canManagePublicChannel(player, state)) {
+            return true;
+        }
+        player.sendMessage("只有公共频道的创建者或 OP 可以通过遥控器修改播放。");
+        return false;
     }
 
     private void updateAndReopen(Player player, UUID uuid, Consumer<Consumer<Boolean>> update, MtvGui.GuiType page, String periphId) {

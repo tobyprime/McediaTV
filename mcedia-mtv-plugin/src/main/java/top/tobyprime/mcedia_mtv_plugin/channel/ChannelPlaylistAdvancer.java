@@ -20,6 +20,7 @@ public final class ChannelPlaylistAdvancer {
             case SHUFFLE -> (int) (Math.random() * size);
             case LOOP_ALL -> (currentIndex + 1) % size;
             case LOOP_ONE -> currentIndex;
+            case CURRENT_ONLY -> -1;
             case SEQUENTIAL -> currentIndex + 1 < size ? currentIndex + 1 : -1;
         };
 

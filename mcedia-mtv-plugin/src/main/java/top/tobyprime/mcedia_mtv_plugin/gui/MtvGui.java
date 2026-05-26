@@ -31,6 +31,7 @@ public class MtvGui {
         ADD_PERIPHERAL,
         WORLD_TRANSFORM,
         CHANNEL_MENU,
+        REMOTE_MENU,
         PUBLIC_CHANNEL_LIST,
         PUBLIC_CHANNEL_CREATE,
         PUBLIC_CHANNEL_MANAGE
@@ -90,6 +91,36 @@ public class MtvGui {
         inv.setItem(15, item(Material.JUKEBOX, "控制最近播放器的频道", "按当前距离最近的 MTV 打开频道控制页"));
         fillBorder27(inv);
         setState(player, GuiType.MAIN_MENU, null);
+        player.openInventory(inv);
+    }
+
+    public void openRemoteMenu(Player player) {
+        manager.findNearbyAsync(player, NEARBY_RANGE, candidates -> runOnPlayer(player, () -> {
+            if (candidates.isEmpty()) {
+                player.sendMessage("附近 " + (int) NEARBY_RANGE + " 米内没有 MTV 播放器。");
+                return;
+            }
+            openRemoteMenu(player, candidates.get(0));
+        }));
+    }
+
+    public void openRemoteMenu(Player player, ManagedMtvPlayer snapshot) {
+        var binding = manager.getChannelService().resolveBinding(snapshot);
+        var publicChannel = binding.isBroadcast() ? manager.getChannelService().getPublicChannel(binding.channelId()) : null;
+        var inv = Bukkit.createInventory(new MtvHolder(GuiType.REMOTE_MENU, snapshot.getUuid(), null), 27, Component.text("遥控器 - " + snapshot.getName()));
+        inv.setItem(4, item(Material.IRON_DOOR,
+                snapshot.getName(),
+                "频道: " + fallback(publicChannel != null ? publicChannel.getChannelName() : null, binding.channelId()),
+                "当前: " + summarize(snapshot.getMediaUrl()),
+                "模式: " + formatPlayOrderMode(manager.getChannelService().previewState(snapshot))));
+        inv.setItem(12, item(Material.STONE_BUTTON, "后退 1 秒", "潜行点击后退 10 秒"));
+        inv.setItem(13, item(Material.MUSIC_DISC_CAT, "设置当前媒体", "切到该视频，并改为播完当前停止", binding.isBroadcast() ? "公共频道需要创建者或 OP" : "会覆盖当前列表"));
+        inv.setItem(14, item(Material.STONE_BUTTON, "前进 1 秒", "潜行点击前进 10 秒"));
+        inv.setItem(20, item(Material.ITEM_FRAME, "播放器入口", "打开当前最近播放器页"));
+        inv.setItem(22, item(Material.SPYGLASS, "刷新目标", "重新选择最近的 MTV"));
+        inv.setItem(24, item(Material.JUKEBOX, "频道入口", "打开当前最近播放器的频道页"));
+        fillBorder27(inv);
+        setState(player, GuiType.REMOTE_MENU, snapshot.getUuid());
         player.openInventory(inv);
     }
 
@@ -525,6 +556,21 @@ public class MtvGui {
                             }
                             reopenPage(player, state.getType(), state.getEntityUuid());
                         }));
+                case "remote_media_url" -> {
+                    var channelState = manager.getChannelService().previewState(snapshot);
+                    if (!manager.getChannelService().canManagePublicChannel(player, channelState)) {
+                        runOnPlayer(player, () -> player.sendMessage("只有公共频道的创建者或 OP 可以通过遥控器修改当前媒体。"));
+                        return;
+                    }
+                    playbackController.updateMediaUrlAsCurrentOnly(state.getEntityUuid(), input,
+                            success -> runOnPlayer(player, () -> {
+                                if (!Boolean.TRUE.equals(success)) {
+                                    player.sendMessage("设置当前媒体失败。");
+                                    return;
+                                }
+                                reopenPage(player, state.getType(), state.getEntityUuid());
+                            }));
+                }
                 case "start_at" -> {
                     long startAt;
                     try {
@@ -587,6 +633,7 @@ public class MtvGui {
                     case PERIPHERAL_LIST -> openPeripheralList(player, snapshot);
                     case WORLD_TRANSFORM -> openWorldTransform(player, snapshot);
                     case CHANNEL_MENU -> openChannelMenu(player, snapshot);
+                    case REMOTE_MENU -> openRemoteMenu(player, snapshot);
                     case PUBLIC_CHANNEL_LIST -> openPublicChannelList(player, uuid, getState(player) != null ? getState(player).getTemp().getOrDefault("public_query", "") : "", getState(player) != null ? parsePage(getState(player)) : 0, getState(player) != null && isPublicOwnOnly(getState(player)));
                     case PUBLIC_CHANNEL_CREATE -> openPublicChannelCreate(player, uuid, "", "", "", 0, false);
                     case NEARBY_PLAYER_LIST -> openNearbyPlayerList(player, getNearbyPage(getState(player)));
@@ -695,6 +742,7 @@ public class MtvGui {
             case SHUFFLE -> "随机";
             case LOOP_ALL -> "列表循环";
             case LOOP_ONE -> "当前媒体循环";
+            case CURRENT_ONLY -> "播完当前停止";
         };
     }
 
