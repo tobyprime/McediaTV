@@ -15,13 +15,8 @@ import top.tobyprime.mcedia_mtv_plugin.model.SpeakerPeripheralConfigModel;
 
 public final class InteractionDataCommandBridge {
     public static final String PLAYER_TAG = "mcedia_mtv";
-    public static final String CONFIG_KEY = "mcedia_mtv";
-    public static final String LEGACY_PLAYER_TAG = "mcedia_interaction_player";
-    public static final String LEGACY_CONFIG_KEY = "mcedia_interaction_player";
     public static final String ENTITY_CONFIG_KEY = "entity_config";
     public static final String CHANNEL_BINDING_KEY = "channel_binding";
-    public static final String SELF_SEED_KEY = "self_seed_state";
-    public static final String STANDALONE_SEED_KEY = "standalone_seed_state";
     public static final String SCHEMA_VERSION_KEY = "schema_version";
     public static final int SCHEMA_VERSION = 3;
 
@@ -30,7 +25,6 @@ public final class InteractionDataCommandBridge {
 
     public static void apply(ItemDisplay itemDisplay, ManagedMtvPlayer player) {
         itemDisplay.addScoreboardTag(PLAYER_TAG);
-        itemDisplay.addScoreboardTag(LEGACY_PLAYER_TAG);
         itemDisplay.addScoreboardTag(SCHEMA_VERSION_KEY + ":" + SCHEMA_VERSION);
 
         CompoundTag root = new CompoundTag();
@@ -68,22 +62,6 @@ public final class InteractionDataCommandBridge {
             channelBinding.putString("region_key", binding.regionKey());
         }
         root.put(CHANNEL_BINDING_KEY, channelBinding);
-
-        if (binding.isSelf()) {
-            CompoundTag seedState = new CompoundTag();
-            seedState.putString("media_url", player.getMediaUrl());
-            seedState.putFloat("speed", player.getSpeed());
-            seedState.putLong("start_at", player.getStartAt());
-            seedState.putLong("base_time", player.getBaseTime());
-            seedState.putLong("base_offset", player.getBaseOffset());
-            seedState.putBoolean("paused", player.isPaused());
-            root.put(SELF_SEED_KEY, seedState);
-        }
-
-        CompoundTag compatConfig = new CompoundTag();
-        compatConfig.put("peripherals", peripherals.copy());
-        root.put(CONFIG_KEY, compatConfig.copy());
-        root.put(LEGACY_CONFIG_KEY, compatConfig.copy());
 
         var stack = new ItemStack(Material.PAINTING);
         var nmsStack = CraftItemStack.asNMSCopy(stack);

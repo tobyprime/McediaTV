@@ -7,6 +7,8 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
+import org.joml.Quaternionf;
+import org.joml.Vector3f;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.ItemDisplay;
 import org.bukkit.entity.Player;
@@ -49,7 +51,15 @@ public class MtvPlayerManager {
     }
 
     public void findNearbyAsync(Player player, double range, Consumer<List<ManagedMtvPlayer>> done) {
-        player.getScheduler().run(plugin, task -> scanNearby(player, range, done), null);
+        runOnPlayer(player, () -> scanNearby(player, range, done));
+    }
+
+    public void findNearbyChannelAsync(Player player, String channelId, double range, Consumer<ManagedMtvPlayer> done) {
+        if (channelId == null || channelId.isBlank()) {
+            done.accept(null);
+            return;
+        }
+        runOnPlayer(player, () -> scanNearbyChannel(player, channelId, range, done));
     }
 
     private void scanNearby(Player player, double range, Consumer<List<ManagedMtvPlayer>> done) {
@@ -72,12 +82,45 @@ public class MtvPlayerManager {
             display.getScheduler().run(plugin, task -> {
                 if (isManagedItemDisplay(display)) {
                     var snapshot = readFromEntity(display);
+                    channelService.previewState(snapshot);
                     if (sameWorld(origin, snapshot) && distanceSquared(origin, snapshot) <= rangeSq) {
                         result.add(snapshot);
                     }
                 }
                 onNearbySnapshotDone(player, origin, result, remaining, done);
             }, () -> onNearbySnapshotDone(player, origin, result, remaining, done));
+        }
+    }
+
+    private void scanNearbyChannel(Player player, String channelId, double range, Consumer<ManagedMtvPlayer> done) {
+        double rangeSq = range * range;
+        var origin = player.getLocation();
+        var candidates = player.getNearbyEntities(range, range, range).stream()
+                .filter(ItemDisplay.class::isInstance)
+                .map(ItemDisplay.class::cast)
+                .toList();
+
+        if (candidates.isEmpty()) {
+            done.accept(null);
+            return;
+        }
+
+        var result = new ConcurrentLinkedQueue<ManagedMtvPlayer>();
+        var remaining = new AtomicInteger(candidates.size());
+
+        for (var display : candidates) {
+            display.getScheduler().run(plugin, task -> {
+                if (isManagedItemDisplay(display)) {
+                    var snapshot = readFromEntity(display);
+                    if (sameWorld(origin, snapshot)
+                            && distanceSquared(origin, snapshot) <= rangeSq
+                            && channelId.equals(channelService.resolveBinding(snapshot).channelId())) {
+                        channelService.previewState(snapshot);
+                        result.add(snapshot);
+                    }
+                }
+                onNearbyChannelDone(player, origin, result, remaining, done);
+            }, () -> onNearbyChannelDone(player, origin, result, remaining, done));
         }
     }
 
@@ -89,15 +132,32 @@ public class MtvPlayerManager {
         if (remaining.decrementAndGet() != 0) {
             return;
         }
-        player.getScheduler().run(plugin, task -> {
+        runOnPlayer(player, () -> {
             var sorted = new ArrayList<>(result);
             sorted.sort(Comparator.comparingDouble(snapshot -> distanceSquared(origin, snapshot)));
             done.accept(sorted);
-        }, null);
+        });
+    }
+
+    private void onNearbyChannelDone(Player player,
+                                     Location origin,
+                                     ConcurrentLinkedQueue<ManagedMtvPlayer> result,
+                                     AtomicInteger remaining,
+                                     Consumer<ManagedMtvPlayer> done) {
+        if (remaining.decrementAndGet() != 0) {
+            return;
+        }
+        runOnPlayer(player, () -> done.accept(result.stream()
+                .min(Comparator.comparingDouble(snapshot -> distanceSquared(origin, snapshot)))
+                .orElse(null)));
     }
 
     public void readSnapshot(UUID uuid, Consumer<ManagedMtvPlayer> done) {
-        withDisplay(uuid, this::readFromEntity, done);
+        withDisplay(uuid, display -> {
+            var snapshot = readFromEntity(display);
+            channelService.previewState(snapshot);
+            return snapshot;
+        }, done);
     }
 
     public ManagedMtvPlayer readFromEntity(ItemDisplay display) {
@@ -107,7 +167,6 @@ public class MtvPlayerManager {
         player.captureLocation(display.getLocation());
         var tag = readCustomData(display);
         readConfig(tag, display, player);
-        applySelfSeedIfNeeded(tag, player);
         return player;
     }
 
@@ -125,12 +184,6 @@ public class MtvPlayerManager {
         if (tag == null || tag.isEmpty()) return;
 
         var entityConfig = tag.getCompoundOrEmpty(InteractionDataCommandBridge.ENTITY_CONFIG_KEY);
-        if (entityConfig.isEmpty()) {
-            entityConfig = tag.getCompoundOrEmpty(InteractionDataCommandBridge.CONFIG_KEY);
-        }
-        if (entityConfig.isEmpty()) {
-            entityConfig = tag.getCompoundOrEmpty(InteractionDataCommandBridge.LEGACY_CONFIG_KEY);
-        }
         if (!entityConfig.isEmpty()) {
             player.setName(entityConfig.getStringOr("name", player.getName()));
             player.setWorld(entityConfig.getStringOr("world", player.getWorld()));
@@ -186,8 +239,6 @@ public class MtvPlayerManager {
                 player.setChannelBinding(new MtvChannelBinding(top.tobyprime.mcedia_mtv_plugin.channel.MtvChannelType.BROADCAST, channelId, regionKey));
             } else if ("self".equalsIgnoreCase(type)) {
                 player.setChannelBinding(new MtvChannelBinding(top.tobyprime.mcedia_mtv_plugin.channel.MtvChannelType.SELF, "", regionKey));
-            } else if (!channelId.isBlank()) {
-                player.setChannelBinding(new MtvChannelBinding(top.tobyprime.mcedia_mtv_plugin.channel.MtvChannelType.STANDALONE, channelId, regionKey));
             }
         }
         if (player.getChannelBinding() == null) {
@@ -206,47 +257,6 @@ public class MtvPlayerManager {
             return null;
         }
         return customData.copyTag();
-    }
-
-    private void applySelfSeedIfNeeded(CompoundTag tag, ManagedMtvPlayer player) {
-        if (tag == null || player.getChannelBinding() == null || !player.getChannelBinding().isSelf()) {
-            return;
-        }
-
-        var runtimeBinding = channelService.resolveBinding(player);
-        var seedTag = tag.getCompoundOrEmpty(InteractionDataCommandBridge.SELF_SEED_KEY);
-        if (seedTag.isEmpty()) {
-            seedTag = tag.getCompoundOrEmpty(InteractionDataCommandBridge.STANDALONE_SEED_KEY);
-        }
-        var legacyEntityConfig = tag.getCompoundOrEmpty(InteractionDataCommandBridge.ENTITY_CONFIG_KEY);
-        if (seedTag.isEmpty()) {
-            legacyEntityConfig = tag.getCompoundOrEmpty(InteractionDataCommandBridge.CONFIG_KEY);
-        }
-        if (seedTag.isEmpty()) {
-            legacyEntityConfig = tag.getCompoundOrEmpty(InteractionDataCommandBridge.LEGACY_CONFIG_KEY);
-        }
-        if (seedTag.isEmpty()) {
-            seedTag = legacyEntityConfig;
-        }
-        if (seedTag.isEmpty()) {
-            return;
-        }
-
-        String mediaUrl = seedTag.getStringOr("media_url", seedTag.getStringOr("url", ""));
-        float speed = seedTag.getFloatOr("speed", 1.0F);
-        long startAt = seedTag.getLongOr("start_at", 0L);
-        long baseTime = seedTag.getLongOr("base_time", 0L);
-        long baseOffset = seedTag.getLongOr("base_offset", 0L);
-        boolean paused = seedTag.getBooleanOr("paused", false);
-        LOGGER.info("Restore MTV self seed state from entity: entity={}, channel={}, mediaUrl={}, speed={}, startAt={}, baseTime={}, baseOffset={}, paused={}",
-                player.getUuid(), runtimeBinding.channelId(), mediaUrl, speed, startAt, baseTime, baseOffset, paused);
-
-        player.setMediaUrl(mediaUrl);
-        player.setSpeed(speed);
-        player.setStartAt(startAt);
-        player.setBaseTime(baseTime);
-        player.setBaseOffset(baseOffset);
-        player.setPaused(paused);
     }
 
     private static int countScreenType(ListTag list, int upTo) {
@@ -323,6 +333,31 @@ public class MtvPlayerManager {
             s.setOffsetZ(z);
             return true;
         }, done);
+    }
+
+    public void setScreenOffsetToPlayer(UUID uuid, String periphId, Player player, Consumer<Boolean> done) {
+        if (player == null) {
+            done.accept(Boolean.FALSE);
+            return;
+        }
+        var target = player.getLocation();
+        withDisplay(uuid, display -> {
+            var displayLocation = display.getLocation();
+            if (!sameWorld(displayLocation, target)) {
+                return Boolean.FALSE;
+            }
+            var snapshot = readFromEntity(display);
+            var screen = snapshot.findScreen(periphId);
+            if (screen == null) {
+                return Boolean.FALSE;
+            }
+            var offset = worldOffsetToLocal(displayLocation, target);
+            screen.setOffsetX(offset.x());
+            screen.setOffsetY(offset.y());
+            screen.setOffsetZ(offset.z());
+            applyEntityState(display, snapshot);
+            return Boolean.TRUE;
+        }, result -> done.accept(Boolean.TRUE.equals(result)));
     }
 
     public void setScreenBrightness(UUID uuid, String periphId, int v, Consumer<Boolean> done) {
@@ -414,6 +449,32 @@ public class MtvPlayerManager {
         }, done);
     }
 
+    public void setSpeakerOffsetToPlayer(UUID uuid, String periphId, Player player, Consumer<Boolean> done) {
+        if (player == null) {
+            done.accept(Boolean.FALSE);
+            return;
+        }
+        var target = player.getLocation();
+        withDisplay(uuid, display -> {
+            var displayLocation = display.getLocation();
+            if (!sameWorld(displayLocation, target)) {
+                return Boolean.FALSE;
+            }
+            var snapshot = readFromEntity(display);
+            var speaker = snapshot.findSpeaker(periphId);
+            if (speaker == null) {
+                LOGGER.warn("setSpeakerOffsetToPlayer: speaker {} not found in entity {}", periphId, uuid);
+                return Boolean.FALSE;
+            }
+            var offset = worldOffsetToLocal(displayLocation, target);
+            speaker.setOffsetX(offset.x());
+            speaker.setOffsetY(offset.y());
+            speaker.setOffsetZ(offset.z());
+            applyEntityState(display, snapshot);
+            return Boolean.TRUE;
+        }, result -> done.accept(Boolean.TRUE.equals(result)));
+    }
+
     public void resetScreenSize(UUID uuid, String periphId, Consumer<Boolean> done) {
         mutate(uuid, p -> {
             var s = p.findScreen(periphId);
@@ -498,61 +559,6 @@ public class MtvPlayerManager {
         }, done);
     }
 
-    public void updateMediaUrl(UUID uuid, String mediaUrl, Consumer<Boolean> done) {
-        withDisplay(uuid, display -> {
-            var player = readFromEntity(display);
-            if (!channelService.updateMediaUrl(player, mediaUrl)) {
-                return Boolean.FALSE;
-            }
-            applyEntityState(display, player);
-            return Boolean.TRUE;
-        }, result -> done.accept(Boolean.TRUE.equals(result)));
-    }
-
-    public void updateSpeed(UUID uuid, float speed, Consumer<Boolean> done) {
-        withDisplay(uuid, display -> {
-            var player = readFromEntity(display);
-            if (!channelService.updateSpeed(player, speed)) {
-                return Boolean.FALSE;
-            }
-            applyEntityState(display, player);
-            return Boolean.TRUE;
-        }, result -> done.accept(Boolean.TRUE.equals(result)));
-    }
-
-    public void updateStartAt(UUID uuid, long startAt, Consumer<Boolean> done) {
-        withDisplay(uuid, display -> {
-            var player = readFromEntity(display);
-            if (!channelService.updateStartAt(player, startAt)) {
-                return Boolean.FALSE;
-            }
-            applyEntityState(display, player);
-            return Boolean.TRUE;
-        }, result -> done.accept(Boolean.TRUE.equals(result)));
-    }
-
-    public void seekRelative(UUID uuid, long deltaUs, Consumer<Boolean> done) {
-        withDisplay(uuid, display -> {
-            var player = readFromEntity(display);
-            if (!channelService.seekRelative(player, deltaUs)) {
-                return Boolean.FALSE;
-            }
-            applyEntityState(display, player);
-            return Boolean.TRUE;
-        }, result -> done.accept(Boolean.TRUE.equals(result)));
-    }
-
-    public void togglePause(UUID uuid, Consumer<Boolean> done) {
-        withDisplay(uuid, display -> {
-            var player = readFromEntity(display);
-            if (!channelService.togglePause(player)) {
-                return Boolean.FALSE;
-            }
-            applyEntityState(display, player);
-            return Boolean.TRUE;
-        }, result -> done.accept(Boolean.TRUE.equals(result)));
-    }
-
     public void updateName(UUID uuid, String name, Consumer<Boolean> done) {
         mutate(uuid, p -> {
             p.setName(name);
@@ -594,10 +600,17 @@ public class MtvPlayerManager {
     }
 
     public void teleportToPlayer(UUID uuid, Player player, Consumer<Boolean> done) {
-        withDisplay(uuid, display -> {
-            display.teleportAsync(player.getLocation());
-            return Boolean.TRUE;
-        }, result -> done.accept(Boolean.TRUE.equals(result)));
+        if (player == null) {
+            done.accept(Boolean.FALSE);
+            return;
+        }
+        player.getScheduler().run(plugin, task -> {
+            var target = player.getLocation();
+            withDisplay(uuid, display -> {
+                display.teleportAsync(target);
+                return Boolean.TRUE;
+            }, result -> done.accept(Boolean.TRUE.equals(result)));
+        }, () -> done.accept(Boolean.FALSE));
     }
 
     public void moveEntity(UUID uuid, double dx, double dy, double dz, Consumer<Boolean> done) {
@@ -646,45 +659,6 @@ public class MtvPlayerManager {
         return itemDisplay;
     }
 
-    public ManagedMtvPlayer findPlayerByChannelId(String channelId) {
-        if (channelId == null || channelId.isBlank()) {
-            return null;
-        }
-        for (var world : Bukkit.getWorlds()) {
-            for (var entity : world.getEntitiesByClass(ItemDisplay.class)) {
-                if (!isManagedItemDisplay(entity)) {
-                    continue;
-                }
-                var player = readFromEntity(entity);
-                var binding = channelService.resolveBinding(player);
-                if (channelId.equals(binding.channelId())) {
-                    return player;
-                }
-            }
-        }
-        return null;
-    }
-
-    public int countPlayersByChannelId(String channelId) {
-        if (channelId == null || channelId.isBlank()) {
-            return 0;
-        }
-        int count = 0;
-        for (var world : Bukkit.getWorlds()) {
-            for (var entity : world.getEntitiesByClass(ItemDisplay.class)) {
-                if (!isManagedItemDisplay(entity)) {
-                    continue;
-                }
-                var player = readFromEntity(entity);
-                var binding = channelService.resolveBinding(player);
-                if (channelId.equals(binding.channelId())) {
-                    count++;
-                }
-            }
-        }
-        return count;
-    }
-
     public void updateChannelBinding(UUID uuid, MtvChannelBinding binding, Consumer<Boolean> done) {
         withDisplay(uuid, display -> {
             var player = readFromEntity(display);
@@ -698,8 +672,8 @@ public class MtvPlayerManager {
         }, result -> done.accept(Boolean.TRUE.equals(result)));
     }
 
-    public void withDisplaySnapshot(UUID uuid, Function<ItemDisplay, Boolean> action, Consumer<Boolean> done) {
-        withDisplay(uuid, action, done);
+    public void withManagedPlayer(UUID uuid, Function<ManagedMtvPlayer, Boolean> action, Consumer<Boolean> done) {
+        withDisplay(uuid, display -> action.apply(readFromEntity(display)), result -> done.accept(Boolean.TRUE.equals(result)));
     }
 
     private <T> void withDisplay(UUID uuid, Function<ItemDisplay, T> action, Consumer<T> done) {
@@ -711,10 +685,36 @@ public class MtvPlayerManager {
         display.getScheduler().run(plugin, task -> done.accept(action.apply(display)), () -> done.accept(null));
     }
 
+    private void runOnPlayer(Player player, Runnable action) {
+        if (player == null || action == null) {
+            return;
+        }
+        player.getScheduler().run(plugin, task -> action.run(), null);
+    }
+
     private static boolean sameWorld(Location origin, ManagedMtvPlayer snapshot) {
         return origin.getWorld() != null
                 && snapshot.getWorld() != null
                 && origin.getWorld().getName().equals(snapshot.getWorld());
+    }
+
+    private static boolean sameWorld(Location left, Location right) {
+        return left.getWorld() != null
+                && right.getWorld() != null
+                && left.getWorld().getUID().equals(right.getWorld().getUID());
+    }
+
+    private static Vector3f worldOffsetToLocal(Location origin, Location target) {
+        var offset = new Vector3f(
+                (float) (target.getX() - origin.getX()),
+                (float) (target.getY() - origin.getY()),
+                (float) (target.getZ() - origin.getZ())
+        );
+        new Quaternionf()
+                .rotateX((float) Math.toRadians(origin.getPitch()))
+                .rotateY((float) Math.toRadians(origin.getYaw()))
+                .transform(offset);
+        return offset;
     }
 
     private static double distanceSquared(Location origin, ManagedMtvPlayer snapshot) {

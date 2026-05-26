@@ -8,7 +8,6 @@ import net.minecraft.world.entity.Display;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import top.tobyprime.mcedia_mtv.client.channel.ClientChannelPlaybackManager;
-import top.tobyprime.mcedia_mtv.client.channel.MtvClientNetworkInitializer;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -26,6 +25,9 @@ public final class EntityPlayerManager {
     private final Map<Display.ItemDisplay, EntityPlayerHandle> activePlayers = new HashMap<>();
     private ClientLevel currentLevel;
 
+    private record ConfigProbe(boolean emptyItemStack, boolean missingCustomData, boolean missingConfigCompound) {
+    }
+
     public static EntityPlayerManager getInstance() {
         return INSTANCE;
     }
@@ -34,11 +36,11 @@ public final class EntityPlayerManager {
     }
 
     public void onInitialize() {
-        LOGGER.info("EntityPlayerManager initialized");
+        LOGGER.debug("EntityPlayerManager initialized");
         ClientTickEvents.END_CLIENT_TICK.register(this::onClientTick);
         ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
             clearAll();
-            MtvClientNetworkInitializer.clearAll();
+            ClientChannelPlaybackManager.getInstance().clear();
             currentLevel = null;
         });
     }
@@ -52,7 +54,6 @@ public final class EntityPlayerManager {
         }
         if (level == null) return;
 
-        LOGGER.debug("EntityPlayerManager tick: tracked={}, level={}", activePlayers.size(), level.dimension());
         scanForPlayers(level);
         ClientChannelPlaybackManager.getInstance().onClientTick(client);
 
@@ -63,13 +64,23 @@ public final class EntityPlayerManager {
             var handle = entry.getValue();
 
             if (display.isRemoved()) {
-                handle.destroy();
+                LOGGER.info("Destroy MTV handle because host display was removed: entityId={}, uuid={}, removalReason={}", display.getId(), display.getUUID(), display.getRemovalReason());
+                handle.destroy("host display removed");
                 iterator.remove();
                 continue;
             }
 
             if (!hasPlayerConfig(display)) {
-                handle.destroy();
+                var probe = probeConfig(display);
+                LOGGER.info(
+                        "Destroy MTV handle because host display config is unavailable: entityId={}, uuid={}, emptyItemStack={}, missingCustomData={}, missingConfigCompound={}",
+                        display.getId(),
+                        display.getUUID(),
+                        probe.emptyItemStack(),
+                        probe.missingCustomData(),
+                        probe.missingConfigCompound()
+                );
+                handle.destroy("host display config unavailable");
                 iterator.remove();
                 continue;
             }
@@ -93,30 +104,36 @@ public final class EntityPlayerManager {
                 continue;
             }
 
-            LOGGER.debug("Found item display player: id={}, pos={}", display.getId(), display.position());
+            LOGGER.info("Track MTV host display: entityId={}, uuid={}, pos={}", display.getId(), display.getUUID(), display.position());
             var handle = new EntityPlayerHandle(display);
             activePlayers.put(display, handle);
         }
     }
 
     private static boolean hasPlayerConfig(Display.ItemDisplay display) {
+        var probe = probeConfig(display);
+        return !probe.emptyItemStack() && !probe.missingCustomData() && !probe.missingConfigCompound();
+    }
+
+    private static ConfigProbe probeConfig(Display.ItemDisplay display) {
         var itemStack = display.getSlot(0).get();
         if (itemStack.isEmpty()) {
-            return false;
+            return new ConfigProbe(true, true, true);
         }
         var customData = itemStack.get(net.minecraft.core.component.DataComponents.CUSTOM_DATA);
         if (customData == null || customData.isEmpty()) {
-            return false;
+            return new ConfigProbe(false, true, true);
         }
         var tag = customData.copyTag();
-        return tag.contains(ENTITY_CONFIG_KEY) || tag.contains(CONFIG_KEY) || tag.contains(LEGACY_CONFIG_KEY);
+        boolean hasConfigCompound = tag.contains(ENTITY_CONFIG_KEY) || tag.contains(CONFIG_KEY) || tag.contains(LEGACY_CONFIG_KEY);
+        return new ConfigProbe(false, false, !hasConfigCompound);
     }
 
     private void clearAll() {
         for (var handle : activePlayers.values()) {
-            handle.destroy();
+            handle.destroy("manager clearAll");
         }
         activePlayers.clear();
-        LOGGER.info("Cleared all item display players");
+        LOGGER.debug("Cleared all item display players");
     }
 }

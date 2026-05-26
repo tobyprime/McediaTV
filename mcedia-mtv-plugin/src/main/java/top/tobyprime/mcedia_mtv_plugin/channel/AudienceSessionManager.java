@@ -3,46 +3,73 @@ package top.tobyprime.mcedia_mtv_plugin.channel;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 public final class AudienceSessionManager {
-    private final Map<UUID, UUID> playerSessions = new ConcurrentHashMap<>();
-    private final Map<UUID, Set<String>> playerSubscriptions = new ConcurrentHashMap<>();
+    private volatile long activeTimeoutMs = 30_000L;
+
     private final Map<String, Map<UUID, AudienceSession>> sessionsByChannel = new ConcurrentHashMap<>();
 
-    public void registerClient(UUID playerUuid, UUID sessionId) {
-        playerSessions.put(playerUuid, sessionId);
+    public record AudienceTouch(boolean stateChanged, boolean durationChanged) {
     }
 
-    public UUID getSessionId(UUID playerUuid) {
-        return playerSessions.get(playerUuid);
+    public record AudienceSummary(long resolvedDurationMs, boolean completed, boolean majorityLoaded) {
     }
 
-    public void subscribe(UUID playerUuid, String channelId) {
+    public void setActiveTimeoutMs(long activeTimeoutMs) {
+        this.activeTimeoutMs = Math.max(0L, activeTimeoutMs);
+    }
+
+    public void subscribe(UUID playerUuid, String channelId, long nowMs) {
         if (channelId == null || channelId.isBlank()) {
-            playerSubscriptions.remove(playerUuid);
             return;
         }
-        playerSubscriptions.computeIfAbsent(playerUuid, key -> ConcurrentHashMap.newKeySet()).add(channelId);
+        var sessions = sessionsByChannel.computeIfAbsent(channelId, key -> new ConcurrentHashMap<>());
+        var session = sessions.computeIfAbsent(playerUuid, key -> new AudienceSession(playerUuid, channelId, nowMs));
+        session.setLastHeartbeatAtMs(nowMs);
+    }
+
+    public void unsubscribe(UUID playerUuid, String channelId) {
+        if (channelId == null || channelId.isBlank()) {
+            return;
+        }
+        var sessions = sessionsByChannel.get(channelId);
+        if (sessions == null) {
+            return;
+        }
+        sessions.remove(playerUuid);
+        if (sessions.isEmpty()) {
+            sessionsByChannel.remove(channelId, sessions);
+        }
     }
 
     public boolean isSubscribed(UUID playerUuid, String channelId) {
-        var subscriptions = playerSubscriptions.get(playerUuid);
-        return subscriptions != null && subscriptions.contains(channelId);
+        var sessions = sessionsByChannel.get(channelId);
+        return sessions != null && sessions.containsKey(playerUuid);
     }
 
-    public AudienceSession touch(UUID playerUuid, UUID sessionId, String channelId, long revision, AudienceObservedState observedState, String loadedMediaId, long durationMs, long nowMs) {
-        playerSessions.put(playerUuid, sessionId);
+    public boolean isActive(AudienceSession session, long nowMs) {
+        if (session == null) {
+            return false;
+        }
+        return nowMs - session.getLastHeartbeatAtMs() <= activeTimeoutMs && isSubscribed(session.getPlayerUuid(), session.getChannelId());
+    }
+
+    public AudienceTouch touch(UUID playerUuid, String channelId, long revision, boolean loaded, boolean completed, long durationMs, long nowMs) {
         var sessions = sessionsByChannel.computeIfAbsent(channelId, key -> new ConcurrentHashMap<>());
-        var session = sessions.computeIfAbsent(sessionId, key -> new AudienceSession(sessionId, playerUuid, channelId, nowMs));
+        var session = sessions.computeIfAbsent(playerUuid, key -> new AudienceSession(playerUuid, channelId, nowMs));
+        long nextDurationMs = Math.max(0L, durationMs);
+        boolean stateChanged = session.getLastRevision() != revision
+                || session.isLoaded() != loaded
+                || session.isCompleted() != completed;
+        boolean durationChanged = session.getDurationMs() != nextDurationMs;
         session.setLastHeartbeatAtMs(nowMs);
         session.setLastRevision(revision);
-        session.setObservedState(observedState);
-        session.setLoadedMediaId(loadedMediaId);
-        session.setDurationMs(durationMs);
-        return session;
+        session.setLoaded(loaded);
+        session.setCompleted(completed);
+        session.setDurationMs(nextDurationMs);
+        return new AudienceTouch(stateChanged || durationChanged, durationChanged);
     }
 
     public List<AudienceSession> getSessions(String channelId) {
@@ -50,104 +77,67 @@ public final class AudienceSessionManager {
         return sessions == null ? List.of() : new ArrayList<>(sessions.values());
     }
 
-    public long resolveDurationMs(String channelId, long revision) {
-        long resolved = 0L;
-        for (var session : getSessions(channelId)) {
-            if (session.getLastRevision() != revision) {
-                continue;
-            }
-            resolved = Math.max(resolved, session.getDurationMs());
-        }
-        return resolved;
-    }
-
-    public boolean isCompleted(String channelId, long revision) {
+    public List<AudienceSession> getActiveSessions(String channelId, long nowMs) {
         var sessions = getSessions(channelId);
         if (sessions.isEmpty()) {
-            return false;
+            return List.of();
         }
+        var activeSessions = new ArrayList<AudienceSession>();
+        for (var session : sessions) {
+            if (isActive(session, nowMs)) {
+                activeSessions.add(session);
+            }
+        }
+        return activeSessions;
+    }
+
+    public AudienceSummary summarize(String channelId, long revision, long nowMs) {
+        var sessions = getActiveSessions(channelId, nowMs);
+        if (sessions.isEmpty()) {
+            return new AudienceSummary(0L, false, false);
+        }
+        long resolvedDurationMs = 0L;
         int matched = 0;
+        int loaded = 0;
         int completed = 0;
         for (var session : sessions) {
             if (session.getLastRevision() != revision) {
                 continue;
             }
             matched++;
-            if (session.getObservedState() == AudienceObservedState.ENDED) {
+            resolvedDurationMs = Math.max(resolvedDurationMs, session.getDurationMs());
+            if (session.isLoaded() && session.getDurationMs() > 0L) {
+                loaded++;
+            }
+            if (session.isCompleted()) {
                 completed++;
             }
         }
-        return matched > 0 && completed * 2 > matched;
-    }
-
-    public boolean isMajorityLoaded(String channelId, long revision) {
-        var sessions = getSessions(channelId);
-        if (sessions.isEmpty()) {
-            return false;
-        }
-        int total = sessions.size();
-        int loaded = 0;
-        for (var session : sessions) {
-            if (session.getLastRevision() != revision) {
-                continue;
-            }
-            if (!session.getLoadedMediaId().isBlank() && session.getDurationMs() > 0L) {
-                loaded++;
-            }
-        }
-        return loaded > 0 && loaded * 2 > total;
+        return new AudienceSummary(
+                resolvedDurationMs,
+                matched > 0 && completed * 2 > matched,
+                matched > 0 && loaded * 2 > matched
+        );
     }
 
     public int countAudience(String channelId) {
-        int sessions = getSessions(channelId).size();
-        int subscribed = 0;
-        for (var entry : playerSubscriptions.entrySet()) {
-            if (entry.getValue().contains(channelId) && playerSessions.containsKey(entry.getKey())) {
-                subscribed++;
-            }
-        }
-        return Math.max(sessions, subscribed);
+        return getActiveSessions(channelId, System.currentTimeMillis()).size();
     }
 
     public void unregisterClient(UUID playerUuid) {
-        var sessionId = playerSessions.remove(playerUuid);
-        playerSubscriptions.remove(playerUuid);
-        if (sessionId == null) {
-            return;
-        }
         for (var sessions : sessionsByChannel.values()) {
-            sessions.remove(sessionId);
+            sessions.remove(playerUuid);
         }
         sessionsByChannel.entrySet().removeIf(entry -> entry.getValue().isEmpty());
     }
 
-    public List<String> pruneExpired(long nowMs, long timeoutMs) {
-        var expiredSessionIds = ConcurrentHashMap.<UUID>newKeySet();
+    public List<String> pruneExpired(long nowMs) {
         var emptiedChannels = new ArrayList<String>();
         for (var entry : sessionsByChannel.entrySet()) {
             var sessions = entry.getValue();
-            sessions.entrySet().removeIf(sessionEntry -> {
-                boolean expired = nowMs - sessionEntry.getValue().getLastHeartbeatAtMs() > timeoutMs;
-                if (expired) {
-                    expiredSessionIds.add(sessionEntry.getKey());
-                }
-                return expired;
-            });
+            sessions.entrySet().removeIf(sessionEntry -> nowMs - sessionEntry.getValue().getLastHeartbeatAtMs() > activeTimeoutMs);
             if (sessions.isEmpty() && sessionsByChannel.remove(entry.getKey(), sessions)) {
                 emptiedChannels.add(entry.getKey());
-            }
-        }
-        if (!expiredSessionIds.isEmpty()) {
-            var expiredPlayers = ConcurrentHashMap.<UUID>newKeySet();
-            playerSessions.entrySet().removeIf(entry -> {
-                boolean expired = expiredSessionIds.contains(entry.getValue());
-                if (expired) {
-                    expiredPlayers.add(entry.getKey());
-                }
-                return expired;
-            });
-            if (!expiredPlayers.isEmpty()) {
-                playerSubscriptions.keySet().removeIf(expiredPlayers::contains);
             }
         }
         return emptiedChannels;

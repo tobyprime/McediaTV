@@ -15,14 +15,6 @@ public record MtvChannelBinding(MtvChannelType type, String channelId, String re
         return new MtvChannelBinding(MtvChannelType.SELF, runtimeSelfChannelId(entityUuid), null);
     }
 
-    public static MtvChannelBinding standalone(UUID entityUuid) {
-        return standalone(runtimeSelfChannelId(entityUuid));
-    }
-
-    public static MtvChannelBinding standalone(String channelId) {
-        return new MtvChannelBinding(MtvChannelType.STANDALONE, channelId, null);
-    }
-
     public static String runtimeSelfChannelId(UUID entityUuid) {
         return "self:" + entityUuid;
     }
@@ -30,9 +22,6 @@ public record MtvChannelBinding(MtvChannelType type, String channelId, String re
     public MtvChannelBinding resolveRuntime(UUID entityUuid) {
         if (type == MtvChannelType.SELF) {
             return self(entityUuid);
-        }
-        if (type == MtvChannelType.STANDALONE && (channelId == null || channelId.isBlank())) {
-            return standalone(entityUuid);
         }
         return this;
     }
@@ -43,9 +32,5 @@ public record MtvChannelBinding(MtvChannelType type, String channelId, String re
 
     public boolean isSelf() {
         return type == MtvChannelType.SELF;
-    }
-
-    public boolean isStandalone() {
-        return type == MtvChannelType.STANDALONE || type == MtvChannelType.SELF;
     }
 }

@@ -76,13 +76,6 @@ public final class MtvPlaybackController {
     private void updatePlayback(UUID uuid,
                                 Function<ManagedMtvPlayer, Boolean> operation,
                                 Consumer<Boolean> done) {
-        manager.withDisplaySnapshot(uuid, display -> {
-            var player = manager.readFromEntity(display);
-            if (!Boolean.TRUE.equals(operation.apply(player))) {
-                return Boolean.FALSE;
-            }
-            manager.applyEntityState(display, player);
-            return Boolean.TRUE;
-        }, result -> done.accept(Boolean.TRUE.equals(result)));
+        manager.withManagedPlayer(uuid, operation, done);
     }
 }

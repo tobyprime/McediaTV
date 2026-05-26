@@ -21,6 +21,7 @@ public final class ClientChannelSession {
     private double lastAppliedSpeed = Double.NaN;
     private int attachments;
     private long lastHeartbeatAtMs;
+    private boolean loadingMedia;
 
     public ClientChannelSession(String channelId) {
         this.channelId = channelId;
@@ -81,8 +82,9 @@ public final class ClientChannelSession {
         if (playingUrl == null) {
             return;
         }
-        LOGGER.info("Stop MTV media because channel has no active snapshot: channel={}, playingUrl={}", channelId, playingUrl);
+        LOGGER.debug("Stop MTV media because channel has no active snapshot: channel={}, playingUrl={}", channelId, playingUrl);
         playingUrl = null;
+        loadingMedia = false;
         lastAppliedSpeed = Double.NaN;
         stopMedia();
     }
@@ -92,12 +94,14 @@ public final class ClientChannelSession {
             stopMediaIfIdle();
             return;
         }
-        if (Double.compare(lastAppliedSpeed, snapshot.speed()) != 0) {
+        boolean speedChanged = Double.compare(lastAppliedSpeed, snapshot.speed()) != 0;
+        if (speedChanged) {
             lastAppliedSpeed = snapshot.speed();
         }
         if (!snapshot.mediaUrl().equals(playingUrl)) {
-            LOGGER.info("Load MTV media from snapshot: channel={}, revision={}, mediaUrl={}", snapshot.channelId(), snapshot.revision(), snapshot.mediaUrl());
+            LOGGER.debug("Load MTV media from snapshot: channel={}, revision={}, mediaUrl={}", snapshot.channelId(), snapshot.revision(), snapshot.mediaUrl());
             playingUrl = snapshot.mediaUrl();
+            loadingMedia = true;
             loadMediaFromChannel(snapshot);
             return;
         }
@@ -115,7 +119,9 @@ public final class ClientChannelSession {
         if (snapshot.paused() != singlePlayer.isPaused()) {
             singlePlayer.setPaused(snapshot.paused());
         }
-        singlePlayer.setSpeed(snapshot.speed());
+        if (speedChanged) {
+            singlePlayer.setSpeed(snapshot.speed());
+        }
     }
 
     private void loadMediaFromChannel(ClientChannelPlaybackSnapshot snapshot) {
@@ -126,6 +132,7 @@ public final class ClientChannelSession {
         }
         singlePlayer.playAsync(() -> MediaResolvers.resolve(snapshot.mediaUrl()))
                 .thenAccept(mediaPlay -> {
+                    loadingMedia = false;
                     long target = computeTargetPositionUs(snapshot);
                     if (target > 0) {
                         var duration = mediaPlay.getDuration();
@@ -136,6 +143,7 @@ public final class ClientChannelSession {
                     singlePlayer.setPaused(snapshot.paused());
                 })
                 .exceptionally(throwable -> {
+                    loadingMedia = false;
                     LOGGER.error("Failed to load media from channel: {}", snapshot.mediaUrl(), throwable);
                     return null;
                 });
@@ -158,46 +166,27 @@ public final class ClientChannelSession {
         if (!(player instanceof SingleMediaPlayer singlePlayer)) {
             return;
         }
-        var media = singlePlayer.getMedia();
-        if (media == null) {
-            return;
-        }
         var mc = Minecraft.getInstance();
         if (mc.player == null) {
             return;
         }
-        long localPositionUs = media.getEstimatedTime();
-        if (localPositionUs < 0) {
-            return;
-        }
-        long resolvedDurationUs = media.getDuration();
-        boolean completed = resolvedDurationUs > 0 && localPositionUs >= resolvedDurationUs;
-        String observedState = completed ? "ENDED" : ("LOADING".equals(snapshot.state()) ? "LOADING" : (singlePlayer.isPaused() ? "PAUSED" : "PLAYING"));
-        LOGGER.info("Report MTV playback state: player={}, channel={}, revision={}, localPositionUs={}, resolvedDurationUs={}, state={}, paused={}, completed={}",
-                mc.player.getUUID(), snapshot.channelId(), snapshot.revision(), localPositionUs, resolvedDurationUs, observedState, singlePlayer.isPaused(), completed);
-        var sessionId = MtvClientNetworkInitializer.getSessionId();
-        if (sessionId == null) {
-            return;
+        var media = singlePlayer.getMedia();
+        long resolvedDurationUs = 0L;
+        boolean loaded = false;
+        boolean completed = false;
+        if (media != null) {
+            long localPositionUs = Math.max(0L, media.getEstimatedTime());
+            resolvedDurationUs = Math.max(0L, media.getDuration());
+            loaded = resolvedDurationUs > 0L;
+            completed = loaded && localPositionUs >= resolvedDurationUs;
         }
         MtvChannelHeartbeatSender.send(new MtvAudienceHeartbeat(
                 snapshot.channelId(),
-                sessionId,
                 snapshot.revision(),
-                observedState,
-                localPositionUs,
-                (float) snapshot.speed(),
-                snapshot.channelId() + ":" + snapshot.revision(),
+                loaded,
+                completed,
                 resolvedDurationUs
         ));
-        if (resolvedDurationUs > 0L) {
-            MtvChannelMediaInfoSender.send(new MtvMediaInfoReport(
-                    snapshot.channelId(),
-                    sessionId,
-                    snapshot.revision(),
-                    snapshot.channelId() + ":" + snapshot.revision(),
-                    resolvedDurationUs
-            ));
-        }
     }
 
     private void stopMedia() {

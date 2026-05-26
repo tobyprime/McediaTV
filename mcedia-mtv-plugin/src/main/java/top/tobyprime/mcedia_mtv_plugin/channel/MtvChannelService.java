@@ -16,14 +16,13 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 import java.util.function.Function;
-import java.util.function.Supplier;
 
 public final class MtvChannelService {
     private static final Logger LOGGER = LoggerFactory.getLogger(MtvChannelService.class);
 
     private final MtvPlayerManager manager;
     private final Map<String, ChannelRuntimeState> channelStates = new ConcurrentHashMap<>();
-    private final ChannelBindingRegistry bindingRegistry = new ChannelBindingRegistry();
+    private final Map<UUID, MtvChannelBinding> entityBindings = new ConcurrentHashMap<>();
     private final AudienceSessionManager audienceSessionManager = new AudienceSessionManager();
     private final ChannelRepository repository;
     private volatile Consumer<String> changeListener = channelId -> {};
@@ -63,9 +62,10 @@ public final class MtvChannelService {
     public ChannelRuntimeState syncSnapshot(ManagedMtvPlayer player) {
         var runtimeBinding = bindRuntime(player);
         var state = loadBoundState(runtimeBinding, player);
+        alignPlaylistPlayback(state);
         persistState(state);
         applyRuntimeStateToPlayer(player, state);
-        LOGGER.info("Synced MTV channel snapshot to player: channel={}, type={}, entity={}, revision={}, mediaUrl={}, paused={}",
+        LOGGER.debug("Synced MTV channel snapshot to player: channel={}, type={}, entity={}, revision={}, mediaUrl={}, paused={}",
                 runtimeBinding.channelId(), runtimeBinding.type(), player.getUuid(), state.getRevision(), state.getPlayState().getMediaUrl(), state.getPlayState().getState() != ChannelPlaybackStatus.PLAYING);
         return state;
     }
@@ -73,6 +73,7 @@ public final class MtvChannelService {
     public ChannelRuntimeState previewState(ManagedMtvPlayer player) {
         var runtimeBinding = bindRuntime(player);
         var state = loadBoundState(runtimeBinding, player);
+        alignPlaylistPlayback(state);
         applyRuntimeStateToPlayer(player, state);
         return state;
     }
@@ -89,7 +90,7 @@ public final class MtvChannelService {
         state.touch();
         persistState(state);
         applyRuntimeStateToPlayer(player, state);
-        LOGGER.info("Mutated MTV channel playback: channel={}, type={}, entity={}, revision={}, mediaUrl={}, speed={}, mediaTimeMs={}, playTimeMs={}, state={}",
+        LOGGER.debug("Mutated MTV channel playback: channel={}, type={}, entity={}, revision={}, mediaUrl={}, speed={}, mediaTimeMs={}, playTimeMs={}, state={}",
                 runtimeBinding.channelId(), runtimeBinding.type(), player.getUuid(), state.getRevision(), state.getPlayState().getMediaUrl(),
                 state.getPlayState().getSpeed(), state.getPlayState().getMediaTimeMs(), state.getPlayState().getPlayTimeMs(), state.getPlayState().getState());
         onChannelChanged(runtimeBinding.channelId());
@@ -299,7 +300,7 @@ public final class MtvChannelService {
 
     public boolean deletePublicChannel(Player player, String channelId) {
         var state = getPublicChannel(channelId);
-        if (state == null || !canManagePublicChannel(player, state) || manager.countPlayersByChannelId(channelId) > 0) {
+        if (state == null || !canManagePublicChannel(player, state)) {
             return false;
         }
         channelStates.remove(channelId);
@@ -386,6 +387,21 @@ public final class MtvChannelService {
         return true;
     }
 
+    private void alignPlaylistPlayback(ChannelRuntimeState state) {
+        if (state == null) {
+            return;
+        }
+        if (state.getPlaylist().isEmpty()) {
+            return;
+        }
+        int cursor = state.getNormalizedPlaylistCursor();
+        var item = state.getPlaylist().get(cursor);
+        if (item.mediaUrl().equals(state.getPlayState().getMediaUrl())) {
+            return;
+        }
+        selectPlaylistIndex(state, cursor, System.currentTimeMillis());
+    }
+
     private boolean movePlaylistItem(ChannelRuntimeState state, int fromIndex, int toIndex) {
         if (fromIndex < 0 || fromIndex >= state.getPlaylist().size() || toIndex < 0 || toIndex >= state.getPlaylist().size() || fromIndex == toIndex) {
             return false;
@@ -410,7 +426,7 @@ public final class MtvChannelService {
         }
         var runtimeBinding = configuredBinding.resolveRuntime(player.getUuid());
         player.setChannelBinding(configuredBinding);
-        bindingRegistry.bind(player.getUuid(), runtimeBinding);
+        entityBindings.put(player.getUuid(), runtimeBinding);
         return runtimeBinding;
     }
 
@@ -446,7 +462,7 @@ public final class MtvChannelService {
         return channelStates.get(channelId);
     }
 
-    public ChannelRuntimeState ensureChannelState(String channelId, Supplier<ManagedMtvPlayer> loader) {
+    public ChannelRuntimeState ensureChannelState(String channelId) {
         var state = getChannelState(channelId);
         if (state != null) {
             return state;
@@ -456,18 +472,7 @@ public final class MtvChannelService {
             channelStates.put(channelId, persisted);
             return persisted;
         }
-        if (loader == null) {
-            return null;
-        }
-        var player = loader.get();
-        if (player == null) {
-            return null;
-        }
-        var binding = resolveBinding(player);
-        if (!channelId.equals(binding.channelId())) {
-            return null;
-        }
-        return syncSnapshot(player);
+        return null;
     }
 
     public Collection<ChannelRuntimeState> getChannelStates() {
@@ -487,12 +492,11 @@ public final class MtvChannelService {
     }
 
     public void unregister(UUID entityUuid) {
-        var binding = bindingRegistry.get(entityUuid);
+        var binding = entityBindings.remove(entityUuid);
         if (binding == null) {
             return;
         }
-        bindingRegistry.unbind(entityUuid);
-        if (!bindingRegistry.hasMembers(binding.channelId()) && binding.isStandalone()) {
+        if (binding.isSelf()) {
             channelStates.remove(binding.channelId());
             removeListener.accept(binding.channelId());
             audienceSessionManager.invalidateChannel(binding.channelId());

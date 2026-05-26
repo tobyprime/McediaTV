@@ -22,6 +22,7 @@ public final class Mcedia_mtv_plugin extends JavaPlugin {
     public void onEnable() {
         this.manager = new MtvPlayerManager(this);
         manager.getChannelService().loadPersistedStates();
+        manager.getChannelService().getAudienceSessionManager().setActiveTimeoutMs(AUDIENCE_TIMEOUT_MS);
         var networkService = new MtvChannelNetworkService(this, manager.getChannelService());
         manager.getChannelService().setChangeListener(networkService::publishSnapshot);
         manager.getChannelService().setRemoveListener(networkService::invalidateChannel);
@@ -33,12 +34,9 @@ public final class Mcedia_mtv_plugin extends JavaPlugin {
         getLifecycleManager().registerEventHandler(LifecycleEvents.COMMANDS, commands ->
                 commands.registrar().register(mtvCommand.buildCommandTree(), "Manage MTV interaction players"));
 
-        getServer().getScheduler().runTaskTimer(this, () -> {
-            var emptiedChannels = manager.getChannelService().getAudienceSessionManager().pruneExpired(System.currentTimeMillis(), AUDIENCE_TIMEOUT_MS);
-            for (var channelId : emptiedChannels) {
-                getLogger().info("MTV channel audience expired: channel=" + channelId);
-            }
-        }, 20L, 20L);
+        getServer().getGlobalRegionScheduler().runAtFixedRate(this, task ->
+                manager.getChannelService().getAudienceSessionManager().pruneExpired(System.currentTimeMillis()),
+                20L, 20L);
 
         PluginManager pluginManager = getServer().getPluginManager();
         pluginManager.registerEvents(networkService, this);

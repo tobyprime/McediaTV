@@ -276,6 +276,8 @@ onHeartbeat:
 
 当客户端开始消费某个 channel 时，创建一个 `audience session`。
 
+当前实现中，不再使用单独的 `channel_hello` / `sessionId` 握手；客户端通过首次 `subscribe(channelId)` 进入该 channel 的 audience 集合。
+
 服务端在 audience 加入后，必须立即下发当前 channel 状态。
 
 ### 心跳
@@ -305,23 +307,19 @@ onHeartbeat:
 
 - `channelId`
 - `revision`
-- `state`
-- `clientMediaTime`
-- `clientPlaybackRate`
-- `loadedMediaId`
+- `loaded`
+- `completed`
 - `duration`
 
-其中客户端状态 `state` 至少包含：
+其中：
 
-- `LOADING`：加载中
-- `PLAYING`：开始播放
-- `ENDED`：播放完成
-
-这些状态用于服务端判断客户端当前所处的媒体生命周期阶段。
+- `loaded = true` 表示客户端本地媒体已经真正 ready，并拿到了有效时长
+- `completed = true` 表示客户端本地媒体已经播放到结尾
+- `duration` 为客户端当前观测到的媒体时长
 
 需要注意：
 
-- 客户端上报状态用于观测、纠偏与结束判定
+- 客户端心跳现在只上报服务端真正消费的观测结果，不再传输 `state`、`clientMediaTime`、`clientPlaybackRate` 或 `loadedMediaId`
 - 服务端权威状态不直接等于客户端上报状态
 - 进度和最终切歌仍以服务端时间轴计算为准
 

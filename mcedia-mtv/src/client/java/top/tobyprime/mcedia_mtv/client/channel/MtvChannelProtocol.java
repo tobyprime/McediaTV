@@ -3,15 +3,12 @@ package top.tobyprime.mcedia_mtv.client.channel;
 import io.netty.buffer.Unpooled;
 import net.minecraft.network.FriendlyByteBuf;
 
-import java.util.UUID;
-
 public final class MtvChannelProtocol {
-    public static final String CHANNEL_HELLO = "mcedia_mtv:channel_hello";
     public static final String CHANNEL_SUBSCRIBE = "mcedia_mtv:channel_subscribe";
+    public static final String CHANNEL_UNSUBSCRIBE = "mcedia_mtv:channel_unsubscribe";
     public static final String CHANNEL_SNAPSHOT = "mcedia_mtv:channel_snapshot";
     public static final String CHANNEL_REMOVE = "mcedia_mtv:channel_remove";
     public static final String CHANNEL_HEARTBEAT = "mcedia_mtv:channel_heartbeat";
-    public static final String CHANNEL_MEDIA_INFO = "mcedia_mtv:channel_media_info";
 
     private MtvChannelProtocol() {
     }
@@ -57,66 +54,28 @@ public final class MtvChannelProtocol {
     public static MtvAudienceHeartbeat readHeartbeat(FriendlyByteBuf buffer) {
         return new MtvAudienceHeartbeat(
                 buffer.readUtf(),
-                buffer.readUUID(),
                 buffer.readLong(),
-                buffer.readUtf(),
-                buffer.readLong(),
-                buffer.readFloat(),
-                buffer.readUtf(),
+                buffer.readBoolean(),
+                buffer.readBoolean(),
                 buffer.readLong()
         );
     }
 
     public static void writeHeartbeat(FriendlyByteBuf buffer, MtvAudienceHeartbeat heartbeat) {
         buffer.writeUtf(heartbeat.channelId());
-        buffer.writeUUID(heartbeat.sessionId());
         buffer.writeLong(heartbeat.revision());
-        buffer.writeUtf(heartbeat.state());
-        buffer.writeLong(heartbeat.clientMediaTimeUs());
-        buffer.writeFloat(heartbeat.clientPlaybackRate());
-        buffer.writeUtf(heartbeat.loadedMediaId());
+        buffer.writeBoolean(heartbeat.loaded());
+        buffer.writeBoolean(heartbeat.completed());
         buffer.writeLong(heartbeat.durationUs());
     }
 
-    public static MtvMediaInfoReport readMediaInfo(FriendlyByteBuf buffer) {
-        return new MtvMediaInfoReport(
-                buffer.readUtf(),
-                buffer.readUUID(),
-                buffer.readLong(),
-                buffer.readUtf(),
-                buffer.readLong()
-        );
-    }
-
-    public static void writeMediaInfo(FriendlyByteBuf buffer, MtvMediaInfoReport report) {
-        buffer.writeUtf(report.channelId());
-        buffer.writeUUID(report.sessionId());
-        buffer.writeLong(report.revision());
-        buffer.writeUtf(report.loadedMediaId());
-        buffer.writeLong(report.durationUs());
-    }
-
-    public static byte[] encodeHello(UUID sessionId) {
-        var buffer = new FriendlyByteBuf(Unpooled.buffer());
-        buffer.writeUUID(sessionId);
-        return toBytes(buffer);
-    }
-
-    public static UUID decodeHello(byte[] message) {
-        var buffer = new FriendlyByteBuf(Unpooled.wrappedBuffer(message));
-        return buffer.readUUID();
-    }
 
     public static MtvChannelSubscriptionRequest readSubscription(FriendlyByteBuf buffer) {
-        return new MtvChannelSubscriptionRequest(
-                buffer.readUtf(),
-                buffer.readUUID()
-        );
+        return new MtvChannelSubscriptionRequest(buffer.readUtf());
     }
 
     public static void writeSubscription(FriendlyByteBuf buffer, MtvChannelSubscriptionRequest request) {
         buffer.writeUtf(request.channelId());
-        buffer.writeUUID(request.sessionId());
     }
 
     public static byte[] encodeSubscription(MtvChannelSubscriptionRequest request) {

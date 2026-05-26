@@ -65,6 +65,8 @@ public class MtvGui {
     }
 
     public static final double NEARBY_RANGE = 50.0;
+    public static final String MEDIA_INPUT_HINT = "请输入支持的播放链接";
+    public static final String MEDIA_INPUT_MESSAGE = MEDIA_INPUT_HINT + "。";
     private static final String NEARBY_PAGE_KEY = "nearby_page";
     private static final String NEARBY_SLOT_UUID_PREFIX = "nearby_slot_";
 
@@ -112,7 +114,7 @@ public class MtvGui {
             inv.setItem(41, item(Material.JUKEBOX, "频道编辑", "打开 channel 播放与列表页"));
             inv.setItem(42, item(Material.BOOK, "公共频道", "搜索并绑定公共频道"));
             inv.setItem(43, item(Material.STRUCTURE_VOID, "切回私有频道", "恢复 self 频道绑定"));
-            inv.setItem(40, item(Material.MUSIC_DISC_CAT, "设置播放链接", snapshot.getMediaUrl().isBlank() ? "未设置" : snapshot.getMediaUrl(), "输入 URL 或 BV 号"));
+            inv.setItem(40, item(Material.MUSIC_DISC_CAT, "设置播放链接", snapshot.getMediaUrl().isBlank() ? "未设置" : snapshot.getMediaUrl(), MEDIA_INPUT_HINT));
             inv.setItem(47, item(Material.STRUCTURE_VOID, "从头播放"));
             inv.setItem(48, item(Material.STONE_BUTTON, "后退 1 秒", "潜行点击后退 10 秒"));
             var pauseIcon = snapshot.isPaused() ? Material.YELLOW_WOOL : Material.RED_WOOL;
@@ -150,8 +152,8 @@ public class MtvGui {
         inv.setItem(14, item(pauseIcon, pauseName));
         inv.setItem(15, item(Material.STONE_BUTTON, "下一首", "始终按列表顺序"));
         inv.setItem(16, item(Material.COMPASS, "设置到位置: " + formatDurationUs(snapshot.getStartAt()), "点击输入微秒值"));
-        inv.setItem(19, item(Material.HOPPER, "首加播放项", "输入 URL 或 BV 号"));
-        inv.setItem(20, item(Material.CHEST, "尾加播放项", "输入 URL 或 BV 号"));
+        inv.setItem(19, item(Material.HOPPER, "首加播放项", MEDIA_INPUT_HINT));
+        inv.setItem(20, item(Material.CHEST, "尾加播放项", MEDIA_INPUT_HINT));
         inv.setItem(21, item(Material.STRUCTURE_VOID, "从头播放当前项"));
         inv.setItem(22, item(Material.STONE_BUTTON, "后退 1 秒", "潜行点击后退 10 秒"));
         inv.setItem(23, item(Material.STONE_BUTTON, "前进 1 秒", "潜行点击前进 10 秒"));
@@ -400,7 +402,10 @@ public class MtvGui {
         inv.setItem(11, item(Material.WRITABLE_BOOK, "频道介绍", fallback(state.getDescription(), "无")));
         inv.setItem(12, item(Material.ENDER_EYE, "当前观看人数", Integer.toString(manager.getChannelService().getAudienceCount(channelId))));
         inv.setItem(13, item(Material.NAME_TAG, "频道 ID", channelId));
-        inv.setItem(14, item(Material.JUKEBOX, "频道播放控制", "打开该公共频道的播放控制页"));
+        inv.setItem(14, item(Material.JUKEBOX,
+                "频道控制",
+                entityUuid != null ? "打开当前播放器的频道控制页" : "打开附近绑定此频道的播放器控制页",
+                canManage ? "你可以编辑此频道" : "你当前只能只读查看"));
         if (canManage) {
             inv.setItem(15, item(Material.NAME_TAG, "编辑频道名称"));
             inv.setItem(16, item(Material.WRITABLE_BOOK, "编辑频道介绍"));

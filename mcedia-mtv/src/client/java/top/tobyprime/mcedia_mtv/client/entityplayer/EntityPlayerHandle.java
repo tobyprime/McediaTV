@@ -20,9 +20,6 @@ import top.tobyprime.mcedia_core.client.entity.PlayerSpeakerEntity;
 import top.tobyprime.mcedia_core.client.player.MediaPlayerHostManager;
 import top.tobyprime.mcedia_mtv.client.channel.ClientChannelPlaybackManager;
 import top.tobyprime.mcedia_mtv.client.channel.ClientChannelSession;
-import top.tobyprime.mcedia_mtv.client.channel.MtvChannelSubscribeSender;
-import top.tobyprime.mcedia_mtv.client.channel.MtvChannelSubscriptionRequest;
-import top.tobyprime.mcedia_mtv.client.channel.MtvClientNetworkInitializer;
 
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -41,6 +38,7 @@ public class EntityPlayerHandle {
 
     private @Nullable String channelId;
     private @Nullable ClientChannelSession channelSession;
+    private boolean missingHostConfigLogged;
 
     public EntityPlayerHandle(ItemDisplay display) {
         this.display = display;
@@ -51,7 +49,6 @@ public class EntityPlayerHandle {
             var config = readConfig();
             syncChannelSession(config.channelId());
             syncPeripherals(config.peripherals());
-            LOGGER.debug("Tick item display player id={}, channel={}, peripherals={}", display.getId(), channelId, config.peripherals().size());
         } catch (Exception e) {
             LOGGER.warn("Error ticking item display player id={}", display.getId(), e);
         }
@@ -66,29 +63,27 @@ public class EntityPlayerHandle {
         }
         channelId = desiredChannelId;
         channelSession = ClientChannelPlaybackManager.getInstance().attach(desiredChannelId);
-        requestChannelSnapshot(desiredChannelId);
         reattachPeripherals();
     }
 
-    private void requestChannelSnapshot(@Nullable String desiredChannelId) {
-        if (desiredChannelId == null || desiredChannelId.isBlank()) {
-            return;
-        }
-        var sessionId = MtvClientNetworkInitializer.getSessionId();
-        if (sessionId == null) {
-            return;
-        }
-        MtvChannelSubscribeSender.send(new MtvChannelSubscriptionRequest(desiredChannelId, sessionId));
-        LOGGER.info("Request MTV channel snapshot: channel={}, session={}", desiredChannelId, sessionId);
-    }
-
     private void syncPeripherals(List<PeripheralConfig> desiredPeripherals) {
+        if (desiredPeripherals.isEmpty() && !runtimePeripherals.isEmpty()) {
+            LOGGER.info(
+                    "MTV host config resolved to empty peripheral list while runtimes still exist: entityId={}, uuid={}, runtimeCount={}, channelId={}",
+                    display.getId(),
+                    display.getUUID(),
+                    runtimePeripherals.size(),
+                    channelId
+            );
+        }
+
         var nextIds = new LinkedHashSet<String>();
         for (var peripheral : desiredPeripherals) {
             String id = peripheral.id();
             nextIds.add(id);
 
             var runtime = runtimePeripherals.get(id);
+            boolean created = false;
             if (runtime == null || runtime.kind() != peripheral.kind()) {
                 if (runtime != null) {
                     destroyRuntimePeripheral(runtime);
@@ -99,10 +94,13 @@ public class EntityPlayerHandle {
                     continue;
                 }
                 runtimePeripherals.put(id, runtime);
+                created = true;
             }
 
             applyPeripheralConfig(runtime, peripheral);
-            assignRuntimePeripheral(runtime);
+            if (created) {
+                assignRuntimePeripheral(runtime);
+            }
         }
 
         var staleIds = new LinkedHashSet<>(runtimePeripherals.keySet());
@@ -145,12 +143,14 @@ public class EntityPlayerHandle {
             case SCREEN -> {
                 var screen = new PlayerScreenEntity(ClientEntityManager.PLAYER_SCREEN, level);
                 level.addEntity(screen);
+                LOGGER.info("Create MTV screen runtime: hostEntityId={}, hostUuid={}, runtimeId={}, runtimeEntityId={}", display.getId(), display.getUUID(), config.id(), screen.getId());
                 yield new ScreenRuntimeHandle(config.id(), screen);
             }
             case SPEAKER -> {
                 var speaker = new PlayerSpeakerEntity(ClientEntityManager.PLAYER_SPEAKER, level);
                 speaker.setMaxRange(PlayerSpeakerEntity.DEFAULT_MAX_RANGE);
                 level.addEntity(speaker);
+                LOGGER.info("Create MTV speaker runtime: hostEntityId={}, hostUuid={}, runtimeId={}, runtimeEntityId={}", display.getId(), display.getUUID(), config.id(), speaker.getId());
                 yield new SpeakerRuntimeHandle(config.id(), speaker);
             }
         };
@@ -231,7 +231,10 @@ public class EntityPlayerHandle {
 
         var customData = itemStack.get(DataComponents.CUSTOM_DATA);
         if (customData == null || customData.isEmpty()) {
-            LOGGER.info("Item display {} has empty custom data", display.getId());
+            if (!missingHostConfigLogged) {
+                LOGGER.info("MTV host display custom data became empty: entityId={}, uuid={}", display.getId(), display.getUUID());
+                missingHostConfigLogged = true;
+            }
             return HostConfig.DEFAULT;
         }
 
@@ -245,8 +248,16 @@ public class EntityPlayerHandle {
             configTag = tag.getCompoundOrEmpty(EntityPlayerManager.LEGACY_CONFIG_KEY);
         }
         if (configTag.isEmpty()) {
-            LOGGER.info("Item display {} has no player config compound", display.getId());
+            if (!missingHostConfigLogged) {
+                LOGGER.info("MTV host display lost player config compound: entityId={}, uuid={}", display.getId(), display.getUUID());
+                missingHostConfigLogged = true;
+            }
             return HostConfig.DEFAULT;
+        }
+
+        if (missingHostConfigLogged) {
+            LOGGER.info("MTV host display config recovered: entityId={}, uuid={}", display.getId(), display.getUUID());
+            missingHostConfigLogged = false;
         }
 
         String boundChannelId = null;
@@ -313,7 +324,7 @@ public class EntityPlayerHandle {
         float offsetRx = peripheralTag.getFloatOr("offset_rx", 0.0F);
         float offsetRy = peripheralTag.getFloatOr("offset_ry", 0.0F);
         float offsetRz = peripheralTag.getFloatOr("offset_rz", 0.0F);
-        float offsetRw = peripheralTag.getFloatOr("offset_rw", 0.0F);
+        float offsetRw = peripheralTag.getFloatOr("offset_rw", 1.0F);
 
         return switch (kind) {
             case SCREEN -> new ScreenPeripheralConfig(
@@ -363,7 +374,15 @@ public class EntityPlayerHandle {
         return id != null ? id : DEFAULT_BACKGROUND_TEXTURE;
     }
 
-    public void destroy() {
+    public void destroy(String reason) {
+        LOGGER.info(
+                "Destroy MTV handle: entityId={}, uuid={}, reason={}, runtimeCount={}, channelId={}",
+                display.getId(),
+                display.getUUID(),
+                reason,
+                runtimePeripherals.size(),
+                channelId
+        );
         if (channelId != null) {
             ClientChannelPlaybackManager.getInstance().detach(channelId);
         }
@@ -381,8 +400,28 @@ public class EntityPlayerHandle {
 
     private void destroyRuntimePeripheral(RuntimePeripheralHandle runtime) {
         switch (runtime) {
-            case ScreenRuntimeHandle screenRuntime -> screenRuntime.screen().remove(RemovalReason.KILLED);
-            case SpeakerRuntimeHandle speakerRuntime -> speakerRuntime.speaker().remove(RemovalReason.KILLED);
+            case ScreenRuntimeHandle screenRuntime -> {
+                LOGGER.info(
+                        "Destroy MTV screen runtime: hostEntityId={}, hostUuid={}, runtimeId={}, runtimeEntityId={}, alreadyRemoved={}",
+                        display.getId(),
+                        display.getUUID(),
+                        runtime.id(),
+                        screenRuntime.screen().getId(),
+                        screenRuntime.screen().isRemoved()
+                );
+                screenRuntime.screen().remove(RemovalReason.KILLED);
+            }
+            case SpeakerRuntimeHandle speakerRuntime -> {
+                LOGGER.info(
+                        "Destroy MTV speaker runtime: hostEntityId={}, hostUuid={}, runtimeId={}, runtimeEntityId={}, alreadyRemoved={}",
+                        display.getId(),
+                        display.getUUID(),
+                        runtime.id(),
+                        speakerRuntime.speaker().getId(),
+                        speakerRuntime.speaker().isRemoved()
+                );
+                speakerRuntime.speaker().remove(RemovalReason.KILLED);
+            }
         }
     }
 

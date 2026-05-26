@@ -29,29 +29,26 @@ public final class MtvChannelNetworkService implements PluginMessageListener, Li
         var messenger = plugin.getServer().getMessenger();
         messenger.registerOutgoingPluginChannel(plugin, MtvChannelProtocol.CHANNEL_SNAPSHOT);
         messenger.registerOutgoingPluginChannel(plugin, MtvChannelProtocol.CHANNEL_REMOVE);
-        messenger.registerIncomingPluginChannel(plugin, MtvChannelProtocol.CHANNEL_HELLO, this);
         messenger.registerIncomingPluginChannel(plugin, MtvChannelProtocol.CHANNEL_SUBSCRIBE, this);
+        messenger.registerIncomingPluginChannel(plugin, MtvChannelProtocol.CHANNEL_UNSUBSCRIBE, this);
         messenger.registerIncomingPluginChannel(plugin, MtvChannelProtocol.CHANNEL_HEARTBEAT, this);
-        messenger.registerIncomingPluginChannel(plugin, MtvChannelProtocol.CHANNEL_MEDIA_INFO, this);
     }
 
     @Override
     public void onPluginMessageReceived(String channel, Player player, byte[] message) {
-        if (MtvChannelProtocol.CHANNEL_HELLO.equals(channel)) {
-            handleHello(player, message);
-            return;
-        }
-        if (MtvChannelProtocol.CHANNEL_SUBSCRIBE.equals(channel)) {
-            handleSubscribe(player, message);
-            return;
-        }
-        if (MtvChannelProtocol.CHANNEL_HEARTBEAT.equals(channel)) {
-            handleHeartbeat(player, message);
-            return;
-        }
-        if (MtvChannelProtocol.CHANNEL_MEDIA_INFO.equals(channel)) {
-            handleMediaInfo(player, message);
-        }
+        runOnPlayer(player, () -> {
+            if (MtvChannelProtocol.CHANNEL_SUBSCRIBE.equals(channel)) {
+                handleSubscribe(player, message);
+                return;
+            }
+            if (MtvChannelProtocol.CHANNEL_UNSUBSCRIBE.equals(channel)) {
+                handleUnsubscribe(player, message);
+                return;
+            }
+            if (MtvChannelProtocol.CHANNEL_HEARTBEAT.equals(channel)) {
+                handleHeartbeat(player, message);
+            }
+        });
     }
 
     @EventHandler
@@ -72,37 +69,23 @@ public final class MtvChannelNetworkService implements PluginMessageListener, Li
         if (state == null) {
             return;
         }
-        var snapshot = state.toSnapshot(resolveDuration(channelId), isCompleted(channelId));
-        int recipients = broadcastSnapshot(snapshot);
-        LOGGER.info("Published MTV channel snapshot: channel={}, revision={}, mediaUrl={}, paused={}, completed={}, recipients={}",
-                snapshot.channelId(), snapshot.revision(), snapshot.mediaUrl(), snapshot.paused(), snapshot.completed(), recipients);
+        long nowMs = System.currentTimeMillis();
+        publishSnapshot(state, summarizeAudience(state, nowMs));
     }
 
     public void publishSnapshotTo(Player player, String channelId) {
         if (player == null || channelId == null || channelId.isBlank()) {
             return;
         }
-        var state = channelService.ensureChannelState(channelId, () -> channelService.getManager().findPlayerByChannelId(channelId));
+        var state = channelService.ensureChannelState(channelId);
         if (state == null) {
             LOGGER.debug("Skip MTV channel snapshot publish: missing channel state for channel={}, player={}", channelId, player.getName());
             return;
         }
-        var snapshot = state.toSnapshot(resolveDuration(channelId), isCompleted(channelId));
+        var snapshot = toSnapshot(state, summarizeAudience(state, System.currentTimeMillis()));
         sendSnapshot(player, snapshot);
-        LOGGER.info("Published MTV channel snapshot to player: player={}, channel={}, revision={}, mediaUrl={}, paused={}, completed={}",
+        LOGGER.debug("Published MTV channel snapshot to player: player={}, channel={}, revision={}, mediaUrl={}, paused={}, completed={}",
                 player.getName(), snapshot.channelId(), snapshot.revision(), snapshot.mediaUrl(), snapshot.paused(), snapshot.completed());
-    }
-
-    public void publishAllTo(Player player) {
-        if (player == null) {
-            return;
-        }
-        int sent = 0;
-        for (var state : channelService.getChannelStates()) {
-            sendSnapshot(player, state.toSnapshot(resolveDuration(state.getChannelId()), isCompleted(state.getChannelId())));
-            sent++;
-        }
-        LOGGER.info("Published all MTV channel snapshots to player: player={}, count={}", player.getName(), sent);
     }
 
     public void invalidateChannel(String channelId) {
@@ -110,22 +93,8 @@ public final class MtvChannelNetworkService implements PluginMessageListener, Li
             return;
         }
         int recipients = broadcastRemove(channelId);
-        LOGGER.info("Invalidated MTV channel: channel={}, recipients={}", channelId, recipients);
+        LOGGER.debug("Invalidated MTV channel: channel={}, recipients={}", channelId, recipients);
         channelService.getAudienceSessionManager().invalidateChannel(channelId);
-    }
-
-    private void handleHello(Player player, byte[] message) {
-        UUID sessionId;
-        try {
-            sessionId = MtvChannelProtocol.decodeHello(message);
-        } catch (Exception e) {
-            LOGGER.warn("Failed to decode MTV hello from {}", player.getName(), e);
-            return;
-        }
-
-        channelService.getAudienceSessionManager().registerClient(player.getUniqueId(), sessionId);
-        channelService.getAudienceSessionManager().subscribe(player.getUniqueId(), null);
-        LOGGER.info("Registered MTV client: player={}, session={}", player.getName(), sessionId);
     }
 
     private void handleSubscribe(Player player, byte[] message) {
@@ -136,13 +105,19 @@ public final class MtvChannelNetworkService implements PluginMessageListener, Li
             LOGGER.warn("Failed to decode MTV subscribe from {}", player.getName(), e);
             return;
         }
-        var expectedSessionId = channelService.getAudienceSessionManager().getSessionId(player.getUniqueId());
-        if (expectedSessionId == null || !expectedSessionId.equals(request.sessionId())) {
-            LOGGER.debug("Ignoring MTV subscribe from unregistered or stale client session: player={}, expectedSession={}, requestSession={}", player.getName(), expectedSessionId, request.sessionId());
+        channelService.getAudienceSessionManager().subscribe(player.getUniqueId(), request.channelId(), System.currentTimeMillis());
+        publishSnapshotTo(player, request.channelId());
+    }
+
+    private void handleUnsubscribe(Player player, byte[] message) {
+        MtvChannelSubscriptionRequest request;
+        try {
+            request = MtvChannelProtocol.decodeSubscription(message);
+        } catch (Exception e) {
+            LOGGER.warn("Failed to decode MTV unsubscribe from {}", player.getName(), e);
             return;
         }
-        channelService.getAudienceSessionManager().subscribe(player.getUniqueId(), request.channelId());
-        publishSnapshotTo(player, request.channelId());
+        channelService.getAudienceSessionManager().unsubscribe(player.getUniqueId(), request.channelId());
     }
 
     private void handleHeartbeat(Player player, byte[] message) {
@@ -153,116 +128,81 @@ public final class MtvChannelNetworkService implements PluginMessageListener, Li
             LOGGER.warn("Failed to decode MTV heartbeat from {}", player.getName(), e);
             return;
         }
-        var expectedSessionId = channelService.getAudienceSessionManager().getSessionId(player.getUniqueId());
-        if (expectedSessionId == null || !expectedSessionId.equals(heartbeat.sessionId())) {
-            LOGGER.debug("Ignoring MTV heartbeat from unregistered or stale client session: player={}, expectedSession={}, heartbeatSession={}", player.getName(), expectedSessionId, heartbeat.sessionId());
+        var audienceSessionManager = channelService.getAudienceSessionManager();
+        if (!audienceSessionManager.isSubscribed(player.getUniqueId(), heartbeat.channelId())) {
+            LOGGER.debug("Ignoring MTV heartbeat for unsubscribed channel: player={}, channel={}", player.getName(), heartbeat.channelId());
             return;
         }
-        var observedState = parseObservedState(heartbeat.state());
-        channelService.getAudienceSessionManager().touch(
+        long nowMs = System.currentTimeMillis();
+        var touch = audienceSessionManager.touch(
                 player.getUniqueId(),
-                heartbeat.sessionId(),
                 heartbeat.channelId(),
                 heartbeat.revision(),
-                observedState,
-                heartbeat.loadedMediaId(),
+                heartbeat.loaded(),
+                heartbeat.completed(),
                 Math.max(0L, heartbeat.durationUs() / 1000L),
-                System.currentTimeMillis()
+                nowMs
         );
-        maybeStartLoadedChannel(heartbeat.channelId());
-        if (observedState == AudienceObservedState.ENDED) {
-            maybePauseCompletedChannel(heartbeat.channelId());
-        }
-    }
-
-    private void handleMediaInfo(Player player, byte[] message) {
-        MtvMediaInfoReport report;
-        try {
-            report = MtvChannelProtocol.decodeMediaInfo(message);
-        } catch (Exception e) {
-            LOGGER.warn("Failed to decode MTV media info report from {}", player.getName(), e);
+        if (!touch.stateChanged()) {
             return;
         }
-        var expectedSessionId = channelService.getAudienceSessionManager().getSessionId(player.getUniqueId());
-        if (expectedSessionId == null || !expectedSessionId.equals(report.sessionId())) {
-            LOGGER.debug("Ignoring MTV media info from unregistered or stale client session: player={}, expectedSession={}, reportSession={}", player.getName(), expectedSessionId, report.sessionId());
-            return;
-        }
-        channelService.getAudienceSessionManager().touch(
-                player.getUniqueId(),
-                report.sessionId(),
-                report.channelId(),
-                report.revision(),
-                AudienceObservedState.LOADING,
-                report.loadedMediaId(),
-                Math.max(0L, report.durationUs() / 1000L),
-                System.currentTimeMillis()
-        );
-        maybeStartLoadedChannel(report.channelId());
-        publishSnapshot(report.channelId());
-    }
-
-    private AudienceObservedState parseObservedState(String value) {
-        return switch (value) {
-            case "LOADING" -> AudienceObservedState.LOADING;
-            case "ENDED" -> AudienceObservedState.ENDED;
-            case "PAUSED" -> AudienceObservedState.PAUSED;
-            default -> AudienceObservedState.PLAYING;
-        };
-    }
-
-    private long resolveDuration(String channelId) {
-        var state = channelService.getChannelState(channelId);
+        var state = channelService.getChannelState(heartbeat.channelId());
         if (state == null) {
-            return 0L;
-        }
-        return Math.max(0L, channelService.getAudienceSessionManager().resolveDurationMs(channelId, state.getRevision()) * 1000L);
-    }
-
-    private boolean isCompleted(String channelId) {
-        var state = channelService.getChannelState(channelId);
-        return state != null && channelService.getAudienceSessionManager().isCompleted(channelId, state.getRevision());
-    }
-
-    private void maybeStartLoadedChannel(String channelId) {
-        var state = channelService.getChannelState(channelId);
-        if (state == null || state.getPlayState().getState() != ChannelPlaybackStatus.LOADING) {
             return;
         }
-        if (!channelService.getAudienceSessionManager().isMajorityLoaded(channelId, state.getRevision())) {
+        var audience = summarizeAudience(state, nowMs);
+        maybeStartLoadedChannel(state, nowMs, audience);
+        if (touch.durationChanged()) {
+            publishSnapshot(state, audience);
+        }
+        if (heartbeat.completed()) {
+            maybePauseCompletedChannel(state, nowMs, audience);
+        }
+    }
+
+    private AudienceSessionManager.AudienceSummary summarizeAudience(ChannelRuntimeState state, long nowMs) {
+        return channelService.getAudienceSessionManager().summarize(state.getChannelId(), state.getRevision(), nowMs);
+    }
+
+    private ChannelSnapshot toSnapshot(ChannelRuntimeState state, AudienceSessionManager.AudienceSummary audience) {
+        return state.toSnapshot(Math.max(0L, audience.resolvedDurationMs() * 1000L), audience.completed());
+    }
+
+    private void maybeStartLoadedChannel(ChannelRuntimeState state, long nowMs, AudienceSessionManager.AudienceSummary audience) {
+        if (state.getPlayState().getState() != ChannelPlaybackStatus.LOADING || !audience.majorityLoaded()) {
             return;
         }
-        ChannelTimelineCalculator.play(state.getPlayState(), System.currentTimeMillis());
+        ChannelTimelineCalculator.play(state.getPlayState(), nowMs);
         state.touch();
         channelService.persistState(state);
-        channelService.onChannelChanged(channelId);
-        LOGGER.info("Started MTV channel after majority loaded current revision: channel={}, revision={}", channelId, state.getRevision());
+        channelService.onChannelChanged(state.getChannelId());
+        LOGGER.debug("Started MTV channel after majority loaded current revision: channel={}, revision={}", state.getChannelId(), state.getRevision());
     }
 
-    private void maybePauseCompletedChannel(String channelId) {
-        if (!isCompleted(channelId)) {
+    private void maybePauseCompletedChannel(ChannelRuntimeState state, long nowMs, AudienceSessionManager.AudienceSummary audience) {
+        if (!audience.completed() || state.isPaused()) {
             return;
         }
-        var state = channelService.getChannelState(channelId);
-        if (state == null || state.isPaused()) {
-            return;
-        }
-        long resolvedDurationUs = resolveDuration(channelId);
+        long resolvedDurationUs = Math.max(0L, audience.resolvedDurationMs() * 1000L);
         state.setDurationMs(Math.max(0L, resolvedDurationUs / 1000L));
-        ChannelPlaylistAdvancer.advanceOrPause(state, System.currentTimeMillis());
+        ChannelPlaylistAdvancer.advanceOrPause(state, nowMs);
         state.touch();
         channelService.persistState(state);
-        channelService.onChannelChanged(channelId);
-        LOGGER.info("Advanced or paused completed MTV channel after majority ended: channel={}, revision={}, resolvedDurationUs={}, playlistCursor={}, paused={}",
-                channelId, state.getRevision(), resolvedDurationUs, state.getPlaylistCursor(), state.isPaused());
+        channelService.onChannelChanged(state.getChannelId());
+        LOGGER.debug("Advanced or paused completed MTV channel after majority ended: channel={}, revision={}, resolvedDurationUs={}, playlistCursor={}, paused={}",
+                state.getChannelId(), state.getRevision(), resolvedDurationUs, state.getPlaylistCursor(), state.isPaused());
+    }
+
+    private void publishSnapshot(ChannelRuntimeState state, AudienceSessionManager.AudienceSummary audience) {
+        var snapshot = toSnapshot(state, audience);
+        int recipients = broadcastSnapshot(snapshot);
+        LOGGER.debug("Published MTV channel snapshot: channel={}, revision={}, mediaUrl={}, paused={}, completed={}, recipients={}",
+                snapshot.channelId(), snapshot.revision(), snapshot.mediaUrl(), snapshot.paused(), snapshot.completed(), recipients);
     }
 
     private int broadcastSnapshot(ChannelSnapshot snapshot) {
         int recipients = 0;
         for (var player : Bukkit.getOnlinePlayers()) {
-            if (channelService.getAudienceSessionManager().getSessionId(player.getUniqueId()) == null) {
-                continue;
-            }
             if (!channelService.getAudienceSessionManager().isSubscribed(player.getUniqueId(), snapshot.channelId())) {
                 continue;
             }
@@ -275,25 +215,32 @@ public final class MtvChannelNetworkService implements PluginMessageListener, Li
     private int broadcastRemove(String channelId) {
         int recipients = 0;
         for (var player : Bukkit.getOnlinePlayers()) {
-            if (channelService.getAudienceSessionManager().getSessionId(player.getUniqueId()) == null) {
+            if (!channelService.getAudienceSessionManager().isSubscribed(player.getUniqueId(), channelId)) {
                 continue;
             }
-            player.sendPluginMessage(plugin, MtvChannelProtocol.CHANNEL_REMOVE, MtvChannelProtocol.encodeRemove(channelId));
+            sendRemove(player, channelId);
             recipients++;
         }
         return recipients;
     }
 
     private void sendSnapshot(Player player, ChannelSnapshot snapshot) {
-        player.sendPluginMessage(plugin, MtvChannelProtocol.CHANNEL_SNAPSHOT, MtvChannelProtocol.encodeSnapshot(snapshot));
+        runOnPlayer(player, () -> player.sendPluginMessage(plugin, MtvChannelProtocol.CHANNEL_SNAPSHOT, MtvChannelProtocol.encodeSnapshot(snapshot)));
+    }
+
+    private void sendRemove(Player player, String channelId) {
+        runOnPlayer(player, () -> player.sendPluginMessage(plugin, MtvChannelProtocol.CHANNEL_REMOVE, MtvChannelProtocol.encodeRemove(channelId)));
+    }
+
+    private void runOnPlayer(Player player, Runnable action) {
+        if (player == null || action == null) {
+            return;
+        }
+        player.getScheduler().run(plugin, task -> action.run(), null);
     }
 
     private void unregisterClient(Player player) {
-        UUID sessionId = channelService.getAudienceSessionManager().getSessionId(player.getUniqueId());
-        if (sessionId == null) {
-            return;
-        }
         channelService.getAudienceSessionManager().unregisterClient(player.getUniqueId());
-        LOGGER.debug("Unregistered MTV client: player={}, session={}", player.getName(), sessionId);
+        LOGGER.debug("Unregistered MTV client: player={}", player.getName());
     }
 }

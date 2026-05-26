@@ -18,14 +18,19 @@ public final class ClientChannelPlaybackManager {
     }
 
     public void onSnapshot(ClientChannelPlaybackSnapshot snapshot) {
-        var session = sessions.get(snapshot.channelId());
-        if (session == null) {
+        if (snapshot == null || snapshot.channelId() == null || snapshot.channelId().isBlank()) {
             return;
         }
-        session.updateSnapshot(snapshot);
+        var session = sessions.get(snapshot.channelId());
+        if (session != null) {
+            session.updateSnapshot(snapshot);
+        }
     }
 
     public void onRemove(String channelId) {
+        if (channelId == null || channelId.isBlank()) {
+            return;
+        }
         var session = sessions.get(channelId);
         if (session != null) {
             session.updateSnapshot(ClientChannelPlaybackSnapshot.EMPTY);
@@ -41,7 +46,11 @@ public final class ClientChannelPlaybackManager {
             return null;
         }
         var session = sessions.computeIfAbsent(channelId, ClientChannelSession::new);
+        boolean shouldSubscribe = session.isUnused();
         session.attach();
+        if (shouldSubscribe) {
+            MtvChannelSubscribeSender.send(new MtvChannelSubscriptionRequest(channelId));
+        }
         return session;
     }
 
@@ -55,6 +64,7 @@ public final class ClientChannelPlaybackManager {
         }
         session.detach();
         if (session.isUnused()) {
+            MtvChannelUnsubscribeSender.send(new MtvChannelSubscriptionRequest(channelId));
             session.destroy();
             sessions.remove(channelId);
         }
