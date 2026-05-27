@@ -151,4 +151,8 @@ public final class AudienceSessionManager {
     public void invalidateChannel(String channelId) {
         sessionsByChannel.remove(channelId);
     }
+
+    public void clear() {
+        sessionsByChannel.clear();
+    }
 }

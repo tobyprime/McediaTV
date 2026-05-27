@@ -80,6 +80,7 @@ public class MtvGui {
     private final MtvPeripheralController controller;
     private final MtvPlaybackController playbackController;
     private final Map<UUID, GuiState> playerStates = new ConcurrentHashMap<>();
+    private volatile boolean closed;
 
     public MtvGui(JavaPlugin plugin, MtvPlayerManager manager, MtvPeripheralController controller, MtvPlaybackController playbackController) {
         this.plugin = plugin;
@@ -121,6 +122,9 @@ public class MtvGui {
                 "频道: " + fallback(publicChannel != null ? publicChannel.getChannelName() : null, binding.channelId()),
                 "当前: " + summarize(playState != null ? playState.getMediaUrl() : ""),
                 "模式: " + formatPlayOrderMode(channelState)));
+        var powerIcon = snapshot.isPowered() ? Material.LIME_DYE : Material.GRAY_DYE;
+        inv.setItem(10, item(powerIcon, "电源: " + (snapshot.isPowered() ? "开" : "关"), "点击切换待机状态"));
+        inv.setItem(11, item(Material.NOTE_BLOCK, "总音量: " + String.format("%.2f", snapshot.getMasterVolume()), "左键 -0.1 / 右键 +0.1", "潜行改动 0.25"));
         inv.setItem(12, item(Material.STONE_BUTTON, "后退 1 秒", "潜行点击后退 10 秒"));
         inv.setItem(13, item(Material.MUSIC_DISC_CAT, "设置当前媒体", "切到该视频，并改为播完当前停止", binding.isBroadcast() ? "公共频道需要创建者或 OP" : "会覆盖当前列表"));
         inv.setItem(14, item(Material.STONE_BUTTON, "前进 1 秒", "潜行点击前进 10 秒"));
@@ -140,6 +144,9 @@ public class MtvGui {
         inv.setItem(12, item(Material.ITEM_FRAME, "外设列表", "屏幕 / 扬声器"));
         inv.setItem(13, item(Material.COMPASS, "位置与朝向", "移动 / 旋转实体"));
         inv.setItem(15, item(Material.ENDER_PEARL, "传送到实体"));
+        var powerIcon = snapshot.isPowered() ? Material.LIME_DYE : Material.GRAY_DYE;
+        inv.setItem(10, item(powerIcon, "电源: " + (snapshot.isPowered() ? "开" : "关"), "点击切换待机状态"));
+        inv.setItem(14, item(Material.NOTE_BLOCK, "总音量: " + String.format("%.2f", snapshot.getMasterVolume()), "左键 -0.1 / 右键 +0.1", "潜行改动 0.25"));
         if (binding.isBroadcast()) {
             inv.setItem(11, item(Material.BOOK,
                     "公共频道信息",
@@ -215,6 +222,7 @@ public class MtvGui {
         inv.setItem(22, item(Material.STONE_BUTTON, "后退 1 秒", "潜行点击后退 10 秒"));
         inv.setItem(23, item(Material.STONE_BUTTON, "前进 1 秒", "潜行点击前进 10 秒"));
         inv.setItem(24, item(Material.BOOK, "列表信息", "项目数: " + state.getPlaylist().size(), "当前位置: " + (state.getPlaylist().isEmpty() ? "无" : (state.getPlaylistCursor() + 1))));
+        inv.setItem(25, item(Material.LAVA_BUCKET, "清空播放列表", "清除所有播放项并停止播放"));
         if (entityUuid != null) {
             inv.setItem(47, item(Material.ARROW, "返回实体页"));
         } else {
@@ -476,6 +484,10 @@ public class MtvGui {
         if (canManage) {
             inv.setItem(15, item(Material.NAME_TAG, "编辑频道名称"));
             inv.setItem(16, item(Material.WRITABLE_BOOK, "编辑频道介绍"));
+            inv.setItem(17, item(state.isPublicControl() ? Material.LIME_DYE : Material.GRAY_DYE,
+                    "播放权限: " + (state.isPublicControl() ? "公开" : "私有"),
+                    "公开: 所有人可控制播放",
+                    "私有: 仅创建者和 OP 可控制播放"));
             inv.setItem(24, item(Material.TNT, "删除公共频道"));
         } else {
             inv.setItem(15, item(Material.BARRIER, "只读", "只有创建者或 OP 可以管理该频道"));
@@ -507,6 +519,22 @@ public class MtvGui {
     public MtvPlaybackController getPlaybackController() { return playbackController; }
     public JavaPlugin getPlugin() { return plugin; }
 
+    public void shutdown() {
+        if (closed) {
+            return;
+        }
+        closed = true;
+        playerStates.clear();
+        for (var player : Bukkit.getOnlinePlayers()) {
+            player.getScheduler().run(plugin, task -> {
+                var holder = player.getOpenInventory().getTopInventory().getHolder();
+                if (holder instanceof MtvHolder) {
+                    player.closeInventory();
+                }
+            }, null);
+        }
+    }
+
     public void setAwaitingInput(Player player, GuiType type, UUID entityUuid, String kind) {
         GuiState state = new GuiState(type, entityUuid);
         state.getTemp().put("awaiting", kind);
@@ -521,6 +549,9 @@ public class MtvGui {
     }
 
     public boolean handleChatInput(Player player, String message) {
+        if (closed) {
+            return false;
+        }
         GuiState state = playerStates.remove(player.getUniqueId());
         if (state == null) return false;
         String awaiting = state.getTemp().get("awaiting");
@@ -596,8 +627,8 @@ public class MtvGui {
                 case "remote_media_url" -> {
                     var binding = manager.getChannelService().resolveBinding(snapshot);
                     var channelState = manager.getChannelService().ensureChannelState(binding.channelId());
-                    if (!manager.getChannelService().canManagePublicChannel(player, channelState)) {
-                        runOnPlayer(player, () -> player.sendMessage("只有公共频道的创建者或 OP 可以通过遥控器修改当前媒体。"));
+                    if (!manager.getChannelService().canControlChannelPlayback(player, channelState)) {
+                        runOnPlayer(player, () -> player.sendMessage("该频道为私有频道，只有创建者或 OP 可以通过遥控器修改当前媒体。"));
                         return;
                     }
                     playbackController.updateMediaUrlAsCurrentOnly(state.getEntityUuid(), input,
@@ -662,6 +693,9 @@ public class MtvGui {
     }
 
     public void reopenPage(Player player, GuiType type, UUID uuid, String periphId) {
+        if (closed) {
+            return;
+        }
         if (type == GuiType.CHANNEL_MENU && uuid == null) {
             var guiState = getState(player);
             String channelId = guiState != null ? guiState.getTemp().get("channel_id") : null;
@@ -714,7 +748,15 @@ public class MtvGui {
     }
 
     private void runOnPlayer(Player player, Runnable task) {
-        player.getScheduler().run(plugin, scheduledTask -> task.run(), null);
+        if (closed) {
+            return;
+        }
+        player.getScheduler().run(plugin, scheduledTask -> {
+            if (closed) {
+                return;
+            }
+            task.run();
+        }, null);
     }
 
     public static int parsePage(GuiState state) {

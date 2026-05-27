@@ -17,6 +17,7 @@ public final class MtvChannelNetworkService implements PluginMessageListener, Li
 
     private final Plugin plugin;
     private final MtvChannelService channelService;
+    private volatile boolean closed;
 
     public MtvChannelNetworkService(Plugin plugin, MtvChannelService channelService) {
         this.plugin = plugin;
@@ -33,8 +34,24 @@ public final class MtvChannelNetworkService implements PluginMessageListener, Li
         messenger.registerIncomingPluginChannel(plugin, MtvChannelProtocol.CHANNEL_HEARTBEAT, this);
     }
 
+    public void shutdown() {
+        if (closed) {
+            return;
+        }
+        closed = true;
+        var messenger = plugin.getServer().getMessenger();
+        messenger.unregisterIncomingPluginChannel(plugin, MtvChannelProtocol.CHANNEL_SUBSCRIBE, this);
+        messenger.unregisterIncomingPluginChannel(plugin, MtvChannelProtocol.CHANNEL_UNSUBSCRIBE, this);
+        messenger.unregisterIncomingPluginChannel(plugin, MtvChannelProtocol.CHANNEL_HEARTBEAT, this);
+        messenger.unregisterOutgoingPluginChannel(plugin, MtvChannelProtocol.CHANNEL_SNAPSHOT);
+        messenger.unregisterOutgoingPluginChannel(plugin, MtvChannelProtocol.CHANNEL_REMOVE);
+    }
+
     @Override
     public void onPluginMessageReceived(String channel, Player player, byte[] message) {
+        if (closed) {
+            return;
+        }
         runOnPlayer(player, () -> {
             if (MtvChannelProtocol.CHANNEL_SUBSCRIBE.equals(channel)) {
                 handleSubscribe(player, message);
@@ -56,6 +73,9 @@ public final class MtvChannelNetworkService implements PluginMessageListener, Li
     }
 
     public void publishSnapshot(String channelId) {
+        if (closed) {
+            return;
+        }
         var state = channelService.getChannelState(channelId);
         if (state == null) {
             return;
@@ -65,7 +85,7 @@ public final class MtvChannelNetworkService implements PluginMessageListener, Li
     }
 
     public void publishSnapshotTo(Player player, String channelId) {
-        if (player == null || channelId == null || channelId.isBlank()) {
+        if (closed || player == null || channelId == null || channelId.isBlank()) {
             return;
         }
         var state = channelService.ensureChannelState(channelId);
@@ -80,7 +100,7 @@ public final class MtvChannelNetworkService implements PluginMessageListener, Li
     }
 
     public void invalidateChannel(String channelId) {
-        if (channelId == null || channelId.isBlank()) {
+        if (closed || channelId == null || channelId.isBlank()) {
             return;
         }
         int recipients = broadcastRemove(channelId);
@@ -225,10 +245,15 @@ public final class MtvChannelNetworkService implements PluginMessageListener, Li
     }
 
     private void runOnPlayer(Player player, Runnable action) {
-        if (player == null || action == null) {
+        if (closed || player == null || action == null) {
             return;
         }
-        player.getScheduler().run(plugin, task -> action.run(), null);
+        player.getScheduler().run(plugin, task -> {
+            if (closed) {
+                return;
+            }
+            action.run();
+        }, null);
     }
 
     private void unregisterClient(Player player) {

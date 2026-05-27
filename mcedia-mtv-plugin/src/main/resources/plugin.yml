@@ -3,6 +3,10 @@ version: '1.0-SNAPSHOT'
 main: top.tobyprime.mcedia_mtv_plugin.Mcedia_mtv_plugin
 api-version: '1.21'
 folia-supported: true
+commands:
+  mtv:
+    description: Manage MTV interaction players
+    usage: /mtv
 permissions:
   mcedia.mtv.admin:
     description: 所有 MTV 管理权限

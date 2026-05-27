@@ -325,6 +325,47 @@ public final class MtvChannelService {
                 || player.getUniqueId().toString().equals(state.getCreatorUuid());
     }
 
+    public boolean canControlChannelPlayback(Player player, ChannelRuntimeState state) {
+        if (state == null || !state.isPublicChannel()) {
+            return true;
+        }
+        if (player == null) {
+            return false;
+        }
+        if (player.isOp() || player.getUniqueId().toString().equals(state.getCreatorUuid())) {
+            return true;
+        }
+        return state.isPublicControl();
+    }
+
+    public boolean clearPlaylist(Player player, String channelId) {
+        var state = ensureChannelState(channelId);
+        if (state == null || !canControlChannelPlayback(player, state)) {
+            return false;
+        }
+        return mutatePlayback(channelId, s -> {
+            if (s.getPlaylist().isEmpty()) {
+                return false;
+            }
+            s.getPlaylist().clear();
+            s.setPlaylistCursor(0);
+            s.setDurationMs(0L);
+            ChannelTimelineCalculator.stop(s.getPlayState(), System.currentTimeMillis());
+            s.getPlayState().setMediaUrl("");
+            return true;
+        });
+    }
+
+    public boolean setPublicControl(Player player, String channelId, boolean publicControl) {
+        return mutatePublicChannel(player, channelId, state -> {
+            if (state.isPublicControl() == publicControl) {
+                return false;
+            }
+            state.setPublicControl(publicControl);
+            return true;
+        });
+    }
+
     public int getAudienceCount(String channelId) {
         return audienceSessionManager.countAudience(channelId);
     }
@@ -461,6 +502,14 @@ public final class MtvChannelService {
             removeListener.accept(binding.channelId());
             audienceSessionManager.invalidateChannel(binding.channelId());
         }
+    }
+
+    public void shutdown() {
+        setChangeListener(null);
+        setRemoveListener(null);
+        audienceSessionManager.clear();
+        entityBindings.clear();
+        channelStates.clear();
     }
 
     public void debugDump() {

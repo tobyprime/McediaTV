@@ -1,6 +1,6 @@
 package top.tobyprime.mcedia_mtv_plugin;
 
-import io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents;
+import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.java.JavaPlugin;
 import top.tobyprime.mcedia_mtv_plugin.channel.MtvChannelNetworkService;
@@ -18,25 +18,31 @@ public final class Mcedia_mtv_plugin extends JavaPlugin {
 
     private MtvPlayerManager manager;
     private MtvGui gui;
+    private MtvChannelNetworkService networkService;
+    private ScheduledTask audiencePruneTask;
 
     @Override
     public void onEnable() {
         this.manager = new MtvPlayerManager(this);
-        manager.getChannelService().loadPersistedStates();
-        manager.getChannelService().getAudienceSessionManager().setActiveTimeoutMs(AUDIENCE_TIMEOUT_MS);
-        var networkService = new MtvChannelNetworkService(this, manager.getChannelService());
-        manager.getChannelService().setChangeListener(networkService::publishSnapshot);
-        manager.getChannelService().setRemoveListener(networkService::invalidateChannel);
+        var channelService = manager.getChannelService();
+        channelService.loadPersistedStates();
+        channelService.getAudienceSessionManager().setActiveTimeoutMs(AUDIENCE_TIMEOUT_MS);
+        this.networkService = new MtvChannelNetworkService(this, channelService);
+        channelService.setChangeListener(networkService::publishSnapshot);
+        channelService.setRemoveListener(networkService::invalidateChannel);
         var controller = new MtvPeripheralController(manager);
         var playbackController = new MtvPlaybackController(manager);
         this.gui = new MtvGui(this, manager, controller, playbackController);
 
         var mtvCommand = new MtvCommand(controller, playbackController, gui);
-        getLifecycleManager().registerEventHandler(LifecycleEvents.COMMANDS, commands ->
-                commands.registrar().register(mtvCommand.buildCommandTree(), "Manage MTV interaction players"));
+        var pluginCommand = getCommand("mtv");
+        if (pluginCommand != null) {
+            pluginCommand.setExecutor(mtvCommand);
+            pluginCommand.setTabCompleter(mtvCommand);
+        }
 
-        getServer().getGlobalRegionScheduler().runAtFixedRate(this, task ->
-                manager.getChannelService().getAudienceSessionManager().pruneExpired(System.currentTimeMillis()),
+        this.audiencePruneTask = getServer().getGlobalRegionScheduler().runAtFixedRate(this, task ->
+                channelService.getAudienceSessionManager().pruneExpired(System.currentTimeMillis()),
                 20L, 20L);
 
         PluginManager pluginManager = getServer().getPluginManager();
@@ -48,5 +54,26 @@ public final class Mcedia_mtv_plugin extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        var currentManager = this.manager;
+        if (currentManager != null) {
+            currentManager.getChannelService().setChangeListener(null);
+            currentManager.getChannelService().setRemoveListener(null);
+        }
+        if (audiencePruneTask != null) {
+            audiencePruneTask.cancel();
+            audiencePruneTask = null;
+        }
+        if (networkService != null) {
+            networkService.shutdown();
+            networkService = null;
+        }
+        if (gui != null) {
+            gui.shutdown();
+            gui = null;
+        }
+        if (currentManager != null) {
+            currentManager.getChannelService().shutdown();
+            manager = null;
+        }
     }
 }
