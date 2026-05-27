@@ -52,13 +52,13 @@ public final class MtvChannelProtocol {
     }
 
     public static MtvAudienceHeartbeat readHeartbeat(FriendlyByteBuf buffer) {
-        return new MtvAudienceHeartbeat(
-                buffer.readUtf(),
-                buffer.readLong(),
-                buffer.readBoolean(),
-                buffer.readBoolean(),
-                buffer.readLong()
-        );
+        String channelId = buffer.readUtf();
+        long revision = buffer.readLong();
+        boolean loaded = buffer.readBoolean();
+        boolean completed = buffer.readBoolean();
+        long durationUs = buffer.readLong();
+        boolean error = buffer.isReadable() && buffer.readBoolean();
+        return new MtvAudienceHeartbeat(channelId, revision, loaded, completed, durationUs, error);
     }
 
     public static void writeHeartbeat(FriendlyByteBuf buffer, MtvAudienceHeartbeat heartbeat) {
@@ -67,6 +67,7 @@ public final class MtvChannelProtocol {
         buffer.writeBoolean(heartbeat.loaded());
         buffer.writeBoolean(heartbeat.completed());
         buffer.writeLong(heartbeat.durationUs());
+        buffer.writeBoolean(heartbeat.error());
     }
 
 
