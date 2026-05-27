@@ -46,7 +46,7 @@ public class MtvGuiListener implements Listener {
             case SCREEN_SETTINGS -> handleScreenSettings(player, holder, slot, rightClick, shiftClick);
             case SPEAKER_SETTINGS -> handleSpeakerSettings(player, holder, slot, rightClick, shiftClick);
             case CHANNEL_MENU -> handleChannelMenu(player, holder, slot, rightClick, shiftClick);
-            case REMOTE_MENU -> handleRemoteMenu(player, holder, slot, shiftClick);
+            case REMOTE_MENU -> handleRemoteMenu(player, holder, slot, rightClick, shiftClick);
             case PUBLIC_CHANNEL_LIST -> handlePublicChannelList(player, holder, slot, rightClick);
             case PUBLIC_CHANNEL_CREATE -> handlePublicChannelCreate(player, holder, slot);
             case PUBLIC_CHANNEL_MANAGE -> handlePublicChannelManage(player, holder, slot);
@@ -102,6 +102,7 @@ public class MtvGuiListener implements Listener {
                     player.sendMessage("请输入新名称。");
                     gui.setAwaitingInput(player, MtvGui.GuiType.PLAYER_MENU, uuid, "rename");
                 }
+                case 10 -> updateAndReopen(player, uuid, done -> gui.getManager().setPowered(uuid, !snap.isPowered(), done), GuiType.PLAYER_MENU, null);
                 case 11 -> {
                     if (binding.isBroadcast()) {
                         gui.openPublicChannelManage(player, uuid, binding.channelId(), "", 0, false);
@@ -116,6 +117,11 @@ public class MtvGuiListener implements Listener {
                 }
                 case 12 -> gui.openPeripheralList(player, snap);
                 case 13 -> gui.openWorldTransform(player, snap);
+                case 14 -> {
+                    float delta = (rightClick ? 1 : -1) * (shiftClick ? 0.25F : 0.1F);
+                    float volume = Math.max(0.0F, Math.min(1.0F, snap.getMasterVolume() + delta));
+                    updateAndReopen(player, uuid, done -> gui.getManager().setMasterVolume(uuid, volume, done), GuiType.PLAYER_MENU, null);
+                }
                 case 15 -> {
                     if (MtvPeripheralController.checkPerm(player, "mcedia.mtv.teleport")) {
                         player.performCommand("mtv tp " + snap.getName());
@@ -263,7 +269,12 @@ public class MtvGuiListener implements Listener {
             player.sendMessage("该频道不存在或无法加载。");
             return;
         }
-        boolean requiresManage = slot != 47 && slot != 49;
+        boolean requiresPlaybackControl = slot != 47 && slot != 49 && slot != 24;
+        boolean requiresManage = slot == 11 || slot == 19 || slot == 20;
+        if (requiresPlaybackControl && !gui.getManager().getChannelService().canControlChannelPlayback(player, state)) {
+            player.sendMessage("该频道为私有频道，只有创建者或 OP 可以控制播放。");
+            return;
+        }
         if (requiresManage && !gui.getManager().getChannelService().canManagePublicChannel(player, state)) {
             player.sendMessage("只有公共频道的创建者或 OP 可以管理该频道。");
             return;
@@ -309,6 +320,7 @@ public class MtvGuiListener implements Listener {
                 long delta = shiftClick ? 10_000_000L : 1_000_000L;
                 updateChannel(player, uuid, channelId, cid -> gui.getManager().getChannelService().seekRelative(cid, delta));
             }
+            case 25 -> updateChannel(player, uuid, channelId, cid -> gui.getManager().getChannelService().clearPlaylist(player, cid));
             case 47 -> {
                 if (uuid != null) {
                     read(player, uuid, snap -> {
@@ -361,7 +373,7 @@ public class MtvGuiListener implements Listener {
         }
     }
 
-    private void handleRemoteMenu(Player player, MtvGui.MtvHolder holder, int slot, boolean shiftClick) {
+    private void handleRemoteMenu(Player player, MtvGui.MtvHolder holder, int slot, boolean rightClick, boolean shiftClick) {
         var uuid = holder.getEntityUuid();
         if (uuid == null) {
             gui.openRemoteMenu(player);
@@ -372,6 +384,12 @@ public class MtvGuiListener implements Listener {
                 return;
             }
             switch (slot) {
+                case 10 -> updateAndReopen(player, uuid, done -> gui.getManager().setPowered(uuid, !snap.isPowered(), done), GuiType.REMOTE_MENU, null);
+                case 11 -> {
+                    float delta = shiftClick ? (rightClick ? 0.25F : -0.25F) : (rightClick ? 0.1F : -0.1F);
+                    float volume = Math.max(0.0F, Math.min(1.0F, snap.getMasterVolume() + delta));
+                    updateAndReopen(player, uuid, done -> gui.getManager().setMasterVolume(uuid, volume, done), GuiType.REMOTE_MENU, null);
+                }
                 case 12 -> {
                     if (!canManageRemotePlayback(player, snap)) {
                         return;
@@ -512,6 +530,17 @@ public class MtvGuiListener implements Listener {
                 player.closeInventory();
                 player.sendMessage("请输入新的公共频道介绍。");
                 gui.setAwaitingInput(player, state, "public_channel_edit_description");
+            }
+            case 17 -> {
+                if (!canManage) {
+                    player.sendMessage("只有创建者或 OP 可以修改该公共频道的播放权限。");
+                    return;
+                }
+                boolean newPublicControl = !channel.isPublicControl();
+                boolean success = gui.getManager().getChannelService().setPublicControl(player, channelId, newPublicControl);
+                if (success) {
+                    delay(player, () -> gui.openPublicChannelManage(player, holder.getEntityUuid(), channelId, query, page, ownOnly));
+                }
             }
             case 24 -> {
                 if (!canManage) {
@@ -672,10 +701,10 @@ public class MtvGuiListener implements Listener {
     private boolean canManageRemotePlayback(Player player, ManagedMtvPlayer snapshot) {
         var binding = gui.getManager().getChannelService().resolveBinding(snapshot);
         var state = gui.getManager().getChannelService().ensureChannelState(binding.channelId());
-        if (gui.getManager().getChannelService().canManagePublicChannel(player, state)) {
+        if (gui.getManager().getChannelService().canControlChannelPlayback(player, state)) {
             return true;
         }
-        player.sendMessage("只有公共频道的创建者或 OP 可以通过遥控器修改播放。");
+        player.sendMessage("该频道为私有频道，只有创建者或 OP 可以通过遥控器控制播放。");
         return false;
     }
 

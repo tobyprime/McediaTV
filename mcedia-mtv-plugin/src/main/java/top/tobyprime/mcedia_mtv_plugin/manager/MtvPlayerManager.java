@@ -186,6 +186,8 @@ public class MtvPlayerManager {
             player.setZ(entityConfig.getDoubleOr("z", player.getZ()));
             player.setYaw(entityConfig.getFloatOr("yaw", player.getYaw()));
             player.setPitch(entityConfig.getFloatOr("pitch", player.getPitch()));
+            player.setMasterVolume(entityConfig.getFloatOr("master_volume", player.getMasterVolume()));
+            player.setPowered(entityConfig.getBooleanOr("powered", player.isPowered()));
 
             var peripherals = entityConfig.getListOrEmpty("peripherals");
             for (int i = 0; i < peripherals.size(); i++) {
@@ -406,6 +408,20 @@ public class MtvPlayerManager {
             var s = p.findSpeaker(periphId);
             if (s == null) return false;
             s.setVolume(Math.max(0.0F, Math.min(4.0F, v)));
+            return true;
+        }, done);
+    }
+
+    public void setMasterVolume(UUID uuid, float v, Consumer<Boolean> done) {
+        mutate(uuid, p -> {
+            p.setMasterVolume(v);
+            return true;
+        }, done);
+    }
+
+    public void setPowered(UUID uuid, boolean powered, Consumer<Boolean> done) {
+        mutate(uuid, p -> {
+            p.setPowered(powered);
             return true;
         }, done);
     }

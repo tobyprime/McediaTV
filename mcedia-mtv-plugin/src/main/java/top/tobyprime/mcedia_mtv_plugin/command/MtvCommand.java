@@ -72,6 +72,20 @@ public class MtvCommand implements CommandExecutor, TabCompleter {
                                 .executes(ctx -> executeBrigadier(ctx.getSource(), "speed", Float.toString(FloatArgumentType.getFloat(ctx, "speed"))))
                                 .then(Commands.argument("name", StringArgumentType.greedyString())
                                         .executes(ctx -> executeBrigadier(ctx.getSource(), "speed", Float.toString(FloatArgumentType.getFloat(ctx, "speed")), ctx.getArgument("name", String.class))))))
+                .then(Commands.literal("mastervolume")
+                        .then(Commands.argument("volume", FloatArgumentType.floatArg(0.0F, 1.0F))
+                                .executes(ctx -> executeBrigadier(ctx.getSource(), "mastervolume", Float.toString(FloatArgumentType.getFloat(ctx, "volume"))))
+                                .then(Commands.argument("name", StringArgumentType.greedyString())
+                                        .executes(ctx -> executeBrigadier(ctx.getSource(), "mastervolume", Float.toString(FloatArgumentType.getFloat(ctx, "volume")), ctx.getArgument("name", String.class))))))
+                .then(Commands.literal("power")
+                        .then(Commands.literal("on")
+                                .executes(ctx -> executeBrigadier(ctx.getSource(), "power", "on"))
+                                .then(Commands.argument("name", StringArgumentType.greedyString())
+                                        .executes(ctx -> executeBrigadier(ctx.getSource(), "power", "on", ctx.getArgument("name", String.class)))))
+                        .then(Commands.literal("off")
+                                .executes(ctx -> executeBrigadier(ctx.getSource(), "power", "off"))
+                                .then(Commands.argument("name", StringArgumentType.greedyString())
+                                        .executes(ctx -> executeBrigadier(ctx.getSource(), "power", "off", ctx.getArgument("name", String.class))))))
                 .then(Commands.literal("tp")
                         .executes(ctx -> executeBrigadier(ctx.getSource(), "tp"))
                         .then(Commands.argument("name", StringArgumentType.greedyString())
@@ -122,6 +136,8 @@ public class MtvCommand implements CommandExecutor, TabCompleter {
             case "gui" -> handleGui(sender);
             case "url" -> handleUrl(sender, args);
             case "speed" -> handleSpeed(sender, args);
+            case "mastervolume" -> handleMasterVolume(sender, args);
+            case "power" -> handlePower(sender, args);
             case "tp" -> handleTp(sender, args);
             case "movehere" -> handleMoveHere(sender, args);
             case "size" -> handleSize(sender, args);
@@ -310,11 +326,17 @@ public class MtvCommand implements CommandExecutor, TabCompleter {
             if (target == null) {
                 return;
             }
-            playbackController.updateMediaUrl(target.getUuid(), url, success -> runOnPlayer(player, () -> {
-                if (success) {
-                    sender.sendMessage("已更新 " + target.getName() + " 的 URL: " + url);
+            playbackController.canControlPlayback(target.getUuid(), player, canControl -> {
+                if (!Boolean.TRUE.equals(canControl)) {
+                    runOnPlayer(player, () -> player.sendMessage("该频道为私有频道，只有创建者或 OP 可以控制播放。"));
+                    return;
                 }
-            }));
+                playbackController.updateMediaUrl(target.getUuid(), url, success -> runOnPlayer(player, () -> {
+                    if (success) {
+                        sender.sendMessage("已更新 " + target.getName() + " 的 URL: " + url);
+                    }
+                }));
+            });
         });
         return true;
     }
@@ -325,8 +347,42 @@ public class MtvCommand implements CommandExecutor, TabCompleter {
             return true;
         }
         if (!MtvPeripheralController.checkPerm(player, "mcedia.mtv.edit")) return true;
-        return withFloatTarget(sender, args, "倍速",
+        return withFloatTargetChecked(sender, args, "倍速",
                 (target, value, done) -> playbackController.updateSpeed(target.getUuid(), value, done));
+    }
+
+    private boolean handleMasterVolume(CommandSender sender, String[] args) {
+        if (!(sender instanceof Player player)) {
+            sender.sendMessage("只能由玩家执行该命令。");
+            return true;
+        }
+        if (!MtvPeripheralController.checkPerm(player, "mcedia.mtv.edit")) return true;
+        return withFloatTarget(sender, args, "总音量",
+                (target, value, done) -> controller.getManager().setMasterVolume(target.getUuid(), value, done));
+    }
+
+    private boolean handlePower(CommandSender sender, String[] args) {
+        if (!(sender instanceof Player player)) {
+            sender.sendMessage("只能由玩家执行该命令。");
+            return true;
+        }
+        if (!MtvPeripheralController.checkPerm(player, "mcedia.mtv.edit")) return true;
+        if (args.length < 2 || (!"on".equalsIgnoreCase(args[1]) && !"off".equalsIgnoreCase(args[1]))) {
+            sender.sendMessage("用法: /mtv power <on|off> [名称]");
+            return true;
+        }
+        boolean powered = "on".equalsIgnoreCase(args[1]);
+        resolveOne(player, args.length >= 3 ? joinArgs(args, 2) : null, target -> {
+            if (target == null) {
+                return;
+            }
+            controller.getManager().setPowered(target.getUuid(), powered, success -> runOnPlayer(player, () -> {
+                if (success) {
+                    sender.sendMessage("已设置 " + target.getName() + " 电源: " + (powered ? "开" : "关"));
+                }
+            }));
+        });
+        return true;
     }
 
     private boolean handleTp(CommandSender sender, String[] args) {
@@ -632,7 +688,7 @@ public class MtvCommand implements CommandExecutor, TabCompleter {
             return true;
         }
         if (!MtvPeripheralController.checkPerm(player, "mcedia.mtv.edit")) return true;
-        return withLongTarget(sender, args, "起始时间",
+        return withLongTargetChecked(sender, args, "起始时间",
                 (target, value, done) -> playbackController.updateStartAt(target.getUuid(), value, done));
     }
 
@@ -763,6 +819,8 @@ public class MtvCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage("/mtv remove <名称> [--confirm] — 删除 MTV");
         sender.sendMessage("/mtv url <地址> [名称] — 设置 URL");
         sender.sendMessage("/mtv speed <倍速> [名称] — 设置播放速度");
+        sender.sendMessage("/mtv mastervolume <0-1> [名称] — 设置总音量");
+        sender.sendMessage("/mtv power <on|off> [名称] — 设置电源状态");
         sender.sendMessage("/mtv size [外设ID] <宽> <高> [名称] — 设置屏幕尺寸");
         sender.sendMessage("/mtv offset [外设ID] <x> <y> <z> [名称] — 设置屏幕偏移");
         sender.sendMessage("/mtv fill [外设ID] <fill|keep_aspect_cover> [名称] — 设置填充模式");
@@ -909,6 +967,13 @@ public class MtvCommand implements CommandExecutor, TabCompleter {
                                     String[] args,
                                     String label,
                                     TriConsumer<ManagedMtvPlayer, Float, Consumer<Boolean>> updater) {
+        return withFloatTargetChecked(sender, args, label, updater);
+    }
+
+    private boolean withFloatTargetChecked(CommandSender sender,
+                                           String[] args,
+                                           String label,
+                                           TriConsumer<ManagedMtvPlayer, Float, Consumer<Boolean>> updater) {
         if (!(sender instanceof Player player)) {
             sender.sendMessage("只能由玩家执行该命令。");
             return true;
@@ -923,11 +988,17 @@ public class MtvCommand implements CommandExecutor, TabCompleter {
                 if (target == null) {
                     return;
                 }
-                updater.accept(target, value, success -> runOnPlayer(player, () -> {
-                    if (success) {
-                        sender.sendMessage("已设置 " + target.getName() + " " + label + ": " + value);
+                playbackController.canControlPlayback(target.getUuid(), player, canControl -> {
+                    if (!Boolean.TRUE.equals(canControl)) {
+                        runOnPlayer(player, () -> player.sendMessage("该频道为私有频道，只有创建者或 OP 可以控制播放。"));
+                        return;
                     }
-                }));
+                    updater.accept(target, value, success -> runOnPlayer(player, () -> {
+                        if (success) {
+                            sender.sendMessage("已设置 " + target.getName() + " " + label + ": " + value);
+                        }
+                    }));
+                });
             });
             return true;
         } catch (NumberFormatException e) {
@@ -940,6 +1011,13 @@ public class MtvCommand implements CommandExecutor, TabCompleter {
                                    String[] args,
                                    String label,
                                    TriConsumer<ManagedMtvPlayer, Long, Consumer<Boolean>> updater) {
+        return withLongTargetChecked(sender, args, label, updater);
+    }
+
+    private boolean withLongTargetChecked(CommandSender sender,
+                                          String[] args,
+                                          String label,
+                                          TriConsumer<ManagedMtvPlayer, Long, Consumer<Boolean>> updater) {
         if (!(sender instanceof Player player)) {
             sender.sendMessage("只能由玩家执行该命令。");
             return true;
@@ -954,11 +1032,17 @@ public class MtvCommand implements CommandExecutor, TabCompleter {
                 if (target == null) {
                     return;
                 }
-                updater.accept(target, value, success -> runOnPlayer(player, () -> {
-                    if (success) {
-                        sender.sendMessage("已设置 " + target.getName() + " " + label + ": " + value);
+                playbackController.canControlPlayback(target.getUuid(), player, canControl -> {
+                    if (!Boolean.TRUE.equals(canControl)) {
+                        runOnPlayer(player, () -> player.sendMessage("该频道为私有频道，只有创建者或 OP 可以控制播放。"));
+                        return;
                     }
-                }));
+                    updater.accept(target, value, success -> runOnPlayer(player, () -> {
+                        if (success) {
+                            sender.sendMessage("已设置 " + target.getName() + " " + label + ": " + value);
+                        }
+                    }));
+                });
             });
             return true;
         } catch (NumberFormatException e) {

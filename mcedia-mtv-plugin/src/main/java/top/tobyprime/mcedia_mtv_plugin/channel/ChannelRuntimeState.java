@@ -17,6 +17,7 @@ public final class ChannelRuntimeState {
     private String channelName = "";
     private String description = "";
     private boolean discoverable;
+    private boolean publicControl = true;
     private long createdAtMs = System.currentTimeMillis();
     private long updatedAtMs = System.currentTimeMillis();
 
@@ -171,5 +172,13 @@ public final class ChannelRuntimeState {
 
     public boolean isPublicChannel() {
         return channelType == MtvChannelType.BROADCAST && discoverable;
+    }
+
+    public boolean isPublicControl() {
+        return publicControl;
+    }
+
+    public void setPublicControl(boolean publicControl) {
+        this.publicControl = publicControl;
     }
 }

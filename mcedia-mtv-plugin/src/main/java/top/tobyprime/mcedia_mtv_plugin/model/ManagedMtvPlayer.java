@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.UUID;
 
 public class ManagedMtvPlayer {
+    private static final float DEFAULT_MASTER_VOLUME = 1.0F;
     private UUID uuid;
     private String name;
     private String world;
@@ -18,6 +19,8 @@ public class ManagedMtvPlayer {
     private double z;
     private float yaw;
     private float pitch;
+    private float masterVolume = DEFAULT_MASTER_VOLUME;
+    private boolean powered = true;
     private MtvChannelBinding channelBinding;
     private final List<ScreenPeripheralConfigModel> screens = new ArrayList<>();
     private final List<SpeakerPeripheralConfigModel> speakers = new ArrayList<>();
@@ -119,6 +122,10 @@ public class ManagedMtvPlayer {
     public void setYaw(float yaw) { this.yaw = yaw; }
     public float getPitch() { return pitch; }
     public void setPitch(float pitch) { this.pitch = pitch; }
+    public float getMasterVolume() { return masterVolume; }
+    public void setMasterVolume(float masterVolume) { this.masterVolume = Math.max(0.0F, Math.min(1.0F, masterVolume)); }
+    public boolean isPowered() { return powered; }
+    public void setPowered(boolean powered) { this.powered = powered; }
     public MtvChannelBinding getChannelBinding() { return channelBinding; }
     public void setChannelBinding(MtvChannelBinding channelBinding) { this.channelBinding = channelBinding; }
 }

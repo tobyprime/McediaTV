@@ -1,5 +1,6 @@
 package top.tobyprime.mcedia_mtv_plugin.controller;
 
+import org.bukkit.Bukkit;
 import top.tobyprime.mcedia_mtv_plugin.channel.MtvChannelService;
 import top.tobyprime.mcedia_mtv_plugin.manager.MtvPlayerManager;
 
@@ -74,6 +75,22 @@ public final class MtvPlaybackController {
 
     public void cyclePlayOrderMode(UUID uuid, Consumer<Boolean> done) {
         updatePlayback(uuid, channelId -> channelService.cyclePlayOrderMode(channelId), done);
+    }
+
+    public void clearPlaylist(UUID uuid, Consumer<Boolean> done) {
+        var bukkitPlayer = Bukkit.getPlayer(uuid);
+        manager.withManagedPlayer(uuid, player -> {
+            var binding = channelService.resolveBinding(player);
+            return channelService.clearPlaylist(bukkitPlayer, binding.channelId());
+        }, result -> done.accept(Boolean.TRUE.equals(result)));
+    }
+
+    public void canControlPlayback(UUID entityUuid, org.bukkit.entity.Player player, Consumer<Boolean> done) {
+        manager.withManagedPlayer(entityUuid, managed -> {
+            var binding = channelService.resolveBinding(managed);
+            var state = channelService.ensureChannelState(binding.channelId());
+            return channelService.canControlChannelPlayback(player, state);
+        }, done);
     }
 
     private void updatePlayback(UUID uuid, Function<String, Boolean> operation, Consumer<Boolean> done) {

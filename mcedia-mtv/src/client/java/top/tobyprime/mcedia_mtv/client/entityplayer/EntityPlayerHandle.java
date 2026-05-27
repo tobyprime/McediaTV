@@ -48,7 +48,7 @@ public class EntityPlayerHandle {
         try {
             var config = readConfig();
             syncChannelSession(config.channelId());
-            syncPeripherals(config.peripherals());
+            syncPeripherals(config.masterVolume(), config.peripherals());
         } catch (Exception e) {
             LOGGER.warn("Error ticking item display player id={}", display.getId(), e);
         }
@@ -66,7 +66,7 @@ public class EntityPlayerHandle {
         reattachPeripherals();
     }
 
-    private void syncPeripherals(List<PeripheralConfig> desiredPeripherals) {
+    private void syncPeripherals(float masterVolume, List<PeripheralConfig> desiredPeripherals) {
         if (desiredPeripherals.isEmpty() && !runtimePeripherals.isEmpty()) {
             LOGGER.info(
                     "MTV host config resolved to empty peripheral list while runtimes still exist: entityId={}, uuid={}, runtimeCount={}, channelId={}",
@@ -97,7 +97,7 @@ public class EntityPlayerHandle {
                 created = true;
             }
 
-            applyPeripheralConfig(runtime, peripheral);
+            applyPeripheralConfig(runtime, peripheral, masterVolume);
             if (created) {
                 assignRuntimePeripheral(runtime);
             }
@@ -156,12 +156,12 @@ public class EntityPlayerHandle {
         };
     }
 
-    private void applyPeripheralConfig(RuntimePeripheralHandle runtime, PeripheralConfig peripheral) {
+    private void applyPeripheralConfig(RuntimePeripheralHandle runtime, PeripheralConfig peripheral, float masterVolume) {
         switch (runtime) {
             case ScreenRuntimeHandle screenRuntime when peripheral instanceof ScreenPeripheralConfig screenConfig ->
                     applyScreenConfig(screenRuntime.screen(), screenConfig);
             case SpeakerRuntimeHandle speakerRuntime when peripheral instanceof SpeakerPeripheralConfig speakerConfig ->
-                    applySpeakerConfig(speakerRuntime.speaker(), speakerConfig);
+                    applySpeakerConfig(speakerRuntime.speaker(), speakerConfig, masterVolume);
             default -> {
             }
         }
@@ -181,11 +181,11 @@ public class EntityPlayerHandle {
         screen.setScreenSize(width, height);
     }
 
-    private void applySpeakerConfig(PlayerSpeakerEntity speaker, SpeakerPeripheralConfig config) {
+    private void applySpeakerConfig(PlayerSpeakerEntity speaker, SpeakerPeripheralConfig config, float masterVolume) {
         var transform = computeTransform(config);
         speaker.setPos(transform.position().x(), transform.position().y(), transform.position().z());
         speaker.setMaxRange(config.maxRange());
-        speaker.setVolume(config.volume());
+        speaker.setVolume(config.volume() * masterVolume);
         speaker.setAudioChannelMode(parseChannelMode(config.channelMode()));
     }
 
@@ -283,8 +283,14 @@ public class EntityPlayerHandle {
             boundChannelId = "self:" + display.getUUID();
         }
 
+        boolean powered = configTag.getBooleanOr("powered", true);
+        if (!powered) {
+            boundChannelId = null;
+        }
+
         var peripherals = readPeripheralList(configTag.getListOrEmpty("peripherals"));
-        return new HostConfig(boundChannelId, peripherals);
+        float masterVolume = Math.max(0.0F, Math.min(1.0F, configTag.getFloatOr("master_volume", 1.0F)));
+        return new HostConfig(boundChannelId, masterVolume, peripherals);
     }
 
     private List<PeripheralConfig> readPeripheralList(ListTag peripheralsTag) {
@@ -428,9 +434,10 @@ public class EntityPlayerHandle {
 
     private record HostConfig(
             @Nullable String channelId,
+            float masterVolume,
             List<PeripheralConfig> peripherals
     ) {
-        private static final HostConfig DEFAULT = new HostConfig(null, List.of());
+        private static final HostConfig DEFAULT = new HostConfig(null, 1.0F, List.of());
     }
 
     private sealed interface PeripheralConfig permits ScreenPeripheralConfig, SpeakerPeripheralConfig {

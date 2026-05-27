@@ -162,6 +162,7 @@ final class FileSystemChannelRepository implements ChannelRepository {
         root.addProperty("channelName", state.getChannelName());
         root.addProperty("description", state.getDescription());
         root.addProperty("discoverable", state.isDiscoverable());
+        root.addProperty("publicControl", state.isPublicControl());
         root.addProperty("createdAtMs", state.getCreatedAtMs());
 
         var playState = new JsonObject();
@@ -202,6 +203,7 @@ final class FileSystemChannelRepository implements ChannelRepository {
         state.setChannelName(getString(root, "channelName", ""));
         state.setDescription(getString(root, "description", ""));
         state.setDiscoverable(getBoolean(root, "discoverable", false));
+        state.setPublicControl(getBoolean(root, "publicControl", true));
         state.setCreatedAtMs(getLong(root, "createdAtMs", System.currentTimeMillis()));
 
         var playState = getObject(root, "playState");

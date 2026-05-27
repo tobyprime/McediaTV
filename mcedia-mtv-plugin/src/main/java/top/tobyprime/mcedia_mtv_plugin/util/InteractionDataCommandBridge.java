@@ -18,7 +18,7 @@ public final class InteractionDataCommandBridge {
     public static final String ENTITY_CONFIG_KEY = "entity_config";
     public static final String CHANNEL_BINDING_KEY = "channel_binding";
     public static final String SCHEMA_VERSION_KEY = "schema_version";
-    public static final int SCHEMA_VERSION = 3;
+    public static final int SCHEMA_VERSION = 4;
 
     private InteractionDataCommandBridge() {
     }
@@ -38,6 +38,8 @@ public final class InteractionDataCommandBridge {
         entityConfig.putDouble("z", player.getZ());
         entityConfig.putFloat("yaw", player.getYaw());
         entityConfig.putFloat("pitch", player.getPitch());
+        entityConfig.putFloat("master_volume", player.getMasterVolume());
+        entityConfig.putBoolean("powered", player.isPowered());
 
         ListTag peripherals = new ListTag();
         for (var s : player.getScreens()) {
