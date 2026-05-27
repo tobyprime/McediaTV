@@ -131,6 +131,7 @@ public final class MtvChannelNetworkService implements PluginMessageListener, Li
                 heartbeat.revision(),
                 heartbeat.loaded(),
                 heartbeat.completed(),
+                heartbeat.error(),
                 Math.max(0L, heartbeat.durationUs() / 1000L),
                 nowMs
         );

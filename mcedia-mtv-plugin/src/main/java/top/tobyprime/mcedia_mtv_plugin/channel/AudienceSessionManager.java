@@ -56,18 +56,20 @@ public final class AudienceSessionManager {
         return nowMs - session.getLastHeartbeatAtMs() <= activeTimeoutMs && isSubscribed(session.getPlayerUuid(), session.getChannelId());
     }
 
-    public AudienceTouch touch(UUID playerUuid, String channelId, long revision, boolean loaded, boolean completed, long durationMs, long nowMs) {
+    public AudienceTouch touch(UUID playerUuid, String channelId, long revision, boolean loaded, boolean completed, boolean error, long durationMs, long nowMs) {
         var sessions = sessionsByChannel.computeIfAbsent(channelId, key -> new ConcurrentHashMap<>());
         var session = sessions.computeIfAbsent(playerUuid, key -> new AudienceSession(playerUuid, channelId, nowMs));
         long nextDurationMs = Math.max(0L, durationMs);
         boolean stateChanged = session.getLastRevision() != revision
                 || session.isLoaded() != loaded
-                || session.isCompleted() != completed;
+                || session.isCompleted() != completed
+                || session.isError() != error;
         boolean durationChanged = session.getDurationMs() != nextDurationMs;
         session.setLastHeartbeatAtMs(nowMs);
         session.setLastRevision(revision);
         session.setLoaded(loaded);
         session.setCompleted(completed);
+        session.setError(error);
         session.setDurationMs(nextDurationMs);
         return new AudienceTouch(stateChanged || durationChanged, durationChanged);
     }
@@ -101,6 +103,9 @@ public final class AudienceSessionManager {
         int loaded = 0;
         int completed = 0;
         for (var session : sessions) {
+            if (session.isError()) {
+                continue;
+            }
             if (session.getLastRevision() != revision) {
                 continue;
             }

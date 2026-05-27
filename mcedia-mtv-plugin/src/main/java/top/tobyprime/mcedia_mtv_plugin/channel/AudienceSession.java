@@ -9,6 +9,7 @@ public final class AudienceSession {
     private long lastRevision;
     private boolean loaded;
     private boolean completed;
+    private boolean error;
     private long durationMs;
 
     public AudienceSession(UUID playerUuid, String channelId, long nowMs) {
@@ -55,6 +56,14 @@ public final class AudienceSession {
 
     public void setCompleted(boolean completed) {
         this.completed = completed;
+    }
+
+    public boolean isError() {
+        return error;
+    }
+
+    public void setError(boolean error) {
+        this.error = error;
     }
 
     public long getDurationMs() {
