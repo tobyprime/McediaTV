@@ -9,7 +9,6 @@ import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.messaging.PluginMessageListener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import top.tobyprime.mcedia_mtv_plugin.model.ManagedMtvPlayer;
 
 import java.util.UUID;
 
@@ -54,14 +53,6 @@ public final class MtvChannelNetworkService implements PluginMessageListener, Li
     @EventHandler
     public void onPlayerQuit(PlayerQuitEvent event) {
         unregisterClient(event.getPlayer());
-    }
-
-    public void publishSnapshot(ManagedMtvPlayer player) {
-        if (player == null) {
-            return;
-        }
-        var binding = channelService.resolveBinding(player);
-        publishSnapshot(binding.channelId());
     }
 
     public void publishSnapshot(String channelId) {

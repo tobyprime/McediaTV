@@ -108,7 +108,9 @@ public class MtvGuiListener implements Listener {
                         return;
                     }
                     float delta = (rightClick ? 1 : -1) * (shiftClick ? 1.0F : 0.25F);
-                    float v = Math.max(0.25F, Math.min(4.0F, snap.getSpeed() + delta));
+                    var channelState = gui.getManager().getChannelService().ensureChannelState(binding.channelId());
+                    float currentSpeed = channelState != null ? (float) channelState.getPlayState().getSpeed() : 1.0F;
+                    float v = Math.max(0.25F, Math.min(4.0F, currentSpeed + delta));
                     player.performCommand("mtv speed " + v + " " + name);
                     gui.reopenPage(player, GuiType.PLAYER_MENU, uuid);
                 }
@@ -238,72 +240,125 @@ public class MtvGuiListener implements Listener {
 
     private void handleChannelMenu(Player player, MtvGui.MtvHolder holder, int slot, boolean rightClick, boolean shiftClick) {
         var uuid = holder.getEntityUuid();
-        if (uuid == null) return;
-        read(player, uuid, snap -> {
-            if (snap == null) return;
-            var state = gui.getManager().getChannelService().previewState(snap);
-            boolean requiresManage = slot != 47 && slot != 49;
-            if (requiresManage && !gui.getManager().getChannelService().canManagePublicChannel(player, state)) {
-                player.sendMessage("只有公共频道的创建者或 OP 可以管理该频道。");
-                return;
+        String channelId;
+        if (uuid != null) {
+            read(player, uuid, snap -> {
+                if (snap == null) return;
+                var binding = gui.getManager().getChannelService().resolveBinding(snap);
+                handleChannelMenuActions(player, uuid, binding.channelId(), slot, rightClick, shiftClick);
+            });
+            return;
+        }
+        var guiState = gui.getState(player);
+        channelId = guiState != null ? guiState.getTemp().get("channel_id") : null;
+        if (channelId == null || channelId.isBlank()) {
+            return;
+        }
+        handleChannelMenuActions(player, null, channelId, slot, rightClick, shiftClick);
+    }
+
+    private void handleChannelMenuActions(Player player, UUID uuid, String channelId, int slot, boolean rightClick, boolean shiftClick) {
+        var state = gui.getManager().getChannelService().ensureChannelState(channelId);
+        if (state == null) {
+            player.sendMessage("该频道不存在或无法加载。");
+            return;
+        }
+        boolean requiresManage = slot != 47 && slot != 49;
+        if (requiresManage && !gui.getManager().getChannelService().canManagePublicChannel(player, state)) {
+            player.sendMessage("只有公共频道的创建者或 OP 可以管理该频道。");
+            return;
+        }
+        var playState = state.getPlayState();
+        float currentSpeed = (float) playState.getSpeed();
+        switch (slot) {
+            case 10 -> {
+                float delta = (rightClick ? 1 : -1) * (shiftClick ? 1.0F : 0.25F);
+                float speed = Math.max(0.25F, Math.min(4.0F, currentSpeed + delta));
+                updateChannel(player, uuid, channelId, cid -> gui.getManager().getChannelService().updateSpeed(cid, speed));
             }
-            switch (slot) {
-                case 10 -> {
-                    float delta = (rightClick ? 1 : -1) * (shiftClick ? 1.0F : 0.25F);
-                    float speed = Math.max(0.25F, Math.min(4.0F, snap.getSpeed() + delta));
-                    updateAndReopen(player, uuid, done -> playbackController.updateSpeed(uuid, speed, done), GuiType.CHANNEL_MENU, null);
+            case 11 -> {
+                player.closeInventory();
+                player.sendMessage(MtvGui.MEDIA_INPUT_MESSAGE);
+                gui.setAwaitingInput(player, gui.getState(player), "channel_media_url");
+            }
+            case 12 -> updateChannel(player, uuid, channelId, gui.getManager().getChannelService()::cyclePlayOrderMode);
+            case 13 -> updateChannel(player, uuid, channelId, gui.getManager().getChannelService()::playPreviousManual);
+            case 14 -> updateChannel(player, uuid, channelId, gui.getManager().getChannelService()::togglePause);
+            case 15 -> updateChannel(player, uuid, channelId, gui.getManager().getChannelService()::playNextManual);
+            case 16 -> {
+                player.closeInventory();
+                player.sendMessage("请输入跳转位置的微秒值。");
+                gui.setAwaitingInput(player, gui.getState(player), "start_at");
+            }
+            case 19 -> {
+                player.closeInventory();
+                player.sendMessage(MtvGui.MEDIA_INPUT_MESSAGE);
+                gui.setAwaitingInput(player, gui.getState(player), "channel_prepend");
+            }
+            case 20 -> {
+                player.closeInventory();
+                player.sendMessage(MtvGui.MEDIA_INPUT_MESSAGE);
+                gui.setAwaitingInput(player, gui.getState(player), "channel_append");
+            }
+            case 21 -> updateChannel(player, uuid, channelId, cid -> gui.getManager().getChannelService().updateStartAt(cid, 0L));
+            case 22 -> {
+                long delta = shiftClick ? -10_000_000L : -1_000_000L;
+                updateChannel(player, uuid, channelId, cid -> gui.getManager().getChannelService().seekRelative(cid, delta));
+            }
+            case 23 -> {
+                long delta = shiftClick ? 10_000_000L : 1_000_000L;
+                updateChannel(player, uuid, channelId, cid -> gui.getManager().getChannelService().seekRelative(cid, delta));
+            }
+            case 47 -> {
+                if (uuid != null) {
+                    read(player, uuid, snap -> {
+                        if (snap != null) gui.openPlayerMenu(player, snap);
+                    });
+                } else {
+                    var guiState = gui.getState(player);
+                    String query = guiState != null ? guiState.getTemp().getOrDefault("public_query", "") : "";
+                    int page = guiState != null ? MtvGui.parsePage(guiState) : 0;
+                    boolean ownOnly = guiState != null && Boolean.parseBoolean(guiState.getTemp().getOrDefault("public_own_only", "false"));
+                    gui.openPublicChannelManage(player, null, channelId, query, page, ownOnly);
                 }
-                case 11 -> {
-                    player.closeInventory();
-                    player.sendMessage(MtvGui.MEDIA_INPUT_MESSAGE);
-                    gui.setAwaitingInput(player, gui.getState(player), "channel_media_url");
-                }
-                case 12 -> updateAndReopen(player, uuid, done -> playbackController.cyclePlayOrderMode(uuid, done), GuiType.CHANNEL_MENU, null);
-                case 13 -> updateAndReopen(player, uuid, done -> playbackController.playPreviousManual(uuid, done), GuiType.CHANNEL_MENU, null);
-                case 14 -> updateAndReopen(player, uuid, done -> playbackController.togglePause(uuid, done), GuiType.CHANNEL_MENU, null);
-                case 15 -> updateAndReopen(player, uuid, done -> playbackController.playNextManual(uuid, done), GuiType.CHANNEL_MENU, null);
-                case 16 -> {
-                    player.closeInventory();
-                    player.sendMessage("请输入跳转位置的微秒值。");
-                    gui.setAwaitingInput(player, gui.getState(player), "start_at");
-                }
-                case 19 -> {
-                    player.closeInventory();
-                    player.sendMessage(MtvGui.MEDIA_INPUT_MESSAGE);
-                    gui.setAwaitingInput(player, gui.getState(player), "channel_prepend");
-                }
-                case 20 -> {
-                    player.closeInventory();
-                    player.sendMessage(MtvGui.MEDIA_INPUT_MESSAGE);
-                    gui.setAwaitingInput(player, gui.getState(player), "channel_append");
-                }
-                case 21 -> updateAndReopen(player, uuid, done -> playbackController.updateStartAt(uuid, 0L, done), GuiType.CHANNEL_MENU, null);
-                case 22 -> {
-                    long delta = shiftClick ? -10_000_000L : -1_000_000L;
-                    updateAndReopen(player, uuid, done -> playbackController.seekRelative(uuid, delta, done), GuiType.CHANNEL_MENU, null);
-                }
-                case 23 -> {
-                    long delta = shiftClick ? 10_000_000L : 1_000_000L;
-                    updateAndReopen(player, uuid, done -> playbackController.seekRelative(uuid, delta, done), GuiType.CHANNEL_MENU, null);
-                }
-                case 47 -> gui.openPlayerMenu(player, snap);
-                case 49 -> gui.reopenPage(player, GuiType.CHANNEL_MENU, uuid);
-                default -> {
-                    int index = indexOf(MtvGui.CHANNEL_PLAYLIST_SLOTS, slot);
-                    if (index >= 0) {
-                        if (shiftClick && rightClick) {
-                            updateAndReopen(player, uuid, done -> playbackController.movePlaylistItemToBack(uuid, index, done), GuiType.CHANNEL_MENU, null);
-                        } else if (shiftClick) {
-                            updateAndReopen(player, uuid, done -> playbackController.movePlaylistItemToFront(uuid, index, done), GuiType.CHANNEL_MENU, null);
-                        } else if (rightClick) {
-                            updateAndReopen(player, uuid, done -> playbackController.removePlaylistItem(uuid, index, done), GuiType.CHANNEL_MENU, null);
-                        } else {
-                            updateAndReopen(player, uuid, done -> playbackController.playPlaylistIndex(uuid, index, done), GuiType.CHANNEL_MENU, null);
-                        }
+            }
+            case 49 -> gui.reopenPage(player, GuiType.CHANNEL_MENU, uuid);
+            default -> {
+                int index = indexOf(MtvGui.CHANNEL_PLAYLIST_SLOTS, slot);
+                if (index >= 0) {
+                    if (shiftClick && rightClick) {
+                        updateChannel(player, uuid, channelId, cid -> gui.getManager().getChannelService().movePlaylistItemToBack(cid, index));
+                    } else if (shiftClick) {
+                        updateChannel(player, uuid, channelId, cid -> gui.getManager().getChannelService().movePlaylistItemToFront(cid, index));
+                    } else if (rightClick) {
+                        updateChannel(player, uuid, channelId, cid -> gui.getManager().getChannelService().removePlaylistItem(cid, index));
+                    } else {
+                        updateChannel(player, uuid, channelId, cid -> gui.getManager().getChannelService().playPlaylistIndex(cid, index));
                     }
                 }
             }
-        });
+        }
+    }
+
+    @FunctionalInterface
+    private interface ChannelOp {
+        boolean apply(String channelId);
+    }
+
+    private void updateChannel(Player player, UUID uuid, String channelId, ChannelOp op) {
+        if (uuid != null) {
+            updateAndReopen(player, uuid, done -> {
+                gui.getManager().withManagedPlayer(uuid, playerEntity -> {
+                    var binding = gui.getManager().getChannelService().resolveBinding(playerEntity);
+                    return op.apply(binding.channelId());
+                }, done);
+            }, GuiType.CHANNEL_MENU, null);
+        } else {
+            boolean success = op.apply(channelId);
+            if (success) {
+                delay(player, () -> gui.reopenPage(player, GuiType.CHANNEL_MENU, null));
+            }
+        }
     }
 
     private void handleRemoteMenu(Player player, MtvGui.MtvHolder holder, int slot, boolean shiftClick) {
@@ -349,7 +404,7 @@ public class MtvGuiListener implements Listener {
     private void handlePublicChannelList(Player player, MtvGui.MtvHolder holder, int slot, boolean rightClick) {
         var state = gui.getState(player);
         String query = state == null ? "" : state.getTemp().getOrDefault("public_query", "");
-        int page = parsePage(state);
+        int page = MtvGui.parsePage(state);
         boolean ownOnly = state != null && Boolean.parseBoolean(state.getTemp().getOrDefault("public_own_only", "false"));
         switch (slot) {
             case 45 -> gui.openPublicChannelList(player, holder.getEntityUuid(), query, Math.max(0, page - 1), ownOnly);
@@ -404,7 +459,7 @@ public class MtvGuiListener implements Listener {
         var state = gui.getState(player);
         if (state == null) return;
         String query = state.getTemp().getOrDefault("public_query", "");
-        int page = parsePage(state);
+        int page = MtvGui.parsePage(state);
         boolean ownOnly = Boolean.parseBoolean(state.getTemp().getOrDefault("public_own_only", "false"));
         switch (slot) {
             case 11 -> {
@@ -434,7 +489,7 @@ public class MtvGuiListener implements Listener {
         if (state == null) return;
         String channelId = state.getTemp().get("channel_id");
         String query = state.getTemp().getOrDefault("public_query", "");
-        int page = parsePage(state);
+        int page = MtvGui.parsePage(state);
         boolean ownOnly = Boolean.parseBoolean(state.getTemp().getOrDefault("public_own_only", "false"));
         var channel = gui.getManager().getChannelService().getPublicChannel(channelId);
         boolean canManage = gui.getManager().getChannelService().canManagePublicChannel(player, channel);
@@ -597,22 +652,11 @@ public class MtvGuiListener implements Listener {
                     gui.openChannelMenu(player, snapshot);
                     return;
                 }
-                openNearbyChannelControl(player, entityUuid, channelId, query, page, ownOnly);
+                gui.openChannelMenu(player, channelId, null);
             });
             return;
         }
-        openNearbyChannelControl(player, null, channelId, query, page, ownOnly);
-    }
-
-    private void openNearbyChannelControl(Player player, UUID entityUuid, String channelId, String query, int page, boolean ownOnly) {
-        gui.getManager().findNearbyChannelAsync(player, channelId, MtvGui.NEARBY_RANGE, snapshot -> delay(player, () -> {
-            if (snapshot == null) {
-                player.sendMessage("附近没有绑定该频道的 MTV 播放器。");
-                gui.openPublicChannelManage(player, entityUuid, channelId, query, page, ownOnly);
-                return;
-            }
-            gui.openChannelMenu(player, snapshot);
-        }));
+        gui.openChannelMenu(player, channelId, null);
     }
 
     private void read(Player player, UUID uuid, Consumer<ManagedMtvPlayer> done) {
@@ -626,7 +670,8 @@ public class MtvGuiListener implements Listener {
     }
 
     private boolean canManageRemotePlayback(Player player, ManagedMtvPlayer snapshot) {
-        var state = gui.getManager().getChannelService().previewState(snapshot);
+        var binding = gui.getManager().getChannelService().resolveBinding(snapshot);
+        var state = gui.getManager().getChannelService().ensureChannelState(binding.channelId());
         if (gui.getManager().getChannelService().canManagePublicChannel(player, state)) {
             return true;
         }
@@ -650,17 +695,6 @@ public class MtvGuiListener implements Listener {
     private static int indexOf(int[] arr, int val) {
         for (int i = 0; i < arr.length; i++) if (arr[i] == val) return i;
         return -1;
-    }
-
-    private static int parsePage(MtvGui.GuiState state) {
-        if (state == null) {
-            return 0;
-        }
-        try {
-            return Integer.parseInt(state.getTemp().getOrDefault("public_page", "0"));
-        } catch (NumberFormatException ignored) {
-            return 0;
-        }
     }
 
 }

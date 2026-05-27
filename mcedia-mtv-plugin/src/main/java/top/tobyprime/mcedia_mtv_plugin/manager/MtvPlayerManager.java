@@ -82,7 +82,6 @@ public class MtvPlayerManager {
             display.getScheduler().run(plugin, task -> {
                 if (isManagedItemDisplay(display)) {
                     var snapshot = readFromEntity(display);
-                    channelService.previewState(snapshot);
                     if (sameWorld(origin, snapshot) && distanceSquared(origin, snapshot) <= rangeSq) {
                         result.add(snapshot);
                     }
@@ -115,7 +114,6 @@ public class MtvPlayerManager {
                     if (sameWorld(origin, snapshot)
                             && distanceSquared(origin, snapshot) <= rangeSq
                             && channelId.equals(channelService.resolveBinding(snapshot).channelId())) {
-                        channelService.previewState(snapshot);
                         result.add(snapshot);
                     }
                 }
@@ -153,11 +151,7 @@ public class MtvPlayerManager {
     }
 
     public void readSnapshot(UUID uuid, Consumer<ManagedMtvPlayer> done) {
-        withDisplay(uuid, display -> {
-            var snapshot = readFromEntity(display);
-            channelService.previewState(snapshot);
-            return snapshot;
-        }, done);
+        withDisplay(uuid, display -> readFromEntity(display), done);
     }
 
     public ManagedMtvPlayer readFromEntity(ItemDisplay display) {
@@ -279,7 +273,6 @@ public class MtvPlayerManager {
         plugin.getServer().getRegionScheduler().execute(plugin, location, () -> {
             ItemDisplay itemDisplay = spawnItemDisplay(location);
             var player = ManagedMtvPlayer.create(itemDisplay.getUniqueId(), name, location);
-            channelService.syncSnapshot(player);
             applyEntityState(itemDisplay, player);
             done.accept(player);
         });
@@ -644,14 +637,6 @@ public class MtvPlayerManager {
         InteractionDataCommandBridge.apply(itemDisplay, player);
     }
 
-    public void persistPlaybackState(UUID uuid, Consumer<Boolean> done) {
-        withDisplay(uuid, display -> {
-            var player = readFromEntity(display);
-            applyEntityState(display, player);
-            return Boolean.TRUE;
-        }, result -> done.accept(Boolean.TRUE.equals(result)));
-    }
-
     private ItemDisplay spawnItemDisplay(Location location) {
         ItemDisplay itemDisplay = location.getWorld().spawn(location, ItemDisplay.class);
         itemDisplay.setRotation(location.getYaw(), location.getPitch());
@@ -666,7 +651,6 @@ public class MtvPlayerManager {
             if (binding.isBroadcast() && channelService.getPublicChannel(binding.channelId()) == null) {
                 return Boolean.FALSE;
             }
-            channelService.syncSnapshot(player);
             applyEntityState(display, player);
             return Boolean.TRUE;
         }, result -> done.accept(Boolean.TRUE.equals(result)));

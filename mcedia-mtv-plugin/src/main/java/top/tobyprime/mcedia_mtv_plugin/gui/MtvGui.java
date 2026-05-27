@@ -9,6 +9,7 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.java.JavaPlugin;
+import top.tobyprime.mcedia_mtv_plugin.channel.ChannelPlaybackStatus;
 import top.tobyprime.mcedia_mtv_plugin.channel.ChannelRuntimeState;
 import top.tobyprime.mcedia_mtv_plugin.controller.MtvPeripheralController;
 import top.tobyprime.mcedia_mtv_plugin.controller.MtvPlaybackController;
@@ -80,7 +81,12 @@ public class MtvGui {
     private final MtvPlaybackController playbackController;
     private final Map<UUID, GuiState> playerStates = new ConcurrentHashMap<>();
 
-    public MtvGui(JavaPlugin plugin, MtvPlayerManager manager, MtvPeripheralController controller, MtvPlaybackController playbackController) { this.plugin = plugin; this.manager = manager; this.controller = controller; this.playbackController = playbackController; }
+    public MtvGui(JavaPlugin plugin, MtvPlayerManager manager, MtvPeripheralController controller, MtvPlaybackController playbackController) {
+        this.plugin = plugin;
+        this.manager = manager;
+        this.controller = controller;
+        this.playbackController = playbackController;
+    }
 
     public void openMainMenu(Player player) {
         var inv = Bukkit.createInventory(new MtvHolder(GuiType.MAIN_MENU, null, null), 27, Component.text("MTV"));
@@ -107,12 +113,14 @@ public class MtvGui {
     public void openRemoteMenu(Player player, ManagedMtvPlayer snapshot) {
         var binding = manager.getChannelService().resolveBinding(snapshot);
         var publicChannel = binding.isBroadcast() ? manager.getChannelService().getPublicChannel(binding.channelId()) : null;
+        var channelState = manager.getChannelService().ensureChannelState(binding.channelId());
+        var playState = channelState != null ? channelState.getPlayState() : null;
         var inv = Bukkit.createInventory(new MtvHolder(GuiType.REMOTE_MENU, snapshot.getUuid(), null), 27, Component.text("遥控器 - " + snapshot.getName()));
         inv.setItem(4, item(Material.IRON_DOOR,
                 snapshot.getName(),
                 "频道: " + fallback(publicChannel != null ? publicChannel.getChannelName() : null, binding.channelId()),
-                "当前: " + summarize(snapshot.getMediaUrl()),
-                "模式: " + formatPlayOrderMode(manager.getChannelService().previewState(snapshot))));
+                "当前: " + summarize(playState != null ? playState.getMediaUrl() : ""),
+                "模式: " + formatPlayOrderMode(channelState)));
         inv.setItem(12, item(Material.STONE_BUTTON, "后退 1 秒", "潜行点击后退 10 秒"));
         inv.setItem(13, item(Material.MUSIC_DISC_CAT, "设置当前媒体", "切到该视频，并改为播完当前停止", binding.isBroadcast() ? "公共频道需要创建者或 OP" : "会覆盖当前列表"));
         inv.setItem(14, item(Material.STONE_BUTTON, "前进 1 秒", "潜行点击前进 10 秒"));
@@ -141,18 +149,24 @@ public class MtvGui {
             inv.setItem(42, item(Material.BOOK, "切换绑定", "重新选择要绑定的公共频道"));
             inv.setItem(43, item(Material.STRUCTURE_VOID, "取消绑定", "切回私有 self 频道"));
         } else {
-            inv.setItem(11, item(Material.CLOCK, "速度: " + snapshot.getSpeed() + "x", "左键 -0.25 / 右键 +0.25"));
+            var channelState = manager.getChannelService().ensureChannelState(binding.channelId());
+            var playState = channelState != null ? channelState.getPlayState() : null;
+            float speed = playState != null ? (float) playState.getSpeed() : 1.0F;
+            String mediaUrl = playState != null ? playState.getMediaUrl() : "";
+            boolean paused = playState != null ? playState.getState() != ChannelPlaybackStatus.PLAYING : false;
+            long startAt = playState != null ? Math.max(0L, playState.getMediaTimeMs() * 1000L) : 0L;
+            inv.setItem(11, item(Material.CLOCK, "速度: " + speed + "x", "左键 -0.25 / 右键 +0.25"));
             inv.setItem(41, item(Material.JUKEBOX, "频道编辑", "打开 channel 播放与列表页"));
             inv.setItem(42, item(Material.BOOK, "公共频道", "搜索并绑定公共频道"));
             inv.setItem(43, item(Material.STRUCTURE_VOID, "切回私有频道", "恢复 self 频道绑定"));
-            inv.setItem(40, item(Material.MUSIC_DISC_CAT, "设置播放链接", snapshot.getMediaUrl().isBlank() ? "未设置" : snapshot.getMediaUrl(), MEDIA_INPUT_HINT));
+            inv.setItem(40, item(Material.MUSIC_DISC_CAT, "设置播放链接", mediaUrl.isBlank() ? "未设置" : mediaUrl, MEDIA_INPUT_HINT));
             inv.setItem(47, item(Material.STRUCTURE_VOID, "从头播放"));
             inv.setItem(48, item(Material.STONE_BUTTON, "后退 1 秒", "潜行点击后退 10 秒"));
-            var pauseIcon = snapshot.isPaused() ? Material.YELLOW_WOOL : Material.RED_WOOL;
-            var pauseName = snapshot.isPaused() ? "▶ 播放" : "⏸ 暂停";
+            var pauseIcon = paused ? Material.YELLOW_WOOL : Material.RED_WOOL;
+            var pauseName = paused ? "▶ 播放" : "⏸ 暂停";
             inv.setItem(49, item(pauseIcon, pauseName));
             inv.setItem(50, item(Material.STONE_BUTTON, "前进 1 秒", "潜行点击前进 10 秒"));
-            inv.setItem(51, item(Material.COMPASS, "设置到位置: " + formatDurationUs(snapshot.getStartAt()), "点击输入微秒值"));
+            inv.setItem(51, item(Material.COMPASS, "设置到位置: " + formatDurationUs(startAt), "点击输入微秒值"));
         }
         inv.setItem(53, item(Material.TNT, "删除 MTV"));
         fillBorder54(inv);
@@ -170,26 +184,42 @@ public class MtvGui {
     }
 
     public void openChannelMenu(Player player, ManagedMtvPlayer snapshot) {
-        ChannelRuntimeState state = manager.getChannelService().previewState(snapshot);
         var binding = manager.getChannelService().resolveBinding(snapshot);
-        var inv = Bukkit.createInventory(new MtvHolder(GuiType.CHANNEL_MENU, snapshot.getUuid(), null), 54, Component.text("频道 - " + snapshot.getName()));
-        inv.setItem(4, item(Material.NAME_TAG, "频道: " + binding.channelId(), "模式: " + formatPlayOrderMode(state), "当前: " + currentPlaylistLabel(state)));
-        inv.setItem(10, item(Material.CLOCK, "速度: " + snapshot.getSpeed() + "x", "左键 -0.25 / 右键 +0.25"));
-        inv.setItem(11, item(Material.MUSIC_DISC_CAT, "设置当前媒体", snapshot.getMediaUrl().isBlank() ? "未设置" : summarize(snapshot.getMediaUrl()), "会替换整个播放列表"));
+        openChannelMenu(player, binding.channelId(), snapshot.getUuid());
+    }
+
+    public void openChannelMenu(Player player, String channelId, UUID entityUuid) {
+        ChannelRuntimeState state = manager.getChannelService().ensureChannelState(channelId);
+        if (state == null) {
+            player.closeInventory();
+            player.sendMessage("该频道不存在或无法加载。");
+            return;
+        }
+        var playState = state.getPlayState();
+        boolean paused = playState.getState() != ChannelPlaybackStatus.PLAYING;
+        long startAtUs = Math.max(0L, playState.getMediaTimeMs() * 1000L);
+        var inv = Bukkit.createInventory(new MtvHolder(GuiType.CHANNEL_MENU, entityUuid, null), 54, Component.text("频道 - " + channelId));
+        inv.setItem(4, item(Material.NAME_TAG, "频道: " + channelId, "模式: " + formatPlayOrderMode(state), "当前: " + currentPlaylistLabel(state)));
+        inv.setItem(10, item(Material.CLOCK, "速度: " + playState.getSpeed() + "x", "左键 -0.25 / 右键 +0.25"));
+        inv.setItem(11, item(Material.MUSIC_DISC_CAT, "设置当前媒体", playState.getMediaUrl().isBlank() ? "未设置" : summarize(playState.getMediaUrl()), "会替换整个播放列表"));
         inv.setItem(12, item(Material.COMPARATOR, "播放顺序", formatPlayOrderMode(state), "点击切换"));
         inv.setItem(13, item(Material.STONE_BUTTON, "上一首", "始终按列表顺序"));
-        var pauseIcon = snapshot.isPaused() ? Material.YELLOW_WOOL : Material.RED_WOOL;
-        var pauseName = snapshot.isPaused() ? "▶ 播放" : "⏸ 暂停";
+        var pauseIcon = paused ? Material.YELLOW_WOOL : Material.RED_WOOL;
+        var pauseName = paused ? "▶ 播放" : "⏸ 暂停";
         inv.setItem(14, item(pauseIcon, pauseName));
         inv.setItem(15, item(Material.STONE_BUTTON, "下一首", "始终按列表顺序"));
-        inv.setItem(16, item(Material.COMPASS, "设置到位置: " + formatDurationUs(snapshot.getStartAt()), "点击输入微秒值"));
+        inv.setItem(16, item(Material.COMPASS, "设置到位置: " + formatDurationUs(startAtUs), "点击输入微秒值"));
         inv.setItem(19, item(Material.HOPPER, "首加播放项", MEDIA_INPUT_HINT));
         inv.setItem(20, item(Material.CHEST, "尾加播放项", MEDIA_INPUT_HINT));
         inv.setItem(21, item(Material.STRUCTURE_VOID, "从头播放当前项"));
         inv.setItem(22, item(Material.STONE_BUTTON, "后退 1 秒", "潜行点击后退 10 秒"));
         inv.setItem(23, item(Material.STONE_BUTTON, "前进 1 秒", "潜行点击前进 10 秒"));
         inv.setItem(24, item(Material.BOOK, "列表信息", "项目数: " + state.getPlaylist().size(), "当前位置: " + (state.getPlaylist().isEmpty() ? "无" : (state.getPlaylistCursor() + 1))));
-        inv.setItem(47, item(Material.ARROW, "返回实体页"));
+        if (entityUuid != null) {
+            inv.setItem(47, item(Material.ARROW, "返回实体页"));
+        } else {
+            inv.setItem(47, item(Material.ARROW, "返回频道管理"));
+        }
         inv.setItem(49, item(Material.SPYGLASS, "刷新"));
 
         for (int i = 0; i < CHANNEL_PLAYLIST_SLOTS.length && i < state.getPlaylist().size(); i++) {
@@ -202,7 +232,13 @@ public class MtvGui {
         }
 
         fillBorder54(inv);
-        setState(player, GuiType.CHANNEL_MENU, snapshot.getUuid());
+        if (entityUuid != null) {
+            setState(player, GuiType.CHANNEL_MENU, entityUuid);
+        } else {
+            var temp = new HashMap<String, String>();
+            temp.put("channel_id", channelId);
+            setState(player, GuiType.CHANNEL_MENU, null, temp);
+        }
         player.openInventory(inv);
     }
 
@@ -468,6 +504,7 @@ public class MtvGui {
     public GuiState getState(Player player) { return playerStates.get(player.getUniqueId()); }
     public MtvPlayerManager getManager() { return manager; }
     public MtvPeripheralController getController() { return controller; }
+    public MtvPlaybackController getPlaybackController() { return playbackController; }
     public JavaPlugin getPlugin() { return plugin; }
 
     public void setAwaitingInput(Player player, GuiType type, UUID entityUuid, String kind) {
@@ -557,7 +594,8 @@ public class MtvGui {
                             reopenPage(player, state.getType(), state.getEntityUuid());
                         }));
                 case "remote_media_url" -> {
-                    var channelState = manager.getChannelService().previewState(snapshot);
+                    var binding = manager.getChannelService().resolveBinding(snapshot);
+                    var channelState = manager.getChannelService().ensureChannelState(binding.channelId());
                     if (!manager.getChannelService().canManagePublicChannel(player, channelState)) {
                         runOnPlayer(player, () -> player.sendMessage("只有公共频道的创建者或 OP 可以通过遥控器修改当前媒体。"));
                         return;
@@ -624,6 +662,14 @@ public class MtvGui {
     }
 
     public void reopenPage(Player player, GuiType type, UUID uuid, String periphId) {
+        if (type == GuiType.CHANNEL_MENU && uuid == null) {
+            var guiState = getState(player);
+            String channelId = guiState != null ? guiState.getTemp().get("channel_id") : null;
+            if (channelId != null) {
+                runOnPlayer(player, () -> openChannelMenu(player, channelId, null));
+                return;
+            }
+        }
         manager.readSnapshot(uuid, snapshot -> {
             if (snapshot == null) {
                 return;
@@ -671,7 +717,7 @@ public class MtvGui {
         player.getScheduler().run(plugin, scheduledTask -> task.run(), null);
     }
 
-    private static int parsePage(GuiState state) {
+    public static int parsePage(GuiState state) {
         try {
             return Integer.parseInt(state.getTemp().getOrDefault("public_page", "0"));
         } catch (NumberFormatException ignored) {

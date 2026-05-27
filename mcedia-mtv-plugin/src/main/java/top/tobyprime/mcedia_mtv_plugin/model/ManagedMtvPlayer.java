@@ -18,12 +18,6 @@ public class ManagedMtvPlayer {
     private double z;
     private float yaw;
     private float pitch;
-    private String mediaUrl = "";
-    private float speed = 1.0F;
-    private long startAt = 0L;
-    private long baseTime = 0L;
-    private long baseOffset = 0L;
-    private boolean paused = false;
     private MtvChannelBinding channelBinding;
     private final List<ScreenPeripheralConfigModel> screens = new ArrayList<>();
     private final List<SpeakerPeripheralConfigModel> speakers = new ArrayList<>();
@@ -107,37 +101,6 @@ public class ManagedMtvPlayer {
         return prefix + "_" + i;
     }
 
-    // --- timeline model ---
-
-    /**
-     * 根据时间线模型获取当前期望的播放位置（微秒）。
-     * 暂停时位置冻结在 baseOffset（flattenTimeline 时拍平的值）。
-     */
-    public long getExpectedPosition() {
-        if (paused) return baseOffset;
-        long elapsed = System.currentTimeMillis() - baseTime;
-        return baseOffset + (long)(elapsed * 1000L * speed);
-    }
-
-    /**
-     * 将当前期望位置拍平到 baseOffset，baseTime 设为当前时间。
-     * 在改速、暂停、seek 等操作前调用。
-     */
-    public void flattenTimeline() {
-        long pos = getExpectedPosition();
-        baseTime = System.currentTimeMillis();
-        baseOffset = pos;
-    }
-
-    /**
-     * 重置时间线到指定偏移位置，适用于新 URL 或 seek 操作。
-     */
-    public void resetTimeline(long offsetUs) {
-        baseTime = System.currentTimeMillis();
-        baseOffset = offsetUs;
-        paused = false;
-    }
-
     // --- getters / setters ---
 
     public UUID getUuid() { return uuid; }
@@ -156,19 +119,6 @@ public class ManagedMtvPlayer {
     public void setYaw(float yaw) { this.yaw = yaw; }
     public float getPitch() { return pitch; }
     public void setPitch(float pitch) { this.pitch = pitch; }
-    public String getMediaUrl() { return mediaUrl; }
-    public void setMediaUrl(String mediaUrl) { this.mediaUrl = mediaUrl; }
-    public float getSpeed() { return speed; }
-    public void setSpeed(float speed) { this.speed = speed; }
-    public long getStartAt() { return startAt; }
-    public void setStartAt(long startAt) { this.startAt = startAt; }
-
-    public long getBaseTime() { return baseTime; }
-    public void setBaseTime(long baseTime) { this.baseTime = baseTime; }
-    public long getBaseOffset() { return baseOffset; }
-    public void setBaseOffset(long baseOffset) { this.baseOffset = baseOffset; }
-    public boolean isPaused() { return paused; }
-    public void setPaused(boolean paused) { this.paused = paused; }
     public MtvChannelBinding getChannelBinding() { return channelBinding; }
     public void setChannelBinding(MtvChannelBinding channelBinding) { this.channelBinding = channelBinding; }
 }

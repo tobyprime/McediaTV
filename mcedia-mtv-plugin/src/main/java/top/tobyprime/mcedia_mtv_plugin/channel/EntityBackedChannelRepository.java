@@ -9,7 +9,6 @@ import com.google.gson.JsonParser;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import top.tobyprime.mcedia_mtv_plugin.model.ManagedMtvPlayer;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -41,16 +40,6 @@ final class FileSystemChannelRepository implements ChannelRepository {
         }
         var bucket = readBucket(resolveFile(channelId));
         return bucket.get(channelId);
-    }
-
-    @Override
-    public synchronized ChannelRuntimeState load(MtvChannelBinding binding, ManagedMtvPlayer player) {
-        var runtimeBinding = binding.resolveRuntime(player.getUuid());
-        var loaded = load(runtimeBinding.channelId());
-        if (loaded != null) {
-            return loaded;
-        }
-        return createFromPlayer(runtimeBinding, player);
     }
 
     @Override
@@ -103,22 +92,6 @@ final class FileSystemChannelRepository implements ChannelRepository {
             LOGGER.warn("Failed to list MTV channel states from {}", rootDirectory, e);
         }
         return new ArrayList<>(states.values());
-    }
-
-    private ChannelRuntimeState createFromPlayer(MtvChannelBinding binding, ManagedMtvPlayer player) {
-        var runtimeBinding = binding.resolveRuntime(player.getUuid());
-        var state = new ChannelRuntimeState(runtimeBinding.channelId(), runtimeBinding.type());
-        state.getPlayState().setMediaUrl(player.getMediaUrl());
-        state.getPlayState().setSpeed(player.getSpeed());
-        state.getPlayState().setMediaTimeMs(Math.max(0L, player.getBaseOffset() / 1000L));
-        state.getPlayState().setPlayTimeMs(Math.max(0L, player.getBaseTime()));
-        state.getPlayState().setState(player.isPaused()
-                ? ChannelPlaybackStatus.PAUSED
-                : (player.getMediaUrl().isBlank() ? ChannelPlaybackStatus.STOPPED : ChannelPlaybackStatus.PLAYING));
-        if (!player.getMediaUrl().isBlank()) {
-            state.getPlaylist().add(new ChannelPlaylistItem(player.getMediaUrl()));
-        }
-        return state;
     }
 
     private Path resolveFile(String channelId) {
