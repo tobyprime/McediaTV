@@ -22,6 +22,7 @@ public final class ClientChannelSession {
     private int attachments;
     private long lastHeartbeatAtMs;
     private boolean loadingMedia;
+    private boolean errorMedia;
 
     public ClientChannelSession(String channelId) {
         this.channelId = channelId;
@@ -85,6 +86,7 @@ public final class ClientChannelSession {
         LOGGER.debug("Stop MTV media because channel has no active snapshot: channel={}, playingUrl={}", channelId, playingUrl);
         playingUrl = null;
         loadingMedia = false;
+        errorMedia = false;
         lastAppliedSpeed = Double.NaN;
         stopMedia();
     }
@@ -102,6 +104,7 @@ public final class ClientChannelSession {
             LOGGER.debug("Load MTV media from snapshot: channel={}, revision={}, mediaUrl={}", snapshot.channelId(), snapshot.revision(), snapshot.mediaUrl());
             playingUrl = snapshot.mediaUrl();
             loadingMedia = true;
+            errorMedia = false;
             loadMediaFromChannel(snapshot);
             return;
         }
@@ -130,23 +133,31 @@ public final class ClientChannelSession {
             LOGGER.warn("Host player is not SingleMediaPlayer for channel={}", snapshot.channelId());
             return;
         }
-        singlePlayer.playAsync(() -> MediaResolvers.resolve(snapshot.mediaUrl()))
-                .thenAccept(mediaPlay -> {
-                    loadingMedia = false;
-                    long target = computeTargetPositionUs(snapshot);
-                    if (target > 0) {
-                        var duration = mediaPlay.getDuration();
-                        long seekTarget = duration > 0 ? Math.min(target, duration) : target;
-                        singlePlayer.seekAsync(seekTarget);
-                    }
-                    singlePlayer.setSpeed(snapshot.speed());
-                    singlePlayer.setPaused(snapshot.paused());
-                })
-                .exceptionally(throwable -> {
-                    loadingMedia = false;
-                    LOGGER.error("Failed to load media from channel: {}", snapshot.mediaUrl(), throwable);
-                    return null;
-                });
+        try {
+            singlePlayer.playAsync(() -> MediaResolvers.resolve(snapshot.mediaUrl()))
+                    .thenAccept(mediaPlay -> {
+                        loadingMedia = false;
+                        errorMedia = false;
+                        long target = computeTargetPositionUs(snapshot);
+                        if (target > 0) {
+                            var duration = mediaPlay.getDuration();
+                            long seekTarget = duration > 0 ? Math.min(target, duration) : target;
+                            singlePlayer.seekAsync(seekTarget);
+                        }
+                        singlePlayer.setSpeed(snapshot.speed());
+                        singlePlayer.setPaused(snapshot.paused());
+                    })
+                    .exceptionally(throwable -> {
+                        loadingMedia = false;
+                        errorMedia = true;
+                        LOGGER.error("Failed to load media from channel: {}", snapshot.mediaUrl(), throwable);
+                        return null;
+                    });
+        } catch (Exception e) {
+            loadingMedia = false;
+            errorMedia = true;
+            LOGGER.error("Failed to start media load from channel: {}", snapshot.mediaUrl(), e);
+        }
     }
 
     private long computeTargetPositionUs(ClientChannelPlaybackSnapshot snapshot) {
@@ -185,7 +196,8 @@ public final class ClientChannelSession {
                 snapshot.revision(),
                 loaded,
                 completed,
-                resolvedDurationUs
+                resolvedDurationUs,
+                errorMedia
         ));
     }
 
