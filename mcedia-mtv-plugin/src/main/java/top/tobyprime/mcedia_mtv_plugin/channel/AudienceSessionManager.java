@@ -111,7 +111,7 @@ public final class AudienceSessionManager {
             }
             matched++;
             resolvedDurationMs = Math.max(resolvedDurationMs, session.getDurationMs());
-            if (session.isLoaded() && session.getDurationMs() > 0L) {
+            if (session.isLoaded()) {
                 loaded++;
             }
             if (session.isCompleted()) {

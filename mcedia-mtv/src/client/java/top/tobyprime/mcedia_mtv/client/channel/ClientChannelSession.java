@@ -188,8 +188,8 @@ public final class ClientChannelSession {
         if (media != null) {
             long localPositionUs = Math.max(0L, media.getEstimatedTime());
             resolvedDurationUs = Math.max(0L, media.getDuration());
-            loaded = resolvedDurationUs > 0L;
-            completed = loaded && localPositionUs >= resolvedDurationUs;
+            loaded = true;
+            completed = resolvedDurationUs > 0L && localPositionUs >= resolvedDurationUs;
         }
         MtvChannelHeartbeatSender.send(new MtvAudienceHeartbeat(
                 snapshot.channelId(),
