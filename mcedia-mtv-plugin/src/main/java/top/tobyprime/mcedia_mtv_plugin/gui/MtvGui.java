@@ -525,6 +525,9 @@ public class MtvGui {
         }
         closed = true;
         playerStates.clear();
+        if (!plugin.isEnabled()) {
+            return;
+        }
         for (var player : Bukkit.getOnlinePlayers()) {
             player.getScheduler().run(plugin, task -> {
                 var holder = player.getOpenInventory().getTopInventory().getHolder();
@@ -748,11 +751,11 @@ public class MtvGui {
     }
 
     private void runOnPlayer(Player player, Runnable task) {
-        if (closed) {
+        if (closed || !plugin.isEnabled()) {
             return;
         }
         player.getScheduler().run(plugin, scheduledTask -> {
-            if (closed) {
+            if (closed || !plugin.isEnabled()) {
                 return;
             }
             task.run();
