@@ -111,8 +111,11 @@ public final class ClientChannelSession {
         if (speedChanged) {
             lastAppliedSpeed = snapshot.speed();
         }
-        if (!snapshot.mediaUrl().equals(playingUrl)) {
-            LOGGER.debug("Load MTV media from snapshot: channel={}, revision={}, mediaUrl={}", snapshot.channelId(), snapshot.revision(), snapshot.mediaUrl());
+        boolean mediaChanged = !snapshot.mediaUrl().equals(playingUrl);
+        boolean shouldRetryFailedMedia = forceResync && errorMedia && !loadingMedia;
+        if (mediaChanged || shouldRetryFailedMedia) {
+            LOGGER.debug("Load MTV media from snapshot: channel={}, revision={}, mediaUrl={}, retry={}",
+                    snapshot.channelId(), snapshot.revision(), snapshot.mediaUrl(), shouldRetryFailedMedia);
             playingUrl = snapshot.mediaUrl();
             loadingMedia = true;
             errorMedia = false;
