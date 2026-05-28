@@ -22,12 +22,26 @@ public final class MtvClientChannelPayloads {
         PayloadTypeRegistry.playC2S().register(MtvChannelClientSubscribePayload.TYPE, MtvChannelClientSubscribePayload.CODEC);
         PayloadTypeRegistry.playC2S().register(MtvChannelClientUnsubscribePayload.TYPE, MtvChannelClientUnsubscribePayload.CODEC);
         PayloadTypeRegistry.playC2S().register(MtvChannelClientHeartbeatPayload.TYPE, MtvChannelClientHeartbeatPayload.CODEC);
-        ClientPlayNetworking.registerGlobalReceiver(MtvChannelClientSnapshotPayload.TYPE, (payload, context) -> ClientChannelPlaybackManager.getInstance().onSnapshot(payload.snapshot()));
-        ClientPlayNetworking.registerGlobalReceiver(MtvChannelClientSyncPayload.TYPE, (payload, context) -> ClientChannelPlaybackManager.getInstance().onSync(payload.snapshot()));
-        ClientPlayNetworking.registerGlobalReceiver(MtvChannelRemovePayload.TYPE, (payload, context) -> ClientChannelPlaybackManager.getInstance().onRemove(payload.channelId()));
+        ClientPlayNetworking.registerGlobalReceiver(MtvChannelClientSnapshotPayload.TYPE, (payload, context) ->
+                safeHandle("snapshot", payload.snapshot().channelId(), payload.snapshot().revision(), () ->
+                        ClientChannelPlaybackManager.getInstance().onSnapshot(payload.snapshot())));
+        ClientPlayNetworking.registerGlobalReceiver(MtvChannelClientSyncPayload.TYPE, (payload, context) ->
+                safeHandle("sync", payload.snapshot().channelId(), payload.snapshot().revision(), () ->
+                        ClientChannelPlaybackManager.getInstance().onSync(payload.snapshot())));
+        ClientPlayNetworking.registerGlobalReceiver(MtvChannelRemovePayload.TYPE, (payload, context) ->
+                safeHandle("remove", payload.channelId(), null, () ->
+                        ClientChannelPlaybackManager.getInstance().onRemove(payload.channelId())));
         ClientPlayConnectionEvents.JOIN.register(MtvClientChannelPayloads::onJoin);
         ClientPlayConnectionEvents.DISCONNECT.register(MtvClientChannelPayloads::onDisconnect);
         LOGGER.debug("Registered MTV client channel payloads and connection listeners");
+    }
+
+    private static void safeHandle(String packetType, String channelId, Long revision, Runnable action) {
+        try {
+            action.run();
+        } catch (Exception e) {
+            LOGGER.warn("Failed to handle MTV {} packet: channel={}, revision={}", packetType, channelId, revision, e);
+        }
     }
 
     private static void onJoin(ClientPacketListener handler, PacketSender sender, Minecraft client) {

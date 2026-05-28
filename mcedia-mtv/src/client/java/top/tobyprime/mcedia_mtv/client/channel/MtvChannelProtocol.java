@@ -14,8 +14,18 @@ public final class MtvChannelProtocol {
     private MtvChannelProtocol() {
     }
 
+    private static IllegalArgumentException invalidPacket(String packetType, String detail) {
+        return new IllegalArgumentException("Invalid MTV " + packetType + " packet: " + detail);
+    }
+
+    private static void ensureFullyRead(FriendlyByteBuf buffer, String packetType) {
+        if (buffer.isReadable()) {
+            throw invalidPacket(packetType, "unexpected trailing " + buffer.readableBytes() + " bytes");
+        }
+    }
+
     public static ClientChannelPlaybackSnapshot readSnapshot(FriendlyByteBuf buffer) {
-        return new ClientChannelPlaybackSnapshot(
+        var snapshot = new ClientChannelPlaybackSnapshot(
                 buffer.readUtf(),
                 buffer.readLong(),
                 buffer.readUtf(),
@@ -28,6 +38,8 @@ public final class MtvChannelProtocol {
                 buffer.readBoolean(),
                 0L
         );
+        ensureFullyRead(buffer, "snapshot");
+        return snapshot;
     }
 
     public static void writeSnapshot(FriendlyByteBuf buffer, ClientChannelPlaybackSnapshot snapshot) {
@@ -44,7 +56,9 @@ public final class MtvChannelProtocol {
     }
 
     public static String readRemove(FriendlyByteBuf buffer) {
-        return buffer.readUtf();
+        var channelId = buffer.readUtf();
+        ensureFullyRead(buffer, "remove");
+        return channelId;
     }
 
     public static void writeRemove(FriendlyByteBuf buffer, String channelId) {
@@ -58,6 +72,7 @@ public final class MtvChannelProtocol {
         boolean completed = buffer.readBoolean();
         long durationUs = buffer.readLong();
         boolean error = buffer.isReadable() && buffer.readBoolean();
+        ensureFullyRead(buffer, "heartbeat");
         return new MtvAudienceHeartbeat(channelId, revision, loaded, completed, durationUs, error);
     }
 
@@ -72,7 +87,9 @@ public final class MtvChannelProtocol {
 
 
     public static MtvChannelSubscriptionRequest readSubscription(FriendlyByteBuf buffer) {
-        return new MtvChannelSubscriptionRequest(buffer.readUtf());
+        var request = new MtvChannelSubscriptionRequest(buffer.readUtf());
+        ensureFullyRead(buffer, "subscription");
+        return request;
     }
 
     public static void writeSubscription(FriendlyByteBuf buffer, MtvChannelSubscriptionRequest request) {

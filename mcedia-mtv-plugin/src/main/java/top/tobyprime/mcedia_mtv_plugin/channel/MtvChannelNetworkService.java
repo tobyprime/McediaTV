@@ -55,7 +55,7 @@ public final class MtvChannelNetworkService implements PluginMessageListener, Li
         if (closed) {
             return;
         }
-        runOnPlayer(player, () -> {
+        runOnPlayer(player, "receive " + channel, () -> {
             if (MtvChannelProtocol.CHANNEL_SUBSCRIBE.equals(channel)) {
                 handleSubscribe(player, message);
                 return;
@@ -137,8 +137,12 @@ public final class MtvChannelNetworkService implements PluginMessageListener, Li
             LOGGER.warn("Failed to decode MTV subscribe from {}", player.getName(), e);
             return;
         }
-        channelService.getAudienceSessionManager().subscribe(player.getUniqueId(), request.channelId(), System.currentTimeMillis());
-        publishSnapshotTo(player, request.channelId());
+        try {
+            channelService.getAudienceSessionManager().subscribe(player.getUniqueId(), request.channelId(), System.currentTimeMillis());
+            publishSnapshotTo(player, request.channelId());
+        } catch (Exception e) {
+            LOGGER.warn("Failed to handle MTV subscribe: player={}, channel={}", player.getName(), request.channelId(), e);
+        }
     }
 
     private void handleUnsubscribe(Player player, byte[] message) {
@@ -149,7 +153,11 @@ public final class MtvChannelNetworkService implements PluginMessageListener, Li
             LOGGER.warn("Failed to decode MTV unsubscribe from {}", player.getName(), e);
             return;
         }
-        channelService.getAudienceSessionManager().unsubscribe(player.getUniqueId(), request.channelId());
+        try {
+            channelService.getAudienceSessionManager().unsubscribe(player.getUniqueId(), request.channelId());
+        } catch (Exception e) {
+            LOGGER.warn("Failed to handle MTV unsubscribe: player={}, channel={}", player.getName(), request.channelId(), e);
+        }
     }
 
     private void handleHeartbeat(Player player, byte[] message) {
@@ -160,39 +168,43 @@ public final class MtvChannelNetworkService implements PluginMessageListener, Li
             LOGGER.warn("Failed to decode MTV heartbeat from {}", player.getName(), e);
             return;
         }
-        var audienceSessionManager = channelService.getAudienceSessionManager();
-        if (!audienceSessionManager.isSubscribed(player.getUniqueId(), heartbeat.channelId())) {
-            LOGGER.debug("Ignoring MTV heartbeat for unsubscribed channel: player={}, channel={}", player.getName(), heartbeat.channelId());
-            return;
-        }
-        long nowMs = System.currentTimeMillis();
-        var touch = audienceSessionManager.touch(
-                player.getUniqueId(),
-                heartbeat.channelId(),
-                heartbeat.revision(),
-                heartbeat.loaded(),
-                heartbeat.completed(),
-                heartbeat.error(),
-                Math.max(0L, heartbeat.durationUs() / 1000L),
-                nowMs
-        );
-        if (!touch.stateChanged()) {
-            return;
-        }
-        var state = channelService.getChannelState(heartbeat.channelId());
-        if (state == null) {
-            return;
-        }
-        var audience = summarizeAudience(state, nowMs);
-        maybeStartLoadedChannel(state, nowMs, audience);
-        if (touch.durationChanged()) {
-            publishSnapshot(state, audience);
-        }
-        if (heartbeat.error()) {
-            publishSync(state, audience);
-        }
-        if (heartbeat.completed()) {
-            maybePauseCompletedChannel(state, nowMs, audience);
+        try {
+            var audienceSessionManager = channelService.getAudienceSessionManager();
+            if (!audienceSessionManager.isSubscribed(player.getUniqueId(), heartbeat.channelId())) {
+                LOGGER.debug("Ignoring MTV heartbeat for unsubscribed channel: player={}, channel={}", player.getName(), heartbeat.channelId());
+                return;
+            }
+            long nowMs = System.currentTimeMillis();
+            var touch = audienceSessionManager.touch(
+                    player.getUniqueId(),
+                    heartbeat.channelId(),
+                    heartbeat.revision(),
+                    heartbeat.loaded(),
+                    heartbeat.completed(),
+                    heartbeat.error(),
+                    Math.max(0L, heartbeat.durationUs() / 1000L),
+                    nowMs
+            );
+            if (!touch.stateChanged()) {
+                return;
+            }
+            var state = channelService.getChannelState(heartbeat.channelId());
+            if (state == null) {
+                return;
+            }
+            var audience = summarizeAudience(state, nowMs);
+            maybeStartLoadedChannel(state, nowMs, audience);
+            if (touch.durationChanged()) {
+                publishSnapshot(state, audience);
+            }
+            if (heartbeat.error()) {
+                publishSync(state, audience);
+            }
+            if (heartbeat.completed()) {
+                maybePauseCompletedChannel(state, nowMs, audience);
+            }
+        } catch (Exception e) {
+            LOGGER.warn("Failed to handle MTV heartbeat: player={}, channel={}, revision={}", player.getName(), heartbeat.channelId(), heartbeat.revision(), e);
         }
     }
 
@@ -278,18 +290,18 @@ public final class MtvChannelNetworkService implements PluginMessageListener, Li
     }
 
     private void sendSnapshot(Player player, ChannelSnapshot snapshot) {
-        runOnPlayer(player, () -> player.sendPluginMessage(plugin, MtvChannelProtocol.CHANNEL_SNAPSHOT, MtvChannelProtocol.encodeSnapshot(snapshot)));
+        runOnPlayer(player, "send snapshot", () -> player.sendPluginMessage(plugin, MtvChannelProtocol.CHANNEL_SNAPSHOT, MtvChannelProtocol.encodeSnapshot(snapshot)));
     }
 
     private void sendSync(Player player, ChannelSnapshot snapshot) {
-        runOnPlayer(player, () -> player.sendPluginMessage(plugin, MtvChannelProtocol.CHANNEL_SYNC, MtvChannelProtocol.encodeSnapshot(snapshot)));
+        runOnPlayer(player, "send sync", () -> player.sendPluginMessage(plugin, MtvChannelProtocol.CHANNEL_SYNC, MtvChannelProtocol.encodeSnapshot(snapshot)));
     }
 
     private void sendRemove(Player player, String channelId) {
-        runOnPlayer(player, () -> player.sendPluginMessage(plugin, MtvChannelProtocol.CHANNEL_REMOVE, MtvChannelProtocol.encodeRemove(channelId)));
+        runOnPlayer(player, "send remove", () -> player.sendPluginMessage(plugin, MtvChannelProtocol.CHANNEL_REMOVE, MtvChannelProtocol.encodeRemove(channelId)));
     }
 
-    private void runOnPlayer(Player player, Runnable action) {
+    private void runOnPlayer(Player player, String actionName, Runnable action) {
         if (closed || player == null || action == null) {
             return;
         }
@@ -297,7 +309,11 @@ public final class MtvChannelNetworkService implements PluginMessageListener, Li
             if (closed) {
                 return;
             }
-            action.run();
+            try {
+                action.run();
+            } catch (Exception e) {
+                LOGGER.warn("Failed to {} for player={}", actionName, player.getName(), e);
+            }
         }, null);
     }
 
