@@ -148,17 +148,18 @@ public final class ChannelRuntimeState {
         return ChannelTimelineCalculator.computeCurrentMediaTimeMs(playState, nowMs);
     }
 
-    public ChannelSnapshot toSnapshot(long resolvedDurationUs, boolean completed) {
+    public ChannelSnapshot toSnapshot(long nowMs, long resolvedDurationUs, boolean completed) {
         long mediaTimeUs = Math.max(0L, playState.getMediaTimeMs() * 1000L);
-        long playTimeMs = Math.max(0L, playState.getPlayTimeMs());
+        long elapsedTimeMs = playState.getState() == ChannelPlaybackStatus.PLAYING
+                ? Math.max(0L, nowMs - playState.getPlayTimeMs())
+                : 0L;
         return new ChannelSnapshot(
                 channelId,
                 revision,
                 playState.getMediaUrl(),
                 (float) playState.getSpeed(),
                 mediaTimeUs,
-                playTimeMs,
-                mediaTimeUs,
+                elapsedTimeMs,
                 playState.getState().name(),
                 playState.getState() != ChannelPlaybackStatus.PLAYING,
                 resolvedDurationUs,

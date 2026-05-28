@@ -7,6 +7,7 @@ public final class MtvChannelProtocol {
     public static final String CHANNEL_SUBSCRIBE = "mcedia_mtv:channel_subscribe";
     public static final String CHANNEL_UNSUBSCRIBE = "mcedia_mtv:channel_unsubscribe";
     public static final String CHANNEL_SNAPSHOT = "mcedia_mtv:channel_snapshot";
+    public static final String CHANNEL_SYNC = "mcedia_mtv:channel_sync";
     public static final String CHANNEL_REMOVE = "mcedia_mtv:channel_remove";
     public static final String CHANNEL_HEARTBEAT = "mcedia_mtv:channel_heartbeat";
 
@@ -21,11 +22,11 @@ public final class MtvChannelProtocol {
                 buffer.readFloat(),
                 buffer.readLong(),
                 buffer.readLong(),
-                buffer.readLong(),
                 buffer.readUtf(),
                 buffer.readBoolean(),
                 buffer.readLong(),
-                buffer.readBoolean()
+                buffer.readBoolean(),
+                0L
         );
     }
 
@@ -34,9 +35,8 @@ public final class MtvChannelProtocol {
         buffer.writeLong(snapshot.revision());
         buffer.writeUtf(snapshot.mediaUrl());
         buffer.writeFloat(snapshot.speed());
-        buffer.writeLong(snapshot.startAt());
-        buffer.writeLong(snapshot.baseTime());
-        buffer.writeLong(snapshot.baseOffset());
+        buffer.writeLong(snapshot.anchorMediaTimeUs());
+        buffer.writeLong(snapshot.elapsedTimeMs());
         buffer.writeUtf(snapshot.state());
         buffer.writeBoolean(snapshot.paused());
         buffer.writeLong(snapshot.resolvedDurationUs());

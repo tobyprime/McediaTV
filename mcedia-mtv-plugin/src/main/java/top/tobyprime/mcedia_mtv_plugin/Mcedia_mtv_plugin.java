@@ -15,11 +15,13 @@ import top.tobyprime.mcedia_mtv_plugin.manager.MtvPlayerManager;
 
 public final class Mcedia_mtv_plugin extends JavaPlugin {
     private static final long AUDIENCE_TIMEOUT_MS = 30_000L;
+    private static final long CHANNEL_SYNC_INTERVAL_TICKS = 100L;
 
     private MtvPlayerManager manager;
     private MtvGui gui;
     private MtvChannelNetworkService networkService;
     private ScheduledTask audiencePruneTask;
+    private ScheduledTask channelSyncTask;
 
     @Override
     public void onEnable() {
@@ -44,6 +46,9 @@ public final class Mcedia_mtv_plugin extends JavaPlugin {
         this.audiencePruneTask = getServer().getGlobalRegionScheduler().runAtFixedRate(this, task ->
                 channelService.getAudienceSessionManager().pruneExpired(System.currentTimeMillis()),
                 20L, 20L);
+        this.channelSyncTask = getServer().getGlobalRegionScheduler().runAtFixedRate(this, task ->
+                        networkService.publishPeriodicUpdates(),
+                CHANNEL_SYNC_INTERVAL_TICKS, CHANNEL_SYNC_INTERVAL_TICKS);
 
         PluginManager pluginManager = getServer().getPluginManager();
         pluginManager.registerEvents(networkService, this);
@@ -62,6 +67,10 @@ public final class Mcedia_mtv_plugin extends JavaPlugin {
         if (audiencePruneTask != null) {
             audiencePruneTask.cancel();
             audiencePruneTask = null;
+        }
+        if (channelSyncTask != null) {
+            channelSyncTask.cancel();
+            channelSyncTask = null;
         }
         if (networkService != null) {
             networkService.shutdown();

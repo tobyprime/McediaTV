@@ -18,12 +18,20 @@ public final class ClientChannelPlaybackManager {
     }
 
     public void onSnapshot(ClientChannelPlaybackSnapshot snapshot) {
+        applySnapshot(snapshot, false);
+    }
+
+    public void onSync(ClientChannelPlaybackSnapshot snapshot) {
+        applySnapshot(snapshot, true);
+    }
+
+    private void applySnapshot(ClientChannelPlaybackSnapshot snapshot, boolean forceResync) {
         if (snapshot == null || snapshot.channelId() == null || snapshot.channelId().isBlank()) {
             return;
         }
         var session = sessions.get(snapshot.channelId());
         if (session != null) {
-            session.updateSnapshot(snapshot);
+            session.updateSnapshot(snapshot.receivedNow(ClientChannelSession.currentMonotonicMs()), forceResync);
         }
     }
 
@@ -33,7 +41,7 @@ public final class ClientChannelPlaybackManager {
         }
         var session = sessions.get(channelId);
         if (session != null) {
-            session.updateSnapshot(ClientChannelPlaybackSnapshot.EMPTY);
+            session.updateSnapshot(ClientChannelPlaybackSnapshot.EMPTY, true);
             if (session.isUnused()) {
                 session.destroy();
                 sessions.remove(channelId);

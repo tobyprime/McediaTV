@@ -11,6 +11,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.UUID;
+import java.util.function.BiConsumer;
 
 public final class MtvChannelNetworkService implements PluginMessageListener, Listener {
     private static final Logger LOGGER = LoggerFactory.getLogger(MtvChannelNetworkService.class);
@@ -28,6 +29,7 @@ public final class MtvChannelNetworkService implements PluginMessageListener, Li
     private void registerChannels() {
         var messenger = plugin.getServer().getMessenger();
         messenger.registerOutgoingPluginChannel(plugin, MtvChannelProtocol.CHANNEL_SNAPSHOT);
+        messenger.registerOutgoingPluginChannel(plugin, MtvChannelProtocol.CHANNEL_SYNC);
         messenger.registerOutgoingPluginChannel(plugin, MtvChannelProtocol.CHANNEL_REMOVE);
         messenger.registerIncomingPluginChannel(plugin, MtvChannelProtocol.CHANNEL_SUBSCRIBE, this);
         messenger.registerIncomingPluginChannel(plugin, MtvChannelProtocol.CHANNEL_UNSUBSCRIBE, this);
@@ -44,6 +46,7 @@ public final class MtvChannelNetworkService implements PluginMessageListener, Li
         messenger.unregisterIncomingPluginChannel(plugin, MtvChannelProtocol.CHANNEL_UNSUBSCRIBE, this);
         messenger.unregisterIncomingPluginChannel(plugin, MtvChannelProtocol.CHANNEL_HEARTBEAT, this);
         messenger.unregisterOutgoingPluginChannel(plugin, MtvChannelProtocol.CHANNEL_SNAPSHOT);
+        messenger.unregisterOutgoingPluginChannel(plugin, MtvChannelProtocol.CHANNEL_SYNC);
         messenger.unregisterOutgoingPluginChannel(plugin, MtvChannelProtocol.CHANNEL_REMOVE);
     }
 
@@ -84,6 +87,22 @@ public final class MtvChannelNetworkService implements PluginMessageListener, Li
         publishSnapshot(state, summarizeAudience(state, nowMs));
     }
 
+    public void publishPeriodicUpdates() {
+        if (closed) {
+            return;
+        }
+        long nowMs = System.currentTimeMillis();
+        for (var state : channelService.getChannelStates()) {
+            if (!state.getPlayState().hasMedia()) {
+                continue;
+            }
+            if (channelService.getAudienceSessionManager().getActiveSessions(state.getChannelId(), nowMs).isEmpty()) {
+                continue;
+            }
+            publishSnapshot(state, summarizeAudience(state, nowMs));
+        }
+    }
+
     public void publishSnapshotTo(Player player, String channelId) {
         if (closed || player == null || channelId == null || channelId.isBlank()) {
             return;
@@ -93,8 +112,10 @@ public final class MtvChannelNetworkService implements PluginMessageListener, Li
             LOGGER.debug("Skip MTV channel snapshot publish: missing channel state for channel={}, player={}", channelId, player.getName());
             return;
         }
-        var snapshot = toSnapshot(state, summarizeAudience(state, System.currentTimeMillis()));
+        long nowMs = System.currentTimeMillis();
+        var snapshot = toSnapshot(state, summarizeAudience(state, nowMs), nowMs);
         sendSnapshot(player, snapshot);
+        sendSync(player, snapshot);
         LOGGER.debug("Published MTV channel snapshot to player: player={}, channel={}, revision={}, mediaUrl={}, paused={}, completed={}",
                 player.getName(), snapshot.channelId(), snapshot.revision(), snapshot.mediaUrl(), snapshot.paused(), snapshot.completed());
     }
@@ -167,6 +188,9 @@ public final class MtvChannelNetworkService implements PluginMessageListener, Li
         if (touch.durationChanged()) {
             publishSnapshot(state, audience);
         }
+        if (heartbeat.error()) {
+            publishSync(state, audience);
+        }
         if (heartbeat.completed()) {
             maybePauseCompletedChannel(state, nowMs, audience);
         }
@@ -176,8 +200,8 @@ public final class MtvChannelNetworkService implements PluginMessageListener, Li
         return channelService.getAudienceSessionManager().summarize(state.getChannelId(), state.getRevision(), nowMs);
     }
 
-    private ChannelSnapshot toSnapshot(ChannelRuntimeState state, AudienceSessionManager.AudienceSummary audience) {
-        return state.toSnapshot(Math.max(0L, audience.resolvedDurationMs() * 1000L), audience.completed());
+    private ChannelSnapshot toSnapshot(ChannelRuntimeState state, AudienceSessionManager.AudienceSummary audience, long nowMs) {
+        return state.toSnapshot(nowMs, Math.max(0L, audience.resolvedDurationMs() * 1000L), audience.completed());
     }
 
     private void maybeStartLoadedChannel(ChannelRuntimeState state, long nowMs, AudienceSessionManager.AudienceSummary audience) {
@@ -206,22 +230,23 @@ public final class MtvChannelNetworkService implements PluginMessageListener, Li
     }
 
     private void publishSnapshot(ChannelRuntimeState state, AudienceSessionManager.AudienceSummary audience) {
-        var snapshot = toSnapshot(state, audience);
-        int recipients = broadcastSnapshot(snapshot);
-        LOGGER.debug("Published MTV channel snapshot: channel={}, revision={}, mediaUrl={}, paused={}, completed={}, recipients={}",
-                snapshot.channelId(), snapshot.revision(), snapshot.mediaUrl(), snapshot.paused(), snapshot.completed(), recipients);
+        publish(state, audience, this::sendSnapshot, "snapshot");
+    }
+
+    private void publishSync(ChannelRuntimeState state, AudienceSessionManager.AudienceSummary audience) {
+        publish(state, audience, this::sendSync, "sync");
+    }
+
+    private void publish(ChannelRuntimeState state, AudienceSessionManager.AudienceSummary audience, BiConsumer<Player, ChannelSnapshot> sender, String kind) {
+        long nowMs = System.currentTimeMillis();
+        var snapshot = toSnapshot(state, audience, nowMs);
+        int recipients = broadcast(snapshot, sender);
+        LOGGER.debug("Published MTV channel {}: channel={}, revision={}, mediaUrl={}, paused={}, completed={}, recipients={}",
+                kind, snapshot.channelId(), snapshot.revision(), snapshot.mediaUrl(), snapshot.paused(), snapshot.completed(), recipients);
     }
 
     private int broadcastSnapshot(ChannelSnapshot snapshot) {
-        int recipients = 0;
-        for (var player : Bukkit.getOnlinePlayers()) {
-            if (!channelService.getAudienceSessionManager().isSubscribed(player.getUniqueId(), snapshot.channelId())) {
-                continue;
-            }
-            sendSnapshot(player, snapshot);
-            recipients++;
-        }
-        return recipients;
+        return broadcast(snapshot, this::sendSnapshot);
     }
 
     private int broadcastRemove(String channelId) {
@@ -236,8 +261,28 @@ public final class MtvChannelNetworkService implements PluginMessageListener, Li
         return recipients;
     }
 
+    private int broadcastSync(ChannelSnapshot snapshot) {
+        return broadcast(snapshot, this::sendSync);
+    }
+
+    private int broadcast(ChannelSnapshot snapshot, BiConsumer<Player, ChannelSnapshot> sender) {
+        int recipients = 0;
+        for (var player : Bukkit.getOnlinePlayers()) {
+            if (!channelService.getAudienceSessionManager().isSubscribed(player.getUniqueId(), snapshot.channelId())) {
+                continue;
+            }
+            sender.accept(player, snapshot);
+            recipients++;
+        }
+        return recipients;
+    }
+
     private void sendSnapshot(Player player, ChannelSnapshot snapshot) {
         runOnPlayer(player, () -> player.sendPluginMessage(plugin, MtvChannelProtocol.CHANNEL_SNAPSHOT, MtvChannelProtocol.encodeSnapshot(snapshot)));
+    }
+
+    private void sendSync(Player player, ChannelSnapshot snapshot) {
+        runOnPlayer(player, () -> player.sendPluginMessage(plugin, MtvChannelProtocol.CHANNEL_SYNC, MtvChannelProtocol.encodeSnapshot(snapshot)));
     }
 
     private void sendRemove(Player player, String channelId) {

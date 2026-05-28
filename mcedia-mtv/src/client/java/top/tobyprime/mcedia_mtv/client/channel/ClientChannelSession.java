@@ -11,7 +11,8 @@ import top.tobyprime.mcedia_core.client.player.PlayerHost;
 
 public final class ClientChannelSession {
     private static final Logger LOGGER = LoggerFactory.getLogger(ClientChannelSession.class);
-    private static final long POSITION_SYNC_THRESHOLD_US = 10_000_000L;
+    private static final long PERIODIC_SYNC_THRESHOLD_US = 3_000_000L;
+    private static final long FORCED_SYNC_THRESHOLD_US = 1_000_000L;
     private static final long HEARTBEAT_INTERVAL_MS = 5_000L;
 
     private final String channelId;
@@ -23,6 +24,7 @@ public final class ClientChannelSession {
     private long lastHeartbeatAtMs;
     private boolean loadingMedia;
     private boolean errorMedia;
+    private boolean forceResyncRequested;
 
     public ClientChannelSession(String channelId) {
         this.channelId = channelId;
@@ -50,10 +52,17 @@ public final class ClientChannelSession {
         return attachments == 0;
     }
 
-    public void updateSnapshot(ClientChannelPlaybackSnapshot snapshot) {
+    public void updateSnapshot(ClientChannelPlaybackSnapshot snapshot, boolean forceResync) {
         if (snapshot == null) {
             return;
         }
+        if (this.snapshot.revision() != snapshot.revision()
+                || !this.snapshot.mediaUrl().equals(snapshot.mediaUrl())
+                || this.snapshot.paused() != snapshot.paused()
+                || Double.compare(this.snapshot.speed(), snapshot.speed()) != 0) {
+            forceResyncRequested = true;
+        }
+        forceResyncRequested = forceResyncRequested || forceResync;
         this.snapshot = snapshot;
     }
 
@@ -96,6 +105,8 @@ public final class ClientChannelSession {
             stopMediaIfIdle();
             return;
         }
+        boolean forceResync = forceResyncRequested;
+        forceResyncRequested = false;
         boolean speedChanged = Double.compare(lastAppliedSpeed, snapshot.speed()) != 0;
         if (speedChanged) {
             lastAppliedSpeed = snapshot.speed();
@@ -116,10 +127,13 @@ public final class ClientChannelSession {
 
         long target = computeTargetPositionUs(snapshot);
         long localPos = singlePlayer.getMedia() == null ? -1L : singlePlayer.getMedia().getEstimatedTime();
-        if (localPos >= 0 && Math.abs(target - localPos) > POSITION_SYNC_THRESHOLD_US) {
+        long deltaUs = localPos >= 0 ? Math.abs(target - localPos) : Long.MAX_VALUE;
+        boolean stateMismatch = snapshot.paused() != singlePlayer.isPaused();
+        boolean shouldSeek = localPos >= 0 && ((forceResync && deltaUs > FORCED_SYNC_THRESHOLD_US) || deltaUs > PERIODIC_SYNC_THRESHOLD_US || stateMismatch);
+        if (shouldSeek) {
             singlePlayer.seekAsync(target);
         }
-        if (snapshot.paused() != singlePlayer.isPaused()) {
+        if (stateMismatch) {
             singlePlayer.setPaused(snapshot.paused());
         }
         if (speedChanged) {
@@ -139,11 +153,9 @@ public final class ClientChannelSession {
                         loadingMedia = false;
                         errorMedia = false;
                         long target = computeTargetPositionUs(snapshot);
-                        if (target > 0) {
-                            var duration = mediaPlay.getDuration();
-                            long seekTarget = duration > 0 ? Math.min(target, duration) : target;
-                            singlePlayer.seekAsync(seekTarget);
-                        }
+                        var duration = mediaPlay.getDuration();
+                        long seekTarget = duration > 0 ? Math.min(target, duration) : target;
+                        singlePlayer.seekAsync(seekTarget);
                         singlePlayer.setSpeed(snapshot.speed());
                         singlePlayer.setPaused(snapshot.paused());
                     })
@@ -161,10 +173,10 @@ public final class ClientChannelSession {
     }
 
     private long computeTargetPositionUs(ClientChannelPlaybackSnapshot snapshot) {
-        long target = snapshot.baseOffset();
+        long target = snapshot.anchorMediaTimeUs();
         if (!snapshot.paused()) {
-            long elapsedMs = Math.max(0L, System.currentTimeMillis() - snapshot.baseTime());
-            target += (long) (elapsedMs * 1000L * snapshot.speed());
+            target += (long) (Math.max(0L, snapshot.elapsedTimeMs()) * 1000L * snapshot.speed());
+            target += (long) (Math.max(0L, currentMonotonicMs() - snapshot.receivedAtMonotonicMs()) * 1000L * snapshot.speed());
         }
         if (snapshot.resolvedDurationUs() > 0L) {
             target = Math.min(target, snapshot.resolvedDurationUs());
@@ -206,5 +218,9 @@ public final class ClientChannelSession {
         if (player instanceof SingleMediaPlayer singlePlayer) {
             singlePlayer.close();
         }
+    }
+
+    static long currentMonotonicMs() {
+        return System.nanoTime() / 1_000_000L;
     }
 }
