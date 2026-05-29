@@ -58,8 +58,17 @@ public class MtvGuiListener implements Listener {
             case 10 -> gui.openNearestPlayerMenu(player);
             case 11 -> gui.openNearbyPlayerList(player, 0);
             case 12 -> gui.openPublicChannelList(player, null, "", 0, false);
+            case 13 -> {
+                if (!player.hasPermission("mcedia.mtv.create")) {
+                    player.sendMessage("你没有权限执行此操作。需要权限: mcedia.mtv.create");
+                    return;
+                }
+                player.closeInventory();
+                player.sendMessage("请输入新 MTV 播放器名称。");
+                gui.setAwaitingInput(player, MtvGui.GuiType.MAIN_MENU, null, "create_name");
+            }
             case 14 -> gui.openPublicChannelList(player, null, "", 0, true);
-            case 15 -> gui.openNearestPlayerChannelMenu(player);
+            case 15 -> gui.openPublicChannelList(player, null, "", 0, false);
         }
     }
 
@@ -93,7 +102,6 @@ public class MtvGuiListener implements Listener {
         if (uuid == null) return;
         read(player, uuid, snap -> {
             if (snap == null) return;
-            String name = snap.getName();
             var binding = gui.getManager().getChannelService().resolveBinding(snap);
 
             switch (slot) {
@@ -112,8 +120,7 @@ public class MtvGuiListener implements Listener {
                     var channelState = gui.getManager().getChannelService().ensureChannelState(binding.channelId());
                     float currentSpeed = channelState != null ? (float) channelState.getPlayState().getSpeed() : 1.0F;
                     float v = Math.max(0.25F, Math.min(4.0F, currentSpeed + delta));
-                    player.performCommand("mtv speed " + v + " " + name);
-                    gui.reopenPage(player, GuiType.PLAYER_MENU, uuid);
+                    updateAndReopen(player, uuid, done -> playbackController.updateSpeed(uuid, v, done), GuiType.PLAYER_MENU, null);
                 }
                 case 12 -> gui.openPeripheralList(player, snap);
                 case 13 -> gui.openWorldTransform(player, snap);
@@ -123,9 +130,16 @@ public class MtvGuiListener implements Listener {
                     updateAndReopen(player, uuid, done -> gui.getManager().setMasterVolume(uuid, volume, done), GuiType.PLAYER_MENU, null);
                 }
                 case 15 -> {
-                    if (MtvPeripheralController.checkPerm(player, "mcedia.mtv.teleport")) {
-                        player.performCommand("mtv tp " + snap.getName());
+                    if (!MtvPeripheralController.checkPerm(player, "mcedia.mtv.teleport")) {
+                        return;
                     }
+                    var location = snap.toLocation();
+                    if (location == null) {
+                        player.sendMessage("该 MTV 的位置无效或所在世界不存在。");
+                        return;
+                    }
+                    player.teleportAsync(location);
+                    player.sendMessage("已传送到 MTV 播放器: " + snap.getName());
                 }
                 case 41 -> {
                     if (binding.isBroadcast()) {
@@ -178,10 +192,13 @@ public class MtvGuiListener implements Listener {
                     gui.setAwaitingInput(player, MtvGui.GuiType.PLAYER_MENU, uuid, "start_at");
                 }
                 case 53 -> {
-                    if (MtvPeripheralController.checkPerm(player, "mcedia.mtv.delete")) {
-                        player.closeInventory();
-                        player.performCommand("mtv remove " + snap.getName());
+                    if (!MtvPeripheralController.checkPerm(player, "mcedia.mtv.delete")) {
+                        return;
                     }
+                    player.closeInventory();
+                    gui.getManager().deletePlayerAsync(uuid, success -> delay(player, () -> player.sendMessage(Boolean.TRUE.equals(success)
+                            ? "已删除 MTV 播放器。"
+                            : "删除 MTV 播放器失败。")));
                 }
             }
         });

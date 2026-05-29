@@ -15,6 +15,7 @@ import top.tobyprime.mcedia_mtv_plugin.controller.MtvPeripheralController;
 import top.tobyprime.mcedia_mtv_plugin.controller.MtvPlaybackController;
 import top.tobyprime.mcedia_mtv_plugin.manager.MtvPlayerManager;
 import top.tobyprime.mcedia_mtv_plugin.model.ManagedMtvPlayer;
+import top.tobyprime.mcedia_mtv_plugin.selector.MtvPlayerSelector;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -79,14 +80,16 @@ public class MtvGui {
     private final MtvPlayerManager manager;
     private final MtvPeripheralController controller;
     private final MtvPlaybackController playbackController;
+    private final MtvPlayerSelector selector;
     private final Map<UUID, GuiState> playerStates = new ConcurrentHashMap<>();
     private volatile boolean closed;
 
-    public MtvGui(JavaPlugin plugin, MtvPlayerManager manager, MtvPeripheralController controller, MtvPlaybackController playbackController) {
+    public MtvGui(JavaPlugin plugin, MtvPlayerManager manager, MtvPeripheralController controller, MtvPlaybackController playbackController, MtvPlayerSelector selector) {
         this.plugin = plugin;
         this.manager = manager;
         this.controller = controller;
         this.playbackController = playbackController;
+        this.selector = selector;
     }
 
     public void openMainMenu(Player player) {
@@ -94,15 +97,16 @@ public class MtvGui {
         inv.setItem(10, item(Material.ENDER_PEARL, "控制最近的播放器", "按当前距离最近的 MTV 打开控制页"));
         inv.setItem(11, item(Material.COMPASS, "附近的播放器", "分页查看附近 MTV 并选择控制"));
         inv.setItem(12, item(Material.BOOK, "频道列表", "浏览全部公共频道"));
+        inv.setItem(13, item(Material.ITEM_FRAME, "创建播放器", "输入名称后在你当前位置创建 MTV 播放器"));
         inv.setItem(14, item(Material.PLAYER_HEAD, "我的频道", "只查看我创建的公共频道"));
-        inv.setItem(15, item(Material.JUKEBOX, "控制最近播放器的频道", "按当前距离最近的 MTV 打开频道控制页"));
+        inv.setItem(15, item(Material.JUKEBOX, "频道控制", "打开公共频道列表并选择要控制的频道"));
         fillBorder27(inv);
         setState(player, GuiType.MAIN_MENU, null);
         player.openInventory(inv);
     }
 
     public void openRemoteMenu(Player player) {
-        manager.findNearbyAsync(player, NEARBY_RANGE, candidates -> runOnPlayer(player, () -> {
+        selector.findNearbyAsync(player, NEARBY_RANGE, candidates -> runOnPlayer(player, () -> {
             if (candidates.isEmpty()) {
                 player.sendMessage("附近 " + (int) NEARBY_RANGE + " 米内没有 MTV 播放器。");
                 return;
@@ -130,7 +134,7 @@ public class MtvGui {
         inv.setItem(14, item(Material.STONE_BUTTON, "前进 1 秒", "潜行点击前进 10 秒"));
         inv.setItem(20, item(Material.ITEM_FRAME, "播放器入口", "打开当前最近播放器页"));
         inv.setItem(22, item(Material.SPYGLASS, "刷新目标", "重新选择最近的 MTV"));
-        inv.setItem(24, item(Material.JUKEBOX, "频道入口", "打开当前最近播放器的频道页"));
+        inv.setItem(24, item(Material.JUKEBOX, "频道入口", "打开当前播放器绑定的频道页"));
         fillBorder27(inv);
         setState(player, GuiType.REMOTE_MENU, snapshot.getUuid());
         player.openInventory(inv);
@@ -240,13 +244,9 @@ public class MtvGui {
         }
 
         fillBorder54(inv);
-        if (entityUuid != null) {
-            setState(player, GuiType.CHANNEL_MENU, entityUuid);
-        } else {
-            var temp = new HashMap<String, String>();
-            temp.put("channel_id", channelId);
-            setState(player, GuiType.CHANNEL_MENU, null, temp);
-        }
+        var temp = new HashMap<String, String>();
+        temp.put("channel_id", channelId);
+        setState(player, GuiType.CHANNEL_MENU, entityUuid, temp);
         player.openInventory(inv);
     }
 
@@ -360,7 +360,7 @@ public class MtvGui {
     }
 
     public void openNearbyPlayerList(Player player, int page) {
-        manager.findNearbyAsync(player, NEARBY_RANGE, results -> runOnPlayer(player, () -> {
+        selector.findNearbyAsync(player, NEARBY_RANGE, results -> runOnPlayer(player, () -> {
             int totalPages = Math.max(1, (results.size() + PUBLIC_CHANNEL_SLOTS.length - 1) / PUBLIC_CHANNEL_SLOTS.length);
             int normalizedPage = Math.max(0, Math.min(page, totalPages - 1));
             var inv = Bukkit.createInventory(new MtvHolder(GuiType.NEARBY_PLAYER_LIST, null, null), 54, Component.text("附近的播放器"));
@@ -396,12 +396,8 @@ public class MtvGui {
         openNearestPlayer(player, snapshot -> openPlayerMenu(player, snapshot), "附近 " + (int) NEARBY_RANGE + " 米内没有 MTV 播放器。");
     }
 
-    public void openNearestPlayerChannelMenu(Player player) {
-        openNearestPlayer(player, snapshot -> openChannelMenu(player, snapshot), "附近 " + (int) NEARBY_RANGE + " 米内没有 MTV 播放器。");
-    }
-
     private void openNearestPlayer(Player player, java.util.function.Consumer<ManagedMtvPlayer> opener, String emptyMessage) {
-        manager.findNearbyAsync(player, NEARBY_RANGE, candidates -> runOnPlayer(player, () -> {
+        selector.findNearbyAsync(player, NEARBY_RANGE, candidates -> runOnPlayer(player, () -> {
             if (candidates.isEmpty()) {
                 player.sendMessage(emptyMessage);
                 openMainMenu(player);
@@ -567,7 +563,18 @@ public class MtvGui {
                     runOnPlayer(player, () -> player.sendMessage("名称不能为空。"));
                     return true;
                 }
-                player.performCommand("mtv create " + input);
+                if (!player.hasPermission("mcedia.mtv.create")) {
+                    runOnPlayer(player, () -> player.sendMessage("你没有权限执行此操作。需要权限: mcedia.mtv.create"));
+                    return true;
+                }
+                manager.createPlayerAsync(player.getLocation(), input, created -> runOnPlayer(player, () -> {
+                    if (created == null) {
+                        player.sendMessage("创建 MTV 播放器失败。");
+                        return;
+                    }
+                    player.sendMessage("已创建 MTV 播放器: " + created.getName());
+                    openPlayerMenu(player, created);
+                }));
                 return true;
             }
             case "public_channel_search" -> {
@@ -699,11 +706,11 @@ public class MtvGui {
         if (closed) {
             return;
         }
-        if (type == GuiType.CHANNEL_MENU && uuid == null) {
+        if (type == GuiType.CHANNEL_MENU) {
             var guiState = getState(player);
             String channelId = guiState != null ? guiState.getTemp().get("channel_id") : null;
             if (channelId != null) {
-                runOnPlayer(player, () -> openChannelMenu(player, channelId, null));
+                runOnPlayer(player, () -> openChannelMenu(player, channelId, uuid));
                 return;
             }
         }
@@ -715,7 +722,15 @@ public class MtvGui {
                 switch (type) {
                     case PERIPHERAL_LIST -> openPeripheralList(player, snapshot);
                     case WORLD_TRANSFORM -> openWorldTransform(player, snapshot);
-                    case CHANNEL_MENU -> openChannelMenu(player, snapshot);
+                    case CHANNEL_MENU -> {
+                        var guiState = getState(player);
+                        String channelId = guiState != null ? guiState.getTemp().get("channel_id") : null;
+                        if (channelId != null && !channelId.isBlank()) {
+                            openChannelMenu(player, channelId, uuid);
+                        } else {
+                            openChannelMenu(player, snapshot);
+                        }
+                    }
                     case REMOTE_MENU -> openRemoteMenu(player, snapshot);
                     case PUBLIC_CHANNEL_LIST -> openPublicChannelList(player, uuid, getState(player) != null ? getState(player).getTemp().getOrDefault("public_query", "") : "", getState(player) != null ? parsePage(getState(player)) : 0, getState(player) != null && isPublicOwnOnly(getState(player)));
                     case PUBLIC_CHANNEL_CREATE -> openPublicChannelCreate(player, uuid, "", "", "", 0, false);

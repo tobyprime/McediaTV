@@ -1,8 +1,11 @@
 package top.tobyprime.mcedia_mtv_plugin;
 
+import io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents;
 import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.java.JavaPlugin;
+
+import java.util.List;
 import top.tobyprime.mcedia_mtv_plugin.channel.MtvChannelNetworkService;
 import top.tobyprime.mcedia_mtv_plugin.command.MtvCommand;
 import top.tobyprime.mcedia_mtv_plugin.controller.MtvPeripheralController;
@@ -12,6 +15,7 @@ import top.tobyprime.mcedia_mtv_plugin.listener.MtvChatListener;
 import top.tobyprime.mcedia_mtv_plugin.listener.MtvGuiListener;
 import top.tobyprime.mcedia_mtv_plugin.listener.MtvRemoteControlListener;
 import top.tobyprime.mcedia_mtv_plugin.manager.MtvPlayerManager;
+import top.tobyprime.mcedia_mtv_plugin.selector.MtvPlayerSelector;
 
 public final class Mcedia_mtv_plugin extends JavaPlugin {
     private static final long AUDIENCE_TIMEOUT_MS = 30_000L;
@@ -34,14 +38,12 @@ public final class Mcedia_mtv_plugin extends JavaPlugin {
         channelService.setRemoveListener(networkService::invalidateChannel);
         var controller = new MtvPeripheralController(manager);
         var playbackController = new MtvPlaybackController(manager);
-        this.gui = new MtvGui(this, manager, controller, playbackController);
+        var selector = new MtvPlayerSelector(this, manager);
+        this.gui = new MtvGui(this, manager, controller, playbackController, selector);
 
-        var mtvCommand = new MtvCommand(controller, playbackController, gui);
-        var pluginCommand = getCommand("mtv");
-        if (pluginCommand != null) {
-            pluginCommand.setExecutor(mtvCommand);
-            pluginCommand.setTabCompleter(mtvCommand);
-        }
+        var mtvCommand = new MtvCommand(controller, playbackController, gui, selector);
+        this.getLifecycleManager().registerEventHandler(LifecycleEvents.COMMANDS, event ->
+                event.registrar().register(mtvCommand.buildCommandTree(), "Manage MTV interaction players", List.of()));
 
         this.audiencePruneTask = getServer().getGlobalRegionScheduler().runAtFixedRate(this, task ->
                 channelService.getAudienceSessionManager().pruneExpired(System.currentTimeMillis()),
