@@ -6,18 +6,16 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.Display.ItemDisplay;
-import net.minecraft.world.entity.Entity.RemovalReason;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import top.tobyprime.mcedia_core.client.audio.SpeakerAudioChannelMode;
-import top.tobyprime.mcedia_core.client.entity.ClientEntityManager;
-import top.tobyprime.mcedia_core.client.entity.PlayerScreenEntity;
-import top.tobyprime.mcedia_core.client.entity.PlayerScreenEntity.ScreenFillMode;
-import top.tobyprime.mcedia_core.client.entity.PlayerSpeakerEntity;
 import top.tobyprime.mcedia_core.client.player.MediaPlayerHostManager;
+import top.tobyprime.mcedia_core.client.player.ScreenPeripheral;
+import top.tobyprime.mcedia_core.client.player.ScreenPeripheral.ScreenFillMode;
+import top.tobyprime.mcedia_core.client.player.SpeakerPeripheral;
 import top.tobyprime.mcedia_mtv.client.channel.ClientChannelPlaybackManager;
 import top.tobyprime.mcedia_mtv.client.channel.ClientChannelSession;
 
@@ -141,16 +139,14 @@ public class EntityPlayerHandle {
 
         return switch (config.kind()) {
             case SCREEN -> {
-                var screen = new PlayerScreenEntity(ClientEntityManager.PLAYER_SCREEN, level);
-                level.addEntity(screen);
-                LOGGER.info("Create MTV screen runtime: hostEntityId={}, hostUuid={}, runtimeId={}, runtimeEntityId={}", display.getId(), display.getUUID(), config.id(), screen.getId());
+                var screen = new ScreenPeripheral(level);
+                LOGGER.info("Create MTV screen runtime: hostEntityId={}, hostUuid={}, runtimeId={}", display.getId(), display.getUUID(), config.id());
                 yield new ScreenRuntimeHandle(config.id(), screen);
             }
             case SPEAKER -> {
-                var speaker = new PlayerSpeakerEntity(ClientEntityManager.PLAYER_SPEAKER, level);
-                speaker.setMaxRange(PlayerSpeakerEntity.DEFAULT_MAX_RANGE);
-                level.addEntity(speaker);
-                LOGGER.info("Create MTV speaker runtime: hostEntityId={}, hostUuid={}, runtimeId={}, runtimeEntityId={}", display.getId(), display.getUUID(), config.id(), speaker.getId());
+                var speaker = new SpeakerPeripheral(level);
+                speaker.setMaxRange(SpeakerPeripheral.DEFAULT_MAX_RANGE);
+                LOGGER.info("Create MTV speaker runtime: hostEntityId={}, hostUuid={}, runtimeId={}", display.getId(), display.getUUID(), config.id());
                 yield new SpeakerRuntimeHandle(config.id(), speaker);
             }
         };
@@ -167,7 +163,7 @@ public class EntityPlayerHandle {
         }
     }
 
-    private void applyScreenConfig(PlayerScreenEntity screen, ScreenPeripheralConfig config) {
+    private void applyScreenConfig(ScreenPeripheral screen, ScreenPeripheralConfig config) {
         var transform = computeTransform(config);
         screen.setPos(transform.position().x(), transform.position().y(), transform.position().z());
         screen.setWorldRotation(transform.rotation());
@@ -181,7 +177,7 @@ public class EntityPlayerHandle {
         screen.setScreenSize(width, height);
     }
 
-    private void applySpeakerConfig(PlayerSpeakerEntity speaker, SpeakerPeripheralConfig config, float masterVolume) {
+    private void applySpeakerConfig(SpeakerPeripheral speaker, SpeakerPeripheralConfig config, float masterVolume) {
         var transform = computeTransform(config);
         speaker.setPos(transform.position().x(), transform.position().y(), transform.position().z());
         speaker.setMaxRange(config.maxRange());
@@ -359,7 +355,7 @@ public class EntityPlayerHandle {
                     offsetRy,
                     offsetRz,
                     offsetRw,
-                    peripheralTag.getFloatOr("max_range", PlayerSpeakerEntity.DEFAULT_MAX_RANGE),
+                    peripheralTag.getFloatOr("max_range", SpeakerPeripheral.DEFAULT_MAX_RANGE),
                     peripheralTag.getFloatOr("volume", 1.0F),
                     peripheralTag.getStringOr("channel_mode", "mix")
             );
@@ -409,25 +405,21 @@ public class EntityPlayerHandle {
         switch (runtime) {
             case ScreenRuntimeHandle screenRuntime -> {
                 LOGGER.info(
-                        "Destroy MTV screen runtime: hostEntityId={}, hostUuid={}, runtimeId={}, runtimeEntityId={}, alreadyRemoved={}",
+                        "Destroy MTV screen runtime: hostEntityId={}, hostUuid={}, runtimeId={}",
                         display.getId(),
                         display.getUUID(),
-                        runtime.id(),
-                        screenRuntime.screen().getId(),
-                        screenRuntime.screen().isRemoved()
+                        runtime.id()
                 );
-                screenRuntime.screen().remove(RemovalReason.KILLED);
+                screenRuntime.screen().close();
             }
             case SpeakerRuntimeHandle speakerRuntime -> {
                 LOGGER.info(
-                        "Destroy MTV speaker runtime: hostEntityId={}, hostUuid={}, runtimeId={}, runtimeEntityId={}, alreadyRemoved={}",
+                        "Destroy MTV speaker runtime: hostEntityId={}, hostUuid={}, runtimeId={}",
                         display.getId(),
                         display.getUUID(),
-                        runtime.id(),
-                        speakerRuntime.speaker().getId(),
-                        speakerRuntime.speaker().isRemoved()
+                        runtime.id()
                 );
-                speakerRuntime.speaker().remove(RemovalReason.KILLED);
+                speakerRuntime.speaker().close();
             }
         }
     }
@@ -530,14 +522,14 @@ public class EntityPlayerHandle {
         PeripheralKind kind();
     }
 
-    private record ScreenRuntimeHandle(String id, PlayerScreenEntity screen) implements RuntimePeripheralHandle {
+    private record ScreenRuntimeHandle(String id, ScreenPeripheral screen) implements RuntimePeripheralHandle {
         @Override
         public PeripheralKind kind() {
             return PeripheralKind.SCREEN;
         }
     }
 
-    private record SpeakerRuntimeHandle(String id, PlayerSpeakerEntity speaker) implements RuntimePeripheralHandle {
+    private record SpeakerRuntimeHandle(String id, SpeakerPeripheral speaker) implements RuntimePeripheralHandle {
         @Override
         public PeripheralKind kind() {
             return PeripheralKind.SPEAKER;

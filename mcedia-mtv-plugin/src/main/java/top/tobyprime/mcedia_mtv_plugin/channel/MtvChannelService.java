@@ -131,11 +131,16 @@ public final class MtvChannelService {
 
     public boolean updateStartAt(String channelId, long startAt) {
         return mutatePlayback(channelId, state -> {
+            long nowMs = System.currentTimeMillis();
             long normalizedMs = Math.max(0L, startAt) / 1000L;
-            if (normalizedMs == state.getPlayState().getMediaTimeMs() && !state.getPlayState().getMediaUrl().isBlank()) {
+            if (state.getPlayState().getMediaUrl().isBlank()) {
                 return false;
             }
-            ChannelTimelineCalculator.seek(state.getPlayState(), normalizedMs, System.currentTimeMillis());
+            long currentMs = state.computeCurrentMediaTimeMs(nowMs);
+            if (normalizedMs == currentMs) {
+                return false;
+            }
+            ChannelTimelineCalculator.seek(state.getPlayState(), normalizedMs, nowMs);
             return true;
         });
     }
