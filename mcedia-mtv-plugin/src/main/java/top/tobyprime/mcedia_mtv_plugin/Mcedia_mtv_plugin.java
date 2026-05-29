@@ -54,7 +54,7 @@ public final class Mcedia_mtv_plugin extends JavaPlugin {
 
         PluginManager pluginManager = getServer().getPluginManager();
         pluginManager.registerEvents(networkService, this);
-        pluginManager.registerEvents(new MtvGuiListener(gui, playbackController), this);
+        pluginManager.registerEvents(new MtvGuiListener(gui), this);
         pluginManager.registerEvents(new MtvRemoteControlListener(gui), this);
         pluginManager.registerEvents(new MtvChatListener(this, gui), this);
     }

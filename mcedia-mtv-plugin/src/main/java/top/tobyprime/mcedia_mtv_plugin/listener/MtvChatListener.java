@@ -20,7 +20,7 @@ public class MtvChatListener implements Listener {
     public void onChat(AsyncChatEvent event) {
         Player player = event.getPlayer();
         String message = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(event.message());
-        if (gui.getState(player) == null) {
+        if (!gui.isAwaitingInput(player)) {
             return;
         }
         event.setCancelled(true);

@@ -330,7 +330,7 @@ public class MtvCommand implements CommandExecutor, TabCompleter {
     private int executeRoot(CommandContext<CommandSourceStack> ctx) {
         CommandSender sender = ctx.getSource().getSender();
         if (sender instanceof Player player) {
-            gui.openMainMenu(player);
+            gui.navigateTo(player, MtvGui.GuiType.MAIN_MENU, null, null, null);
         } else {
             sendHelp(sender);
         }
@@ -351,7 +351,7 @@ public class MtvCommand implements CommandExecutor, TabCompleter {
             sender.sendMessage("只有玩家可以打开 MTV GUI。");
             return 0;
         }
-        gui.openMainMenu(player);
+        gui.navigateTo(player, MtvGui.GuiType.MAIN_MENU, null, null, null);
         return Command.SINGLE_SUCCESS;
     }
 
@@ -388,7 +388,7 @@ public class MtvCommand implements CommandExecutor, TabCompleter {
                 return;
             }
             sender.sendMessage("已创建 MTV 播放器: " + created.getName());
-            gui.openPlayerMenu(player, created);
+            gui.navigateTo(player, MtvGui.GuiType.PLAYER_MENU, created.getUuid(), null, null);
         }, null));
         return Command.SINGLE_SUCCESS;
     }
