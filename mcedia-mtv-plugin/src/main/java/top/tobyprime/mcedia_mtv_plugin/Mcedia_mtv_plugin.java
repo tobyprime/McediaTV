@@ -1,11 +1,12 @@
 package top.tobyprime.mcedia_mtv_plugin;
 
-import io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents;
+import com.mojang.brigadier.tree.LiteralCommandNode;
 import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
+import org.bukkit.Bukkit;
+import org.bukkit.craftbukkit.CraftServer;
 import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.java.JavaPlugin;
 
-import java.util.List;
 import top.tobyprime.mcedia_mtv_plugin.channel.MtvChannelNetworkService;
 import top.tobyprime.mcedia_mtv_plugin.command.MtvCommand;
 import top.tobyprime.mcedia_mtv_plugin.controller.MtvPeripheralController;
@@ -42,8 +43,11 @@ public final class Mcedia_mtv_plugin extends JavaPlugin {
         this.gui = new MtvGui(this, manager, controller, playbackController, selector);
 
         var mtvCommand = new MtvCommand(controller, playbackController, gui, selector);
-        this.getLifecycleManager().registerEventHandler(LifecycleEvents.COMMANDS, event ->
-                event.registrar().register(mtvCommand.buildCommandTree(), "Manage MTV interaction players", List.of()));
+        // 直接注册 Brigadier 命令节点到服务端调度器，
+        // 替代 getLifecycleManager().registerEventHandler(LifecycleEvents.COMMANDS, …)
+        // 从而支持 plugman 热卸载/重载场景。
+        unregisterCommand(); // 清理可能残留的旧节点
+        registerCommand(mtvCommand.buildCommandTree());
 
         this.audiencePruneTask = getServer().getGlobalRegionScheduler().runAtFixedRate(this, task ->
                 channelService.getAudienceSessionManager().pruneExpired(System.currentTimeMillis()),
@@ -82,9 +86,44 @@ public final class Mcedia_mtv_plugin extends JavaPlugin {
             gui.shutdown();
             gui = null;
         }
+        // 反注册 Brigadier 命令节点，确保 plugman reload 后能重新注册
+        unregisterCommand();
         if (currentManager != null) {
             currentManager.getChannelService().shutdown();
             manager = null;
+        }
+    }
+
+    /**
+     * 将 Brigadier 命令节点直接注册到 Minecraft 服务器命令调度器。
+     * 由于 Paper 的 {@link io.papermc.paper.command.brigadier.CommandSourceStack}
+     * 由 NMS 的 net.minecraft.commands.CommandSourceStack 实现，
+     * 运行时通过原始类型绕开编译期泛型差异。
+     */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private void registerCommand(LiteralCommandNode<?> node) {
+        try {
+            var craftServer = (CraftServer) Bukkit.getServer();
+            var nmsServer = craftServer.getServer();
+            var dispatcher = nmsServer.getCommands().getDispatcher();
+            dispatcher.getRoot().addChild((com.mojang.brigadier.tree.CommandNode) node);
+        } catch (Exception e) {
+            getLogger().warning("无法注册 /mtv 命令: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 从服务端命令调度器中移除 /mtv 命令节点。
+     */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private void unregisterCommand() {
+        try {
+            var craftServer = (CraftServer) Bukkit.getServer();
+            var nmsServer = craftServer.getServer();
+            var dispatcher = nmsServer.getCommands().getDispatcher();
+            dispatcher.getRoot().getChildren().removeIf(child -> child.getName().equals("mtv"));
+        } catch (Exception ignored) {
+            // 某些环境可能不支持
         }
     }
 }
