@@ -184,9 +184,9 @@ public class MtvPlayerManager {
                 player.setOwner(creator.getUniqueId());
             }
             player.setPublic(false);
-            applyEntityState(itemDisplay, player);
-            // Self channel state must exist before any peripheral subscribes.
+            // Create the self channel state before exposing the binding to clients.
             channelService.createSelfChannelState(itemDisplay.getUniqueId());
+            applyEntityState(itemDisplay, player);
             done.accept(player);
         });
     }
