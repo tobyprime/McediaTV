@@ -10,14 +10,18 @@ permissions:
     children:
       mtv.player.create: true
       mtv.player.edit: true
+      mtv.player.edit.others: true
       mtv.player.teleport: true
       mtv.gui: true
       mtv.channel.create: true
       mtv.channel.manage.others: true
       mtv.channel.control.others: true
+  mtv.player.edit.others:
+    description: 编辑/删除别人创建的私有 MTV 播放器
+    default: op
   mtv.player.create:
     description: 创建 MTV 播放器
-    default: op
+    default: true
   mtv.player.edit:
     description: 编辑 MTV 设置（屏幕/扬声器/播放/移动/删除）
     default: true
