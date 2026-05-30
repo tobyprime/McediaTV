@@ -1,6 +1,7 @@
 package top.tobyprime.mcedia_mtv_plugin.gui;
 
 import net.kyori.adventure.text.Component;
+import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import java.util.UUID;
@@ -49,38 +50,46 @@ public class PlayerMenuPage extends GuiPage {
                     "§7屏幕: §f" + screenCount + " 个  §7|  扬声器: §f" + speakerCount + " 个",
                     "§7管理连接的外接显示与音频设备"));
 
-            inv.setItem(17, item(Material.COMPASS,
+            // ── Row 3 (27-35): 🔧 播放器设置 ──
+
+            inv.setItem(29, item(Material.COMPASS,
                     "§6⇕ 位置与朝向",
                     "§7调整此 MTV 的位置、偏航与俯仰角"));
 
-            // ── Row 3 (27-35): 📡 频道管理 ──
+            var owner = snapshot.getOwner();
+            String ownerName = owner == null ? "§7未知" : "§f" + Bukkit.getOfflinePlayer(owner).getName();
+            var publicIcon = snapshot.isPublic() ? Material.LIME_WOOL : Material.RED_WOOL;
+            var publicText = snapshot.isPublic() ? "§a🔓 公开" : "§c🔒 私有";
+            inv.setItem(31, item(publicIcon,
+                    publicText,
+                    "§7拥有者: " + ownerName,
+                    "§7点击切换公开/私有模式",
+                    snapshot.isPublic() ? "§7任何人都可以编辑此播放器" : "§7只有创建者可以编辑此播放器"));
+
+            // ── Row 5 (45-53): 📡 频道管理 + ⚠️ 危险操作 ──
 
             if (binding.isBroadcast()) {
                 var publicChannel = context.manager().getChannelService()
                         .getPublicChannel(binding.channelId());
-                inv.setItem(29, item(Material.WRITABLE_BOOK,
+                inv.setItem(47, item(Material.WRITABLE_BOOK,
                         "§d📡 查看当前频道",
                         "§7频道: §b" + MtvGui.fallback(
                                 publicChannel != null ? publicChannel.getChannelName() : null,
                                 binding.channelId()),
                         "§7点击查看频道详情与成员"));
             } else {
-                inv.setItem(29, item(Material.JUKEBOX,
+                inv.setItem(47, item(Material.JUKEBOX,
                         "§6📻 频道设置",
                         "§7管理播放列表、播放模式与频道配置"));
             }
 
-            inv.setItem(31, item(Material.KNOWLEDGE_BOOK,
+            inv.setItem(49, item(Material.KNOWLEDGE_BOOK,
                     "§b🔗 绑定新的频道",
                     "§7搜索并绑定可用的公共 MTV 频道"));
 
-            inv.setItem(33, item(Material.LEVER,
+            inv.setItem(51, item(Material.LEVER,
                     "§e⬅ 切回私有频道",
                     "§7解除公共频道绑定，恢复独立播放模式"));
-
-            // ── Row 4 (36-44): (预留，暂无功能) ──
-
-            // ── Row 5 (45-53): ⚠️ 危险操作 ──
 
             inv.setItem(53, item(Material.TNT,
                     "§c☠ 删除 MTV 播放器",
@@ -104,7 +113,10 @@ public class PlayerMenuPage extends GuiPage {
 
             switch (slot) {
                 // ── Row 1: 设备配置 ──
-                case 11 -> context.requestInput(player, "请输入新名称。", "rename");
+                case 11 -> {
+                    if (!MtvPeripheralController.canEdit(player, snap)) return;
+                    context.requestInput(player, "请输入新名称。", "rename");
+                }
                 case 13 -> {
                     if (!MtvPeripheralController.checkPerm(player, "mtv.player.teleport")) return;
                     var loc = snap.toLocation();
@@ -116,10 +128,18 @@ public class PlayerMenuPage extends GuiPage {
                     player.sendMessage("已传送到 MTV 播放器: " + snap.getName());
                 }
                 case 15 -> context.navigateTo(player, MtvGui.GuiType.PERIPHERAL_LIST, uuid);
-                case 17 -> context.navigateTo(player, MtvGui.GuiType.WORLD_TRANSFORM, uuid);
 
-                // ── Row 3: 频道管理 ──
-                case 29 -> {
+                // ── Row 3: 播放器设置 ──
+                case 29 -> context.navigateTo(player, MtvGui.GuiType.WORLD_TRANSFORM, uuid);
+                case 31 -> {
+                    if (!MtvPeripheralController.canEdit(player, snap)) return;
+                    boolean next = !snap.isPublic();
+                    context.updateAndRefresh(player, uuid,
+                            done -> context.manager().setPublicAsync(uuid, next, done));
+                }
+
+                // ── Row 5: 频道管理 ──
+                case 47 -> {
                     if (binding.isBroadcast()) {
                         var st = context.newState();
                         st.put("channel_id", binding.channelId());
@@ -128,13 +148,17 @@ public class PlayerMenuPage extends GuiPage {
                     }
                     context.navigateTo(player, MtvGui.GuiType.CHANNEL_MENU, uuid);
                 }
-                case 31 -> context.navigateTo(player, MtvGui.GuiType.PUBLIC_CHANNEL_LIST, uuid);
-                case 33 -> context.updateAndRefresh(player, uuid,
-                        done -> context.manager().updateChannelBinding(uuid, MtvChannelBinding.self(), done));
+                case 49 -> context.navigateTo(player, MtvGui.GuiType.PUBLIC_CHANNEL_LIST, uuid);
+                case 51 -> {
+                    if (!MtvPeripheralController.canEdit(player, snap)) return;
+                    context.updateAndRefresh(player, uuid,
+                            done -> context.manager().updateChannelBinding(uuid, MtvChannelBinding.self(), done));
+                }
 
                 // ── Row 5: 危险操作 ──
                 case 53 -> {
                     if (!MtvPeripheralController.checkPerm(player, "mtv.player.edit")) return;
+                    if (!MtvPeripheralController.canEdit(player, snap)) return;
                     player.closeInventory();
                     context.manager().deletePlayerAsync(uuid, success ->
                             context.delay(player, () -> player.sendMessage(Boolean.TRUE.equals(success)
