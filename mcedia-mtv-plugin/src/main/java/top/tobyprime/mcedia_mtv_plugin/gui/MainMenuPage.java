@@ -3,7 +3,6 @@ package top.tobyprime.mcedia_mtv_plugin.gui;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
-import org.bukkit.inventory.Inventory;
 
 public class MainMenuPage extends GuiPage {
     @Override
@@ -34,10 +33,10 @@ public class MainMenuPage extends GuiPage {
         inv.setItem(40, item(Material.GRAY_STAINED_GLASS_PANE, " "));
 
         // ── 右侧：频道 ──
-        inv.setItem(24, item(Material.BOOK, "频道列表",
+        inv.setItem(24, item(Material.JUKEBOX, "频道控制",
+                "直接控制最近播放器当前绑定的频道"));
+        inv.setItem(33, item(Material.BOOK, "频道列表",
                 "浏览全部公共频道"));
-        inv.setItem(33, item(Material.JUKEBOX, "频道控制",
-                "打开公共频道列表并选择要控制的频道"));
         inv.setItem(42, item(Material.PLAYER_HEAD, "我的频道",
                 "只查看我创建的公共频道"));
 
@@ -75,14 +74,17 @@ public class MainMenuPage extends GuiPage {
             }
 
             // ── 频道操作 ──
-            case 24 -> context.navigateTo(player, MtvGui.GuiType.PUBLIC_CHANNEL_LIST, null);
-            case 33 -> {
-                var st = context.newState();
-                st.put(MtvGui.PUBLIC_OWN_ONLY_KEY, "false");
-                st.put(MtvGui.PUBLIC_QUERY_KEY, "");
-                st.put(MtvGui.PUBLIC_PAGE_KEY, "0");
-                context.navigateTo(player, MtvGui.GuiType.PUBLIC_CHANNEL_LIST, null, null, st);
+            case 24 -> {
+                context.selector().findNearbyAsync(player, MtvGui.NEARBY_RANGE,
+                        results -> context.runOnPlayer(player, () -> {
+                            if (results.isEmpty()) {
+                                player.sendMessage("附近 " + (int) MtvGui.NEARBY_RANGE + " 米内没有 MTV 播放器。");
+                                return;
+                            }
+                            context.navigateTo(player, MtvGui.GuiType.CHANNEL_MENU, results.get(0).getUuid());
+                        }));
             }
+            case 33 -> context.navigateTo(player, MtvGui.GuiType.PUBLIC_CHANNEL_LIST, null);
             case 42 -> {
                 var st = context.newState();
                 st.put(MtvGui.PUBLIC_OWN_ONLY_KEY, "true");

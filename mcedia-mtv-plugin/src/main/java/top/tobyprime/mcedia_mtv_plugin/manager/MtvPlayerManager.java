@@ -173,6 +173,8 @@ public class MtvPlayerManager {
             ItemDisplay itemDisplay = spawnItemDisplay(location);
             var player = ManagedMtvPlayer.create(itemDisplay.getUniqueId(), name, location);
             applyEntityState(itemDisplay, player);
+            // Self channel state must exist before any peripheral subscribes.
+            channelService.createSelfChannelState(itemDisplay.getUniqueId());
             done.accept(player);
         });
     }
