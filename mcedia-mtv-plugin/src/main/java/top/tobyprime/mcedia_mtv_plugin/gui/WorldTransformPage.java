@@ -3,6 +3,7 @@ package top.tobyprime.mcedia_mtv_plugin.gui;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
+import top.tobyprime.mcedia_mtv_plugin.controller.MtvPeripheralController;
 import java.util.UUID;
 
 public class WorldTransformPage extends GuiPage {
@@ -51,31 +52,56 @@ public class WorldTransformPage extends GuiPage {
         float rotStep = dir * (shiftClick ? 25 : 5);
 
         switch (slot) {
-            case 10 -> context.updateAndRefresh(player, uuid,
-                    done -> context.manager().moveEntity(uuid, posStep, 0, 0, done));
-            case 11 -> context.updateAndRefresh(player, uuid,
-                    done -> context.manager().moveEntity(uuid, 0, posStep, 0, done));
-            case 12 -> context.updateAndRefresh(player, uuid,
-                    done -> context.manager().moveEntity(uuid, 0, 0, posStep, done));
+            case 10, 11, 12, 15, 21 -> context.read(player, uuid, snap -> {
+                if (snap == null) return;
+                if (!MtvPeripheralController.canEdit(player, snap)) {
+                    player.sendMessage("该 MTV 播放器为私有，只有创建者或拥有 mtv.player.edit.others 权限的玩家可以编辑。");
+                    return;
+                }
+                switch (slot) {
+                    case 10 -> context.updateAndRefresh(player, uuid,
+                            done -> context.manager().moveEntity(uuid, posStep, 0, 0, done));
+                    case 11 -> context.updateAndRefresh(player, uuid,
+                            done -> context.manager().moveEntity(uuid, 0, posStep, 0, done));
+                    case 12 -> context.updateAndRefresh(player, uuid,
+                            done -> context.manager().moveEntity(uuid, 0, 0, posStep, done));
+                    case 15 -> context.updateAndRefresh(player, uuid,
+                            done -> context.manager().snapEntityPosition(uuid, done));
+                    case 21 -> context.updateAndRefresh(player, uuid,
+                            done -> context.manager().setEntityRotation(uuid, 0, 0, done));
+                }
+            });
             case 19 -> context.read(player, uuid, snap -> {
-                if (snap != null) context.updateAndRefresh(player, uuid,
+                if (snap == null) return;
+                if (!MtvPeripheralController.canEdit(player, snap)) {
+                    player.sendMessage("该 MTV 播放器为私有，只有创建者或拥有 mtv.player.edit.others 权限的玩家可以编辑。");
+                    return;
+                }
+                context.updateAndRefresh(player, uuid,
                         done -> context.manager().setEntityRotation(uuid,
                                 snap.getYaw() + rotStep, snap.getPitch(), done));
             });
             case 20 -> context.read(player, uuid, snap -> {
-                if (snap != null) context.updateAndRefresh(player, uuid,
+                if (snap == null) return;
+                if (!MtvPeripheralController.canEdit(player, snap)) {
+                    player.sendMessage("该 MTV 播放器为私有，只有创建者或拥有 mtv.player.edit.others 权限的玩家可以编辑。");
+                    return;
+                }
+                context.updateAndRefresh(player, uuid,
                         done -> context.manager().setEntityRotation(uuid,
                                 snap.getYaw(), snap.getPitch() + rotStep, done));
             });
-            case 21 -> context.updateAndRefresh(player, uuid,
-                    done -> context.manager().setEntityRotation(uuid, 0, 0, done));
-            case 15 -> context.updateAndRefresh(player, uuid,
-                    done -> context.manager().snapEntityPosition(uuid, done));
             case 16 -> {
-                if (!top.tobyprime.mcedia_mtv_plugin.controller.MtvPeripheralController
-                        .checkPerm(player, "mtv.player.edit")) return true;
-                context.updateAndRefresh(player, uuid,
-                        done -> context.manager().teleportToPlayer(uuid, player, done));
+                if (!MtvPeripheralController.checkPerm(player, "mtv.player.edit")) return true;
+                context.read(player, uuid, snap -> {
+                    if (snap == null) return;
+                    if (!MtvPeripheralController.canEdit(player, snap)) {
+                        player.sendMessage("该 MTV 播放器为私有，只有创建者或拥有 mtv.player.edit.others 权限的玩家可以编辑。");
+                        return;
+                    }
+                    context.updateAndRefresh(player, uuid,
+                            done -> context.manager().teleportToPlayer(uuid, player, done));
+                });
             }
             default -> { return false; }
         }

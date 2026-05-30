@@ -140,6 +140,10 @@ public class ScreenSettingsPage extends GuiPage {
 
         context.read(player, uuid, snap -> {
             if (snap == null) return;
+            if (!MtvPeripheralController.canEdit(player, snap)) {
+                player.sendMessage("该 MTV 播放器为私有，只有创建者或拥有 mtv.player.edit.others 权限的玩家可以编辑。");
+                return;
+            }
             var sc = snap.findScreen(periphId);
             if (sc == null) return;
 

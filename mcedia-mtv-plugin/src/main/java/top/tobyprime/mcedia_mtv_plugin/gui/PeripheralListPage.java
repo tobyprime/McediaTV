@@ -5,6 +5,7 @@ import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 
+import top.tobyprime.mcedia_mtv_plugin.controller.MtvPeripheralController;
 import java.util.UUID;
 
 public class PeripheralListPage extends GuiPage {
@@ -67,7 +68,14 @@ public class PeripheralListPage extends GuiPage {
         if (uuid == null) return false;
 
         if (slot == 43) {
-            context.navigateTo(player, MtvGui.GuiType.ADD_PERIPHERAL, uuid);
+            context.read(player, uuid, snap -> {
+                if (snap == null) return;
+                if (!MtvPeripheralController.canEdit(player, snap)) {
+                    player.sendMessage("该 MTV 播放器为私有，只有创建者或拥有 mtv.player.edit.others 权限的玩家可以编辑。");
+                    return;
+                }
+                context.navigateTo(player, MtvGui.GuiType.ADD_PERIPHERAL, uuid);
+            });
         } else {
             int idx = GuiPage.indexOf(PERIPH_SLOTS, slot);
             if (idx < 0) return false;

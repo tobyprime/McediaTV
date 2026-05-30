@@ -4,6 +4,7 @@ import net.kyori.adventure.text.Component;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
+import top.tobyprime.mcedia_mtv_plugin.controller.MtvPeripheralController;
 
 import java.util.UUID;
 
@@ -34,15 +35,23 @@ public class AddPeripheralPage extends GuiPage {
                                           boolean rightClick, boolean shiftClick) {
         UUID uuid = entry.getEntityUuid();
         if (uuid == null) return false;
-        if (slot == 20) {
-            context.manager().addScreen(uuid, screen ->
-                    context.navigateTo(player, MtvGui.GuiType.PERIPHERAL_LIST, uuid));
-        } else if (slot == 24) {
-            context.manager().addSpeaker(uuid, speaker ->
-                    context.navigateTo(player, MtvGui.GuiType.PERIPHERAL_LIST, uuid));
-        } else {
+        if (slot != 20 && slot != 24) {
             return false;
         }
+        context.read(player, uuid, snap -> {
+            if (snap == null) return;
+            if (!MtvPeripheralController.canEdit(player, snap)) {
+                player.sendMessage("该 MTV 播放器为私有，只有创建者或拥有 mtv.player.edit.others 权限的玩家可以编辑。");
+                return;
+            }
+            if (slot == 20) {
+                context.manager().addScreen(uuid, screen ->
+                        context.navigateTo(player, MtvGui.GuiType.PERIPHERAL_LIST, uuid));
+            } else if (slot == 24) {
+                context.manager().addSpeaker(uuid, speaker ->
+                        context.navigateTo(player, MtvGui.GuiType.PERIPHERAL_LIST, uuid));
+            }
+        });
         return true;
     }
 }
