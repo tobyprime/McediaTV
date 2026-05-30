@@ -78,6 +78,21 @@ public final class ClientChannelPlaybackManager {
         }
     }
 
+    public void detachForPowerOff(String channelId) {
+        if (channelId == null || channelId.isBlank()) {
+            return;
+        }
+        var session = sessions.get(channelId);
+        if (session == null) {
+            return;
+        }
+        session.detach();
+        if (session.isUnused()) {
+            MtvChannelUnsubscribeSender.send(new MtvChannelSubscriptionRequest(channelId));
+            session.suspend();
+        }
+    }
+
     public void onClientTick(Minecraft client) {
         for (var session : sessions.values()) {
             session.tick();

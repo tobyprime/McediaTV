@@ -83,8 +83,19 @@ public final class ClientChannelSession {
         }
     }
 
-    public void destroy() {
+    public void suspend() {
+        snapshot = ClientChannelPlaybackSnapshot.EMPTY;
+        playingUrl = null;
+        loadingMedia = false;
+        errorMedia = false;
+        forceResyncRequested = false;
+        lastAppliedSpeed = Double.NaN;
+        lastHeartbeatAtMs = 0L;
         stopMedia();
+    }
+
+    public void destroy() {
+        suspend();
         MediaPlayerHostManager.get().requestDestroy(host);
     }
 

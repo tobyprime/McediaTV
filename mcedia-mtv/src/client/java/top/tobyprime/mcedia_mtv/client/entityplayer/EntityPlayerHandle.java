@@ -13,6 +13,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import top.tobyprime.mcedia_core.client.audio.SpeakerAudioChannelMode;
 import top.tobyprime.mcedia_core.client.player.MediaPlayerHostManager;
+import top.tobyprime.mcedia_core.client.player.PlayerHost;
 import top.tobyprime.mcedia_core.client.player.ScreenPeripheral;
 import top.tobyprime.mcedia_core.client.player.ScreenPeripheral.ScreenFillMode;
 import top.tobyprime.mcedia_core.client.player.SpeakerPeripheral;
@@ -36,6 +37,8 @@ public class EntityPlayerHandle {
 
     private @Nullable String channelId;
     private @Nullable ClientChannelSession channelSession;
+    private final PlayerHost standbyHost = MediaPlayerHostManager.get().createHost();
+    private boolean powered = true;
     private boolean missingHostConfigLogged;
 
     public EntityPlayerHandle(ItemDisplay display) {
@@ -45,14 +48,35 @@ public class EntityPlayerHandle {
     public void tick() {
         try {
             var config = readConfig();
-            syncChannelSession(config.channelId());
+            syncPowerAndChannel(config.powered(), config.channelId());
             syncPeripherals(config.masterVolume(), config.peripherals());
         } catch (Exception e) {
             LOGGER.warn("Error ticking item display player id={}", display.getId(), e);
         }
     }
 
-    private void syncChannelSession(@Nullable String desiredChannelId) {
+    private void syncPowerAndChannel(boolean desiredPowered, @Nullable String desiredChannelId) {
+        if (!desiredPowered) {
+            if (powered && channelId != null) {
+                detachPeripheralsFromCurrentHost();
+                ClientChannelPlaybackManager.getInstance().detachForPowerOff(channelId);
+                channelSession = null;
+                attachPeripheralsToStandbyHost();
+            }
+            powered = false;
+            channelId = desiredChannelId;
+            return;
+        }
+
+        boolean wasPowered = powered;
+        powered = true;
+        if (!wasPowered) {
+            channelId = desiredChannelId;
+            channelSession = ClientChannelPlaybackManager.getInstance().attach(desiredChannelId);
+            reattachPeripherals();
+            return;
+        }
+
         if ((channelId == null && desiredChannelId == null) || (channelId != null && channelId.equals(desiredChannelId))) {
             return;
         }
@@ -114,6 +138,32 @@ public class EntityPlayerHandle {
     private void reattachPeripherals() {
         for (var runtime : runtimePeripherals.values()) {
             assignRuntimePeripheral(runtime);
+        }
+    }
+
+    private void detachPeripheralsFromCurrentHost() {
+        if (channelSession == null) {
+            return;
+        }
+        var host = channelSession.getHost();
+        for (var runtime : runtimePeripherals.values()) {
+            switch (runtime) {
+                case ScreenRuntimeHandle screenRuntime -> host.removePeripheral(screenRuntime.screen());
+                case SpeakerRuntimeHandle speakerRuntime -> host.removePeripheral(speakerRuntime.speaker());
+            }
+        }
+    }
+
+    private void attachPeripheralsToStandbyHost() {
+        var standbyHostId = MediaPlayerHostManager.get().getHostId(standbyHost);
+        if (standbyHostId == null) {
+            return;
+        }
+        for (var runtime : runtimePeripherals.values()) {
+            switch (runtime) {
+                case ScreenRuntimeHandle screenRuntime -> MediaPlayerHostManager.get().assignPeripheralToHost(standbyHostId, screenRuntime.screen());
+                case SpeakerRuntimeHandle speakerRuntime -> standbyHost.removePeripheral(speakerRuntime.speaker());
+            }
         }
     }
 
@@ -280,13 +330,10 @@ public class EntityPlayerHandle {
         }
 
         boolean powered = configTag.getBooleanOr("powered", true);
-        if (!powered) {
-            boundChannelId = null;
-        }
 
         var peripherals = readPeripheralList(configTag.getListOrEmpty("peripherals"));
         float masterVolume = Math.max(0.0F, Math.min(1.0F, configTag.getFloatOr("master_volume", 1.0F)));
-        return new HostConfig(boundChannelId, masterVolume, peripherals);
+        return new HostConfig(powered, boundChannelId, masterVolume, peripherals);
     }
 
     private List<PeripheralConfig> readPeripheralList(ListTag peripheralsTag) {
@@ -386,15 +433,15 @@ public class EntityPlayerHandle {
                 runtimePeripherals.size(),
                 channelId
         );
+        standbyHost.clearPeripherals();
+        MediaPlayerHostManager.get().requestDestroy(standbyHost);
         if (channelId != null) {
             ClientChannelPlaybackManager.getInstance().detach(channelId);
         }
         channelSession = null;
         channelId = null;
-        for (var runtime : runtimePeripherals.values()) {
-            destroyRuntimePeripheral(runtime);
-        }
-        runtimePeripherals.clear();
+        powered = true;
+        destroyAllRuntimePeripherals();
     }
 
     public @Nullable String getChannelId() {
@@ -424,12 +471,20 @@ public class EntityPlayerHandle {
         }
     }
 
+    private void destroyAllRuntimePeripherals() {
+        for (var runtime : runtimePeripherals.values()) {
+            destroyRuntimePeripheral(runtime);
+        }
+        runtimePeripherals.clear();
+    }
+
     private record HostConfig(
+            boolean powered,
             @Nullable String channelId,
             float masterVolume,
             List<PeripheralConfig> peripherals
     ) {
-        private static final HostConfig DEFAULT = new HostConfig(null, 1.0F, List.of());
+        private static final HostConfig DEFAULT = new HostConfig(true, null, 1.0F, List.of());
     }
 
     private sealed interface PeripheralConfig permits ScreenPeripheralConfig, SpeakerPeripheralConfig {
