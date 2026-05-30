@@ -3,8 +3,6 @@ package top.tobyprime.mcedia_mtv_plugin.gui;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
-import org.bukkit.inventory.Inventory;
-import java.util.Map;
 import java.util.UUID;
 import top.tobyprime.mcedia_mtv_plugin.channel.MtvChannelBinding;
 
@@ -37,8 +35,6 @@ public class PublicChannelListPage extends GuiPage {
         inv.setItem(47, item(Material.OAK_SIGN, "输入搜索词"));
         inv.setItem(48, item(Material.BARRIER, "清空搜索"));
         inv.setItem(49, item(Material.ANVIL, "创建公共频道"));
-        inv.setItem(50, item(Material.ARROW,
-                entry.getEntityUuid() != null ? "返回播放器页" : "返回主菜单"));
         inv.setItem(53, item(Material.ARROW, "下一页"));
 
         int start = page * MtvGui.PUBLIC_CHANNEL_SLOTS.length;
@@ -91,13 +87,6 @@ public class PublicChannelListPage extends GuiPage {
                 }
                 var st = MtvGui.publicChannelState(query, page, ownOnly);
                 context.navigateTo(player, MtvGui.GuiType.PUBLIC_CHANNEL_CREATE, entityUuid, null, st);
-            }
-            case 50 -> {
-                if (entityUuid != null) {
-                    context.read(player, entityUuid, snap -> context.navigateTo(player, MtvGui.GuiType.PLAYER_MENU, entityUuid));
-                } else {
-                    context.navigateTo(player, MtvGui.GuiType.MAIN_MENU);
-                }
             }
             case 53 -> {
                 var st = MtvGui.publicChannelState(query, page + 1, ownOnly);

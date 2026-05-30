@@ -3,8 +3,6 @@ package top.tobyprime.mcedia_mtv_plugin.gui;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
-import org.bukkit.inventory.Inventory;
-
 import java.util.UUID;
 
 public class WorldTransformPage extends GuiPage {
@@ -37,7 +35,6 @@ public class WorldTransformPage extends GuiPage {
             inv.setItem(20, item(Material.COMPASS, "俯仰: " + String.format("%.0f", snapshot.getPitch()) + "°",
                     "左键 -5 / 右键 +5"));
             inv.setItem(21, item(Material.STRUCTURE_VOID, "重置朝向", "恢复默认朝向"));
-            inv.setItem(49, item(Material.ARROW, "返回播放器页"));
             setupTitleBar(inv, nav, entry);
             openInventory(player, inv);
         });
@@ -80,7 +77,6 @@ public class WorldTransformPage extends GuiPage {
                 context.updateAndRefresh(player, uuid,
                         done -> context.manager().teleportToPlayer(uuid, player, done));
             }
-            case 49 -> context.navigateTo(player, MtvGui.GuiType.PLAYER_MENU, uuid);
             default -> { return false; }
         }
         return true;

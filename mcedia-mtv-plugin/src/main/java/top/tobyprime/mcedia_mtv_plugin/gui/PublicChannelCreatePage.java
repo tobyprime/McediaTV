@@ -3,8 +3,6 @@ package top.tobyprime.mcedia_mtv_plugin.gui;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
-import org.bukkit.inventory.Inventory;
-
 import java.util.UUID;
 
 public class PublicChannelCreatePage extends GuiPage {
@@ -29,7 +27,6 @@ public class PublicChannelCreatePage extends GuiPage {
         inv.setItem(22, item(Material.WRITABLE_BOOK, "设置频道介绍",
                 "当前: " + (desc.isBlank() ? "未设置" : desc)));
         inv.setItem(24, item(Material.EMERALD_BLOCK, "确认创建"));
-        inv.setItem(40, item(Material.ARROW, "返回列表"));
         setupTitleBar(inv, nav, entry);
         openInventory(player, inv);
     }
@@ -65,14 +62,6 @@ public class PublicChannelCreatePage extends GuiPage {
                 st.put(MtvGui.PUBLIC_PAGE_KEY, Integer.toString(page));
                 st.put(MtvGui.PUBLIC_OWN_ONLY_KEY, Boolean.toString(ownOnly));
                 context.navigateTo(player, MtvGui.GuiType.PUBLIC_CHANNEL_MANAGE,
-                        entityUuid, null, st);
-            }
-            case 40 -> {
-                var st = context.newState();
-                st.put(MtvGui.PUBLIC_QUERY_KEY, query);
-                st.put(MtvGui.PUBLIC_PAGE_KEY, Integer.toString(page));
-                st.put(MtvGui.PUBLIC_OWN_ONLY_KEY, Boolean.toString(ownOnly));
-                context.navigateTo(player, MtvGui.GuiType.PUBLIC_CHANNEL_LIST,
                         entityUuid, null, st);
             }
             default -> { return false; }

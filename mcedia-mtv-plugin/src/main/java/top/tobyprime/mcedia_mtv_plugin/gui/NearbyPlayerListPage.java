@@ -3,8 +3,6 @@ package top.tobyprime.mcedia_mtv_plugin.gui;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
-import org.bukkit.inventory.Inventory;
-
 import java.util.UUID;
 
 public class NearbyPlayerListPage extends GuiPage {
@@ -30,7 +28,6 @@ public class NearbyPlayerListPage extends GuiPage {
                     var inv = createInventory(entry);
                     inv.setItem(45, item(Material.ARROW, "上一页"));
                     inv.setItem(49, item(Material.SPYGLASS, "刷新"));
-                    inv.setItem(50, item(Material.ARROW, "返回主菜单"));
                     inv.setItem(53, item(Material.ARROW, "下一页"));
 
                     var origin = player.getLocation();
@@ -69,7 +66,6 @@ public class NearbyPlayerListPage extends GuiPage {
                 st.put(MtvGui.NEARBY_PAGE_KEY, Integer.toString(page));
                 context.navigateTo(player, MtvGui.GuiType.NEARBY_PLAYER_LIST, null, null, st);
             }
-            case 50 -> context.navigateTo(player, MtvGui.GuiType.MAIN_MENU);
             case 53 -> {
                 var st = context.newState();
                 st.put(MtvGui.NEARBY_PAGE_KEY, Integer.toString(page + 1));

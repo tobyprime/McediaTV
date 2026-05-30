@@ -37,17 +37,23 @@ public class PeripheralListPage extends GuiPage {
             int idx = 0;
             for (var s : snapshot.getScreens()) {
                 if (idx >= PERIPH_SLOTS.length) break;
-                inv.setItem(PERIPH_SLOTS[idx++], item(Material.MAP, "屏幕 [" + s.getId() + "]",
-                        s.getWidth() + " x " + s.getHeight(), "亮度: " + s.getMinBrightness(), "点击编辑"));
+                inv.setItem(PERIPH_SLOTS[idx++], item(Material.GLOW_ITEM_FRAME,
+                        "§b🖥 屏幕 §7[" + s.getId() + "]",
+                        "§7尺寸: §f" + s.getWidth() + " × " + s.getHeight(),
+                        "§7亮度: §f" + s.getMinBrightness(),
+                        "§a点击编辑"));
             }
             for (var s : snapshot.getSpeakers()) {
                 if (idx >= PERIPH_SLOTS.length) break;
-                inv.setItem(PERIPH_SLOTS[idx++], item(Material.NOTE_BLOCK, "扬声器 [" + s.getId() + "]",
-                        "音量: " + s.getVolume(), "范围: " + s.getMaxRange(), "点击编辑"));
+                inv.setItem(PERIPH_SLOTS[idx++], item(Material.JUKEBOX,
+                        "§6🔊 扬声器 §7[" + s.getId() + "]",
+                        "§7音量: §f" + s.getVolume(),
+                        "§7范围: §f" + s.getMaxRange(),
+                        "§a点击编辑"));
             }
 
-            inv.setItem(43, item(Material.GREEN_WOOL, "新增外设"));
-            inv.setItem(49, item(Material.ARROW, "返回播放器页"));
+            inv.setItem(43, item(Material.GREEN_WOOL,
+                    "§a+ 新增外设", "§7添加屏幕或扬声器到 MTV"));
             setupTitleBar(inv, nav, entry);
             openInventory(player, inv);
         });
@@ -62,8 +68,6 @@ public class PeripheralListPage extends GuiPage {
 
         if (slot == 43) {
             context.navigateTo(player, MtvGui.GuiType.ADD_PERIPHERAL, uuid);
-        } else if (slot == 49) {
-            context.navigateTo(player, MtvGui.GuiType.PLAYER_MENU, uuid);
         } else {
             int idx = GuiPage.indexOf(PERIPH_SLOTS, slot);
             if (idx < 0) return false;
