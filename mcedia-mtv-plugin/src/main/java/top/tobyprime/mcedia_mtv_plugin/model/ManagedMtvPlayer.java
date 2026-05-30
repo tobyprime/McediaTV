@@ -22,6 +22,8 @@ public class ManagedMtvPlayer {
     private float masterVolume = DEFAULT_MASTER_VOLUME;
     private boolean powered = true;
     private MtvChannelBinding channelBinding;
+    private UUID owner;
+    private boolean isPublic = false;
     private final List<ScreenPeripheralConfigModel> screens = new ArrayList<>();
     private final List<SpeakerPeripheralConfigModel> speakers = new ArrayList<>();
 
@@ -128,4 +130,8 @@ public class ManagedMtvPlayer {
     public void setPowered(boolean powered) { this.powered = powered; }
     public MtvChannelBinding getChannelBinding() { return channelBinding; }
     public void setChannelBinding(MtvChannelBinding channelBinding) { this.channelBinding = channelBinding; }
+    public UUID getOwner() { return owner; }
+    public void setOwner(UUID owner) { this.owner = owner; }
+    public boolean isPublic() { return isPublic; }
+    public void setPublic(boolean isPublic) { this.isPublic = isPublic; }
 }

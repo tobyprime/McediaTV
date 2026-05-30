@@ -114,7 +114,7 @@ public class MainMenuPage extends GuiPage {
             context.runOnPlayer(player, () -> player.sendMessage("你没有权限执行此操作。需要权限: mtv.player.create"));
             return true;
         }
-        context.manager().createPlayerAsync(player.getLocation(), input,
+        context.manager().createPlayerAsync(player.getLocation(), input, player,
                 created -> context.runOnPlayer(player, () -> {
                     if (created == null) {
                         player.sendMessage("创建 MTV 播放器失败。");

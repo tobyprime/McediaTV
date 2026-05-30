@@ -85,6 +85,14 @@ public class MtvPlayerManager {
             player.setPitch(entityConfig.getFloatOr("pitch", player.getPitch()));
             player.setMasterVolume(entityConfig.getFloatOr("master_volume", player.getMasterVolume()));
             player.setPowered(entityConfig.getBooleanOr("powered", player.isPowered()));
+            String ownerStr = entityConfig.getStringOr("owner", "");
+            if (!ownerStr.isBlank()) {
+                try {
+                    player.setOwner(UUID.fromString(ownerStr));
+                } catch (IllegalArgumentException ignored) {
+                }
+            }
+            player.setPublic(entityConfig.getBooleanOr("is_public", player.isPublic()));
 
             var peripherals = entityConfig.getListOrEmpty("peripherals");
             for (int i = 0; i < peripherals.size(); i++) {
@@ -164,7 +172,7 @@ public class MtvPlayerManager {
         return c;
     }
 
-    public void createPlayerAsync(Location location, String name, Consumer<ManagedMtvPlayer> done) {
+    public void createPlayerAsync(Location location, String name, Player creator, Consumer<ManagedMtvPlayer> done) {
         if (location.getWorld() == null) {
             done.accept(null);
             return;
@@ -172,6 +180,10 @@ public class MtvPlayerManager {
         plugin.getServer().getRegionScheduler().execute(plugin, location, () -> {
             ItemDisplay itemDisplay = spawnItemDisplay(location);
             var player = ManagedMtvPlayer.create(itemDisplay.getUniqueId(), name, location);
+            if (creator != null) {
+                player.setOwner(creator.getUniqueId());
+            }
+            player.setPublic(false);
             applyEntityState(itemDisplay, player);
             // Self channel state must exist before any peripheral subscribes.
             channelService.createSelfChannelState(itemDisplay.getUniqueId());
@@ -321,6 +333,13 @@ public class MtvPlayerManager {
     public void setPowered(UUID uuid, boolean powered, Consumer<Boolean> done) {
         mutate(uuid, p -> {
             p.setPowered(powered);
+            return true;
+        }, done);
+    }
+
+    public void setPublicAsync(UUID uuid, boolean isPublic, Consumer<Boolean> done) {
+        mutate(uuid, p -> {
+            p.setPublic(isPublic);
             return true;
         }, done);
     }
@@ -550,6 +569,15 @@ public class MtvPlayerManager {
         itemDisplay.setCustomNameVisible(false);
         player.captureLocation(itemDisplay.getLocation());
         InteractionDataCommandBridge.apply(itemDisplay, player);
+    }
+
+    public static boolean canEditPlayer(Player player, ManagedMtvPlayer snapshot) {
+        if (snapshot == null) return false;
+        if (snapshot.isPublic()) return true;
+        if (snapshot.getOwner() == null) return true;
+        if (player == null) return false;
+        return player.getUniqueId().equals(snapshot.getOwner())
+                || player.hasPermission("mtv.player.edit.others");
     }
 
     private ItemDisplay spawnItemDisplay(Location location) {
