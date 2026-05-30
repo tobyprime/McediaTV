@@ -142,7 +142,7 @@ public class MtvCommand implements CommandExecutor, TabCompleter {
                                                 "切换播放顺序失败。"))))
                         .then(Commands.literal("channel")
                                 .then(Commands.literal("self")
-                                        .executes(ctx -> executePlayerTarget(ctx, selection -> manager.updateChannelBinding(selection.uuid(), MtvChannelBinding.self(), success -> reply(ctx, success, "已切回私有 self 频道。", "切回私有 self 频道失败。")))))
+                                        .executes(ctx -> executePlayerEditTarget(ctx, selection -> manager.updateChannelBinding(selection.uuid(), MtvChannelBinding.self(), success -> reply(ctx, success, "已切回私有 self 频道。", "切回私有 self 频道失败。")))))
                                 .then(Commands.literal("bind")
                                         .then(Commands.argument("channelId", StringArgumentType.word())
                                                 .executes(this::executePlayerChannelBind))))
@@ -366,7 +366,7 @@ public class MtvCommand implements CommandExecutor, TabCompleter {
             sender.sendMessage("名称不能为空。");
             return 0;
         }
-        manager.createPlayerAsync(player.getLocation(), name, created -> player.getScheduler().run(manager.getPlugin(), task -> {
+        manager.createPlayerAsync(player.getLocation(), name, player, created -> player.getScheduler().run(manager.getPlugin(), task -> {
             if (created == null) {
                 sender.sendMessage("创建 MTV 播放器失败。");
                 return;
@@ -386,7 +386,7 @@ public class MtvCommand implements CommandExecutor, TabCompleter {
             ctx.getSource().getSender().sendMessage("该公共频道不存在: " + channelId);
             return 0;
         }
-        return executePlayerTarget(ctx, selection -> manager.updateChannelBinding(selection.uuid(), MtvChannelBinding.broadcast(channelId), success -> reply(ctx, success, "已绑定公共频道。", "绑定公共频道失败。")));
+        return executePlayerEditTarget(ctx, selection -> manager.updateChannelBinding(selection.uuid(), MtvChannelBinding.broadcast(channelId), success -> reply(ctx, success, "已绑定公共频道。", "绑定公共频道失败。")));
     }
 
     private int executePlayerRename(CommandContext<CommandSourceStack> ctx) {
@@ -398,7 +398,7 @@ public class MtvCommand implements CommandExecutor, TabCompleter {
             ctx.getSource().getSender().sendMessage("名称不能为空。");
             return 0;
         }
-        return executePlayerTarget(ctx, selection -> manager.updateName(selection.uuid(), newName, success -> reply(ctx, success, "已重命名 MTV 播放器。", "重命名 MTV 播放器失败。")));
+        return executePlayerEditTarget(ctx, selection -> manager.updateName(selection.uuid(), newName, success -> reply(ctx, success, "已重命名 MTV 播放器。", "重命名 MTV 播放器失败。")));
     }
 
     private int executePlayerTeleport(CommandContext<CommandSourceStack> ctx) {
@@ -430,14 +430,14 @@ public class MtvCommand implements CommandExecutor, TabCompleter {
             sender.sendMessage("只有玩家可以将 MTV 移动到自己位置。");
             return 0;
         }
-        return executePlayerTarget(ctx, selection -> manager.teleportToPlayer(selection.uuid(), player, success -> reply(ctx, success, "已将 MTV 移动到你的位置。", "移动 MTV 失败。")));
+        return executePlayerEditTarget(ctx, selection -> manager.teleportToPlayer(selection.uuid(), player, success -> reply(ctx, success, "已将 MTV 移动到你的位置。", "移动 MTV 失败。")));
     }
 
     private int executePlayerRemove(CommandContext<CommandSourceStack> ctx) {
         if (!hasPermission(ctx.getSource().getSender(), "mtv.player.edit")) {
             return 0;
         }
-        return executePlayerTarget(ctx, selection -> manager.deletePlayerAsync(selection.uuid(), success -> reply(ctx, success, "已删除 MTV 播放器。", "删除 MTV 播放器失败。")));
+        return executePlayerEditTarget(ctx, selection -> manager.deletePlayerAsync(selection.uuid(), success -> reply(ctx, success, "已删除 MTV 播放器。", "删除 MTV 播放器失败。")));
     }
 
     private int executeScreenBrightness(CommandContext<CommandSourceStack> ctx, String screenId) {
@@ -445,7 +445,7 @@ public class MtvCommand implements CommandExecutor, TabCompleter {
             return 0;
         }
         int value = IntegerArgumentType.getInteger(ctx, "value");
-        return executePlayerTarget(ctx, selection -> controller.setScreenBrightness(selection.uuid(), selection.snapshot(), screenId, value, success -> reply(ctx, success, "已更新屏幕亮度。", "更新屏幕亮度失败。")));
+        return executePlayerEditTarget(ctx, selection -> controller.setScreenBrightness(selection.uuid(), selection.snapshot(), screenId, value, success -> reply(ctx, success, "已更新屏幕亮度。", "更新屏幕亮度失败。")));
     }
 
     private int executeScreenSize(CommandContext<CommandSourceStack> ctx, String screenId) {
@@ -454,7 +454,7 @@ public class MtvCommand implements CommandExecutor, TabCompleter {
         }
         float width = FloatArgumentType.getFloat(ctx, "width");
         float height = FloatArgumentType.getFloat(ctx, "height");
-        return executePlayerTarget(ctx, selection -> controller.setScreenSize(selection.uuid(), selection.snapshot(), screenId, width, height, success -> reply(ctx, success, "已更新屏幕尺寸。", "更新屏幕尺寸失败。")));
+        return executePlayerEditTarget(ctx, selection -> controller.setScreenSize(selection.uuid(), selection.snapshot(), screenId, width, height, success -> reply(ctx, success, "已更新屏幕尺寸。", "更新屏幕尺寸失败。")));
     }
 
     private int executeScreenOffset(CommandContext<CommandSourceStack> ctx, String screenId) {
@@ -464,7 +464,7 @@ public class MtvCommand implements CommandExecutor, TabCompleter {
         float x = FloatArgumentType.getFloat(ctx, "x");
         float y = FloatArgumentType.getFloat(ctx, "y");
         float z = FloatArgumentType.getFloat(ctx, "z");
-        return executePlayerTarget(ctx, selection -> controller.setScreenOffset(selection.uuid(), selection.snapshot(), screenId, x, y, z, success -> reply(ctx, success, "已更新屏幕偏移。", "更新屏幕偏移失败。")));
+        return executePlayerEditTarget(ctx, selection -> controller.setScreenOffset(selection.uuid(), selection.snapshot(), screenId, x, y, z, success -> reply(ctx, success, "已更新屏幕偏移。", "更新屏幕偏移失败。")));
     }
 
     private int executeScreenFill(CommandContext<CommandSourceStack> ctx, String screenId) {
@@ -472,7 +472,7 @@ public class MtvCommand implements CommandExecutor, TabCompleter {
             return 0;
         }
         String mode = StringArgumentType.getString(ctx, "mode");
-        return executePlayerTarget(ctx, selection -> controller.setScreenFillMode(selection.uuid(), selection.snapshot(), screenId, mode, success -> reply(ctx, success, "已更新屏幕填充模式。", "更新屏幕填充模式失败。")));
+        return executePlayerEditTarget(ctx, selection -> controller.setScreenFillMode(selection.uuid(), selection.snapshot(), screenId, mode, success -> reply(ctx, success, "已更新屏幕填充模式。", "更新屏幕填充模式失败。")));
     }
 
     private int executeScreenDanmaku(CommandContext<CommandSourceStack> ctx, String screenId) {
@@ -480,7 +480,7 @@ public class MtvCommand implements CommandExecutor, TabCompleter {
             return 0;
         }
         boolean visible = BoolArgumentType.getBool(ctx, "visible");
-        return executePlayerTarget(ctx, selection -> controller.setScreenDanmakuVisible(selection.uuid(), selection.snapshot(), screenId, visible, success -> reply(ctx, success, "已更新屏幕弹幕可见性。", "更新屏幕弹幕可见性失败。")));
+        return executePlayerEditTarget(ctx, selection -> controller.setScreenDanmakuVisible(selection.uuid(), selection.snapshot(), screenId, visible, success -> reply(ctx, success, "已更新屏幕弹幕可见性。", "更新屏幕弹幕可见性失败。")));
     }
 
     private int executeSpeakerVolume(CommandContext<CommandSourceStack> ctx, String speakerId) {
@@ -488,7 +488,7 @@ public class MtvCommand implements CommandExecutor, TabCompleter {
             return 0;
         }
         float value = FloatArgumentType.getFloat(ctx, "value");
-        return executePlayerTarget(ctx, selection -> controller.setSpeakerVolume(selection.uuid(), selection.snapshot(), speakerId, value, success -> reply(ctx, success, "已更新扬声器音量。", "更新扬声器音量失败。")));
+        return executePlayerEditTarget(ctx, selection -> controller.setSpeakerVolume(selection.uuid(), selection.snapshot(), speakerId, value, success -> reply(ctx, success, "已更新扬声器音量。", "更新扬声器音量失败。")));
     }
 
     private int executeSpeakerRange(CommandContext<CommandSourceStack> ctx, String speakerId) {
@@ -496,7 +496,7 @@ public class MtvCommand implements CommandExecutor, TabCompleter {
             return 0;
         }
         float value = FloatArgumentType.getFloat(ctx, "value");
-        return executePlayerTarget(ctx, selection -> controller.setSpeakerRange(selection.uuid(), selection.snapshot(), speakerId, value, success -> reply(ctx, success, "已更新扬声器范围。", "更新扬声器范围失败。")));
+        return executePlayerEditTarget(ctx, selection -> controller.setSpeakerRange(selection.uuid(), selection.snapshot(), speakerId, value, success -> reply(ctx, success, "已更新扬声器范围。", "更新扬声器范围失败。")));
     }
 
     private int executeSpeakerOffset(CommandContext<CommandSourceStack> ctx, String speakerId) {
@@ -506,7 +506,7 @@ public class MtvCommand implements CommandExecutor, TabCompleter {
         float x = FloatArgumentType.getFloat(ctx, "x");
         float y = FloatArgumentType.getFloat(ctx, "y");
         float z = FloatArgumentType.getFloat(ctx, "z");
-        return executePlayerTarget(ctx, selection -> controller.setSpeakerOffset(selection.uuid(), selection.snapshot(), speakerId, x, y, z, success -> reply(ctx, success, "已更新扬声器偏移。", "更新扬声器偏移失败。")));
+        return executePlayerEditTarget(ctx, selection -> controller.setSpeakerOffset(selection.uuid(), selection.snapshot(), speakerId, x, y, z, success -> reply(ctx, success, "已更新扬声器偏移。", "更新扬声器偏移失败。")));
     }
 
     private int executeChannelUrl(CommandContext<CommandSourceStack> ctx) {
@@ -644,12 +644,36 @@ public class MtvCommand implements CommandExecutor, TabCompleter {
         if (!hasPermission(sender, "mtv.player.edit")) {
             return 0;
         }
-        return executePlayerTarget(ctx, selection -> guardPlaybackControl(ctx, selection, allowed -> {
+        TargetSelection selection = resolveBrigadierTarget(ctx);
+        if (selection == null) {
+            return 0;
+        }
+        if (!canEditPlayer(sender, selection.snapshot())) {
+            return 0;
+        }
+        guardPlaybackControl(ctx, selection, allowed -> {
             if (!Boolean.TRUE.equals(allowed)) {
                 return;
             }
             operation.run(selection, success -> reply(ctx, success, successMessage, failureMessage));
-        }));
+        });
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int executePlayerEditTarget(CommandContext<CommandSourceStack> ctx, Consumer<TargetSelection> consumer) {
+        CommandSender sender = ctx.getSource().getSender();
+        if (!hasPermission(sender, "mtv.player.edit")) {
+            return 0;
+        }
+        TargetSelection selection = resolveBrigadierTarget(ctx);
+        if (selection == null) {
+            return 0;
+        }
+        if (!canEditPlayer(sender, selection.snapshot())) {
+            return 0;
+        }
+        consumer.accept(selection);
+        return Command.SINGLE_SUCCESS;
     }
 
     private int executePlayerTarget(CommandContext<CommandSourceStack> ctx, Consumer<TargetSelection> consumer) {
@@ -758,6 +782,17 @@ public class MtvCommand implements CommandExecutor, TabCompleter {
         }
         sender.sendMessage("你没有权限执行此操作。需要权限: " + permission);
         return false;
+    }
+
+    private boolean canEditPlayer(CommandSender sender, ManagedMtvPlayer snapshot) {
+        if (!(sender instanceof Player player)) {
+            return true;
+        }
+        if (!MtvPlayerManager.canEditPlayer(player, snapshot)) {
+            sender.sendMessage("该 MTV 播放器为私有，只有创建者或拥有 mtv.player.edit.others 权限的玩家可以编辑。");
+            return false;
+        }
+        return true;
     }
 
     private void reply(CommandContext<CommandSourceStack> ctx, Boolean success, String successMessage, String failureMessage) {
