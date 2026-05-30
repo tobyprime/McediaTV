@@ -66,8 +66,8 @@ public class MainMenuPage extends GuiPage {
                 context.navigateTo(player, MtvGui.GuiType.NEARBY_PLAYER_LIST, null, null, st);
             }
             case 38 -> {
-                if (!player.hasPermission("mcedia.mtv.create")) {
-                    player.sendMessage("你没有权限执行此操作。需要权限: mcedia.mtv.create");
+                if (!player.hasPermission("mtv.player.create")) {
+                    player.sendMessage("你没有权限执行此操作。需要权限: mtv.player.create");
                     return true;
                 }
                 context.requestInput(player, "请输入新 MTV 播放器名称。", MtvGui.AWAITING_CREATE_NAME);
@@ -110,8 +110,8 @@ public class MainMenuPage extends GuiPage {
             context.runOnPlayer(player, () -> player.sendMessage("名称不能为空。"));
             return true;
         }
-        if (!player.hasPermission("mcedia.mtv.create")) {
-            context.runOnPlayer(player, () -> player.sendMessage("你没有权限执行此操作。需要权限: mcedia.mtv.create"));
+        if (!player.hasPermission("mtv.player.create")) {
+            context.runOnPlayer(player, () -> player.sendMessage("你没有权限执行此操作。需要权限: mtv.player.create"));
             return true;
         }
         context.manager().createPlayerAsync(player.getLocation(), input,

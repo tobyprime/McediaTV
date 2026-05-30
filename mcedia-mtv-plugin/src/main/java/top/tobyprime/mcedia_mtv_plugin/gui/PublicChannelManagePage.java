@@ -83,7 +83,7 @@ public class PublicChannelManagePage extends GuiPage {
                     "§f播放权限: " + (channel.isPublicControl()
                             ? "§a公开" : "§c私有"),
                     "§7公开: 所有人可控制播放",
-                    "§7私有: 仅创建者和 OP 可控制播放",
+                    "§7私有: 仅创建者和拥有频道控制权限的玩家可控制播放",
                     "§8点击切换"));
 
             inv.setItem(53, item(Material.TNT,
@@ -93,7 +93,7 @@ public class PublicChannelManagePage extends GuiPage {
         } else {
             inv.setItem(49, item(Material.BARRIER,
                     "§c⛔ 只读模式",
-                    "§7只有创建者或 OP 可以管理该频道"));
+                    "§7只有创建者或拥有频道管理权限的玩家可以管理该频道"));
         }
 
         setupTitleBar(inv, nav, entry);
@@ -125,7 +125,7 @@ public class PublicChannelManagePage extends GuiPage {
             // ── Row 3: 编辑名称（可管理） ──
             case 31 -> {
                 if (!canManage) {
-                    player.sendMessage("只有创建者或 OP 可以编辑该公共频道。");
+                    player.sendMessage("只有创建者或拥有频道管理权限的玩家可以编辑该公共频道。");
                     return true;
                 }
                 context.requestInput(player,
@@ -135,7 +135,7 @@ public class PublicChannelManagePage extends GuiPage {
             // ── Row 3: 编辑介绍（可管理） ──
             case 33 -> {
                 if (!canManage) {
-                    player.sendMessage("只有创建者或 OP 可以编辑该公共频道。");
+                    player.sendMessage("只有创建者或拥有频道管理权限的玩家可以编辑该公共频道。");
                     return true;
                 }
                 context.requestInput(player,
@@ -145,7 +145,7 @@ public class PublicChannelManagePage extends GuiPage {
             // ── Row 5: 播放权限切换（可管理） ──
             case 47 -> {
                 if (!canManage) {
-                    player.sendMessage("只有创建者或 OP 可以修改该公共频道的播放权限。");
+                    player.sendMessage("只有创建者或拥有频道管理权限的玩家可以修改该公共频道的播放权限。");
                     return true;
                 }
                 if (channel == null) return true;
@@ -158,7 +158,7 @@ public class PublicChannelManagePage extends GuiPage {
             // ── Row 5: 删除频道（可管理） ──
             case 53 -> {
                 if (!canManage) {
-                    player.sendMessage("只有创建者或 OP 可以删除该公共频道。");
+                    player.sendMessage("只有创建者或拥有频道管理权限的玩家可以删除该公共频道。");
                     return true;
                 }
                 boolean success = context.manager().getChannelService()

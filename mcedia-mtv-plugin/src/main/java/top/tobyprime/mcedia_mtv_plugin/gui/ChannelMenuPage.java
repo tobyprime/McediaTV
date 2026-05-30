@@ -278,7 +278,7 @@ public class ChannelMenuPage extends GuiPage {
         if (context.manager().getChannelService().canControlChannelPlayback(player, state)) {
             return true;
         }
-        player.sendMessage("该频道为私有频道，只有创建者或 OP 可以控制播放。");
+        player.sendMessage("该频道未开启公开控制，只有创建者或拥有频道控制权限的玩家可以控制播放。");
         return false;
     }
 

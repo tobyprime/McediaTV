@@ -48,12 +48,21 @@ public class PublicChannelCreatePage extends GuiPage {
                 context.requestInput(player, "请输入公共频道介绍。", "public_channel_description");
             }
             case 24 -> {
+                if (!player.hasPermission("mtv.channel.create")) {
+                    player.sendMessage("你没有权限创建公共频道。需要权限: mtv.channel.create");
+                    return true;
+                }
                 String name = entry.getState("public_channel_name", "");
                 String desc = entry.getState("public_channel_description", "");
                 var created = context.manager().getChannelService()
                         .createPublicChannel(player, name, desc);
                 if (created == null) {
-                    player.sendMessage("创建公共频道失败，请先填写有效名称。");
+                    String normalizedName = name == null ? "" : name.trim();
+                    if (normalizedName.isBlank()) {
+                        player.sendMessage("创建公共频道失败，请先填写有效名称。");
+                    } else {
+                        player.sendMessage("创建公共频道失败，请检查是否拥有权限: mtv.channel.create");
+                    }
                     return true;
                 }
                 var st = context.newState();

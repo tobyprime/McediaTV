@@ -278,7 +278,7 @@ public final class MtvChannelService {
     }
 
     public ChannelRuntimeState createPublicChannel(Player player, String channelName, String description) {
-        if (player == null) {
+        if (player == null || !player.hasPermission("mtv.channel.create")) {
             return null;
         }
         String normalizedName = channelName == null ? "" : channelName.trim();
@@ -366,9 +366,8 @@ public final class MtvChannelService {
         if (player == null) {
             return false;
         }
-        return player.hasPermission("mcedia.mtv.channel.manage.others")
-                || player.isOp()
-                || player.getUniqueId().toString().equals(state.getCreatorUuid());
+        return player.getUniqueId().toString().equals(state.getCreatorUuid())
+                || player.hasPermission("mtv.channel.manage.others");
     }
 
     public boolean canControlChannelPlayback(Player player, ChannelRuntimeState state) {
@@ -378,7 +377,8 @@ public final class MtvChannelService {
         if (player == null) {
             return false;
         }
-        if (player.isOp() || player.getUniqueId().toString().equals(state.getCreatorUuid())) {
+        if (player.getUniqueId().toString().equals(state.getCreatorUuid())
+                || player.hasPermission("mtv.channel.control.others")) {
             return true;
         }
         return state.isPublicControl();

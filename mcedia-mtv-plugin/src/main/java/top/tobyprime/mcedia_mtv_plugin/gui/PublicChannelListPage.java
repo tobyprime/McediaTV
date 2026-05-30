@@ -81,8 +81,8 @@ public class PublicChannelListPage extends GuiPage {
                 context.navigateTo(player, MtvGui.GuiType.PUBLIC_CHANNEL_LIST, entityUuid, null, st);
             }
             case 49 -> {
-                if (!player.hasPermission("mcedia.mtv.channel.create")) {
-                    player.sendMessage("你没有权限创建公共频道。");
+                if (!player.hasPermission("mtv.channel.create")) {
+                    player.sendMessage("你没有权限创建公共频道。需要权限: mtv.channel.create");
                     return true;
                 }
                 var st = MtvGui.publicChannelState(query, page, ownOnly);

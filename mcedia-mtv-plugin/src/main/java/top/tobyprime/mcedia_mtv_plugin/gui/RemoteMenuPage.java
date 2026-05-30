@@ -192,7 +192,7 @@ public class RemoteMenuPage extends GuiPage {
                         .ensureChannelState(binding.channelId());
                 if (!context.manager().getChannelService().canControlChannelPlayback(player, channelState)) {
                     context.runOnPlayer(player, () ->
-                            player.sendMessage("该频道为私有频道，只有创建者或 OP 可以通过遥控器修改当前媒体。"));
+                            player.sendMessage("该频道未开启公开控制，只有创建者或拥有频道控制权限的玩家可以通过遥控器修改当前媒体。"));
                     return;
                 }
                 context.playbackController().insertNextAndPlay(uuid, input,
@@ -217,7 +217,7 @@ public class RemoteMenuPage extends GuiPage {
         if (context.manager().getChannelService().canControlChannelPlayback(player, state)) {
             return true;
         }
-        player.sendMessage("该频道为私有频道，只有创建者或 OP 可以通过遥控器控制播放。");
+        player.sendMessage("该频道未开启公开控制，只有创建者或拥有频道控制权限的玩家可以通过遥控器控制播放。");
         return false;
     }
 }
