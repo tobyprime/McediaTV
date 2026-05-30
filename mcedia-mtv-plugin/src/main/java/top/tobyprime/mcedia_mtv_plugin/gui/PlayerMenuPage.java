@@ -106,7 +106,7 @@ public class PlayerMenuPage extends GuiPage {
                 // ── Row 1: 设备配置 ──
                 case 11 -> context.requestInput(player, "请输入新名称。", "rename");
                 case 13 -> {
-                    if (!MtvPeripheralController.checkPerm(player, "mcedia.mtv.teleport")) return;
+                    if (!MtvPeripheralController.checkPerm(player, "mtv.player.teleport")) return;
                     var loc = snap.toLocation();
                     if (loc == null) {
                         player.sendMessage("该 MTV 的位置无效或所在世界不存在。");
@@ -134,7 +134,7 @@ public class PlayerMenuPage extends GuiPage {
 
                 // ── Row 5: 危险操作 ──
                 case 53 -> {
-                    if (!MtvPeripheralController.checkPerm(player, "mcedia.mtv.delete")) return;
+                    if (!MtvPeripheralController.checkPerm(player, "mtv.player.edit")) return;
                     player.closeInventory();
                     context.manager().deletePlayerAsync(uuid, success ->
                             context.delay(player, () -> player.sendMessage(Boolean.TRUE.equals(success)

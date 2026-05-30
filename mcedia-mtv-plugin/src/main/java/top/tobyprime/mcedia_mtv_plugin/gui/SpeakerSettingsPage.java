@@ -173,7 +173,7 @@ public class SpeakerSettingsPage extends GuiPage {
                 case 50 -> context.updateAndRefresh(player, uuid,
                         done -> context.manager().setSpeakerOffsetToPlayer(uuid, periphId, player, done));
                 case 53 -> {
-                    if (!MtvPeripheralController.checkPerm(player, "mcedia.mtv.delete")) return;
+                    if (!MtvPeripheralController.checkPerm(player, "mtv.player.edit")) return;
                     context.updateAndRefresh(player, uuid,
                             done -> context.manager().removePeripheral(uuid, "speaker", periphId, done));
                 }

@@ -32,7 +32,7 @@ public final class MtvRemoteControlListener implements Listener {
         if (!isRemoteControl(event.getItem())) {
             return;
         }
-        if (!MtvPeripheralController.checkPerm(event.getPlayer(), "mcedia.mtv.gui")) {
+        if (!MtvPeripheralController.checkPerm(event.getPlayer(), "mtv.gui")) {
             return;
         }
         event.setUseInteractedBlock(Event.Result.DENY);

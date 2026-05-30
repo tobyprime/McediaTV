@@ -48,7 +48,6 @@ import java.util.function.Consumer;
  */
 public class MtvCommand implements CommandExecutor, TabCompleter {
     private static final Logger LOGGER = LoggerFactory.getLogger(MtvCommand.class);
-    private static final double RANGE = 50.0;
 
     private final MtvPeripheralController controller;
     private final MtvPlaybackController playbackController;
@@ -78,8 +77,6 @@ public class MtvCommand implements CommandExecutor, TabCompleter {
                         .executes(this::executeHelp))
                 .then(Commands.literal("gui")
                         .executes(this::executeGui))
-                .then(Commands.literal("list")
-                        .executes(this::executeList))
                 .then(Commands.literal("create")
                         .then(Commands.argument("name", StringArgumentType.greedyString())
                                 .executes(this::executeCreate)))
@@ -344,7 +341,7 @@ public class MtvCommand implements CommandExecutor, TabCompleter {
 
     private int executeGui(CommandContext<CommandSourceStack> ctx) {
         CommandSender sender = ctx.getSource().getSender();
-        if (!hasPermission(sender, "mcedia.mtv.gui")) {
+        if (!hasPermission(sender, "mtv.gui")) {
             return 0;
         }
         if (!(sender instanceof Player player)) {
@@ -355,22 +352,9 @@ public class MtvCommand implements CommandExecutor, TabCompleter {
         return Command.SINGLE_SUCCESS;
     }
 
-    private int executeList(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
-        if (!hasPermission(sender, "mcedia.mtv.list")) {
-            return 0;
-        }
-        if (!(sender instanceof Player player)) {
-            sender.sendMessage("只有玩家可以查看附近 MTV 列表。");
-            return 0;
-        }
-        selector.findNearbyAsync(player, RANGE, results -> sendNearbyList(player, results));
-        return Command.SINGLE_SUCCESS;
-    }
-
     private int executeCreate(CommandContext<CommandSourceStack> ctx) {
         CommandSender sender = ctx.getSource().getSender();
-        if (!hasPermission(sender, "mcedia.mtv.create")) {
+        if (!hasPermission(sender, "mtv.player.create")) {
             return 0;
         }
         if (!(sender instanceof Player player)) {
@@ -394,7 +378,7 @@ public class MtvCommand implements CommandExecutor, TabCompleter {
     }
 
     private int executePlayerChannelBind(CommandContext<CommandSourceStack> ctx) {
-        if (!hasPermission(ctx.getSource().getSender(), "mcedia.mtv.edit")) {
+        if (!hasPermission(ctx.getSource().getSender(), "mtv.player.edit")) {
             return 0;
         }
         String channelId = StringArgumentType.getString(ctx, "channelId");
@@ -406,7 +390,7 @@ public class MtvCommand implements CommandExecutor, TabCompleter {
     }
 
     private int executePlayerRename(CommandContext<CommandSourceStack> ctx) {
-        if (!hasPermission(ctx.getSource().getSender(), "mcedia.mtv.edit")) {
+        if (!hasPermission(ctx.getSource().getSender(), "mtv.player.edit")) {
             return 0;
         }
         String newName = StringArgumentType.getString(ctx, "newName").trim();
@@ -419,7 +403,7 @@ public class MtvCommand implements CommandExecutor, TabCompleter {
 
     private int executePlayerTeleport(CommandContext<CommandSourceStack> ctx) {
         CommandSender sender = ctx.getSource().getSender();
-        if (!hasPermission(sender, "mcedia.mtv.teleport")) {
+        if (!hasPermission(sender, "mtv.player.teleport")) {
             return 0;
         }
         if (!(sender instanceof Player player)) {
@@ -439,7 +423,7 @@ public class MtvCommand implements CommandExecutor, TabCompleter {
 
     private int executePlayerMoveHere(CommandContext<CommandSourceStack> ctx) {
         CommandSender sender = ctx.getSource().getSender();
-        if (!hasPermission(sender, "mcedia.mtv.movehere")) {
+        if (!hasPermission(sender, "mtv.player.edit")) {
             return 0;
         }
         if (!(sender instanceof Player player)) {
@@ -450,14 +434,14 @@ public class MtvCommand implements CommandExecutor, TabCompleter {
     }
 
     private int executePlayerRemove(CommandContext<CommandSourceStack> ctx) {
-        if (!hasPermission(ctx.getSource().getSender(), "mcedia.mtv.delete")) {
+        if (!hasPermission(ctx.getSource().getSender(), "mtv.player.edit")) {
             return 0;
         }
         return executePlayerTarget(ctx, selection -> manager.deletePlayerAsync(selection.uuid(), success -> reply(ctx, success, "已删除 MTV 播放器。", "删除 MTV 播放器失败。")));
     }
 
     private int executeScreenBrightness(CommandContext<CommandSourceStack> ctx, String screenId) {
-        if (!hasPermission(ctx.getSource().getSender(), "mcedia.mtv.edit")) {
+        if (!hasPermission(ctx.getSource().getSender(), "mtv.player.edit")) {
             return 0;
         }
         int value = IntegerArgumentType.getInteger(ctx, "value");
@@ -465,7 +449,7 @@ public class MtvCommand implements CommandExecutor, TabCompleter {
     }
 
     private int executeScreenSize(CommandContext<CommandSourceStack> ctx, String screenId) {
-        if (!hasPermission(ctx.getSource().getSender(), "mcedia.mtv.edit")) {
+        if (!hasPermission(ctx.getSource().getSender(), "mtv.player.edit")) {
             return 0;
         }
         float width = FloatArgumentType.getFloat(ctx, "width");
@@ -474,7 +458,7 @@ public class MtvCommand implements CommandExecutor, TabCompleter {
     }
 
     private int executeScreenOffset(CommandContext<CommandSourceStack> ctx, String screenId) {
-        if (!hasPermission(ctx.getSource().getSender(), "mcedia.mtv.edit")) {
+        if (!hasPermission(ctx.getSource().getSender(), "mtv.player.edit")) {
             return 0;
         }
         float x = FloatArgumentType.getFloat(ctx, "x");
@@ -484,7 +468,7 @@ public class MtvCommand implements CommandExecutor, TabCompleter {
     }
 
     private int executeScreenFill(CommandContext<CommandSourceStack> ctx, String screenId) {
-        if (!hasPermission(ctx.getSource().getSender(), "mcedia.mtv.edit")) {
+        if (!hasPermission(ctx.getSource().getSender(), "mtv.player.edit")) {
             return 0;
         }
         String mode = StringArgumentType.getString(ctx, "mode");
@@ -492,7 +476,7 @@ public class MtvCommand implements CommandExecutor, TabCompleter {
     }
 
     private int executeScreenDanmaku(CommandContext<CommandSourceStack> ctx, String screenId) {
-        if (!hasPermission(ctx.getSource().getSender(), "mcedia.mtv.edit")) {
+        if (!hasPermission(ctx.getSource().getSender(), "mtv.player.edit")) {
             return 0;
         }
         boolean visible = BoolArgumentType.getBool(ctx, "visible");
@@ -500,7 +484,7 @@ public class MtvCommand implements CommandExecutor, TabCompleter {
     }
 
     private int executeSpeakerVolume(CommandContext<CommandSourceStack> ctx, String speakerId) {
-        if (!hasPermission(ctx.getSource().getSender(), "mcedia.mtv.edit")) {
+        if (!hasPermission(ctx.getSource().getSender(), "mtv.player.edit")) {
             return 0;
         }
         float value = FloatArgumentType.getFloat(ctx, "value");
@@ -508,7 +492,7 @@ public class MtvCommand implements CommandExecutor, TabCompleter {
     }
 
     private int executeSpeakerRange(CommandContext<CommandSourceStack> ctx, String speakerId) {
-        if (!hasPermission(ctx.getSource().getSender(), "mcedia.mtv.edit")) {
+        if (!hasPermission(ctx.getSource().getSender(), "mtv.player.edit")) {
             return 0;
         }
         float value = FloatArgumentType.getFloat(ctx, "value");
@@ -516,7 +500,7 @@ public class MtvCommand implements CommandExecutor, TabCompleter {
     }
 
     private int executeSpeakerOffset(CommandContext<CommandSourceStack> ctx, String speakerId) {
-        if (!hasPermission(ctx.getSource().getSender(), "mcedia.mtv.edit")) {
+        if (!hasPermission(ctx.getSource().getSender(), "mtv.player.edit")) {
             return 0;
         }
         float x = FloatArgumentType.getFloat(ctx, "x");
@@ -657,7 +641,7 @@ public class MtvCommand implements CommandExecutor, TabCompleter {
 
     private int executePlayerPlayback(CommandContext<CommandSourceStack> ctx, PlayerOp operation, String successMessage, String failureMessage) {
         CommandSender sender = ctx.getSource().getSender();
-        if (!hasPermission(sender, "mcedia.mtv.edit")) {
+        if (!hasPermission(sender, "mtv.player.edit")) {
             return 0;
         }
         return executePlayerTarget(ctx, selection -> guardPlaybackControl(ctx, selection, allowed -> {
@@ -713,7 +697,7 @@ public class MtvCommand implements CommandExecutor, TabCompleter {
         }
         playbackController.canControlPlayback(selection.uuid(), player, allowed -> player.getScheduler().run(manager.getPlugin(), task -> {
             if (!Boolean.TRUE.equals(allowed)) {
-                sender.sendMessage("该频道为私有频道，只有创建者、公开控制用户或 OP 可以控制播放。");
+                sender.sendMessage("该频道未开启公开控制，只有创建者或拥有 mtv.channel.control.others 权限的玩家可以控制播放。");
                 done.accept(Boolean.FALSE);
                 return;
             }
@@ -732,7 +716,7 @@ public class MtvCommand implements CommandExecutor, TabCompleter {
                                        String successMessage,
                                        String failureMessage) {
         CommandSender sender = ctx.getSource().getSender();
-        if (!hasPermission(sender, "mcedia.mtv.edit")) {
+        if (!hasPermission(sender, "mtv.player.edit")) {
             return 0;
         }
         ChannelRuntimeState state = manager.getChannelService().ensureChannelState(channelId);
@@ -752,40 +736,15 @@ public class MtvCommand implements CommandExecutor, TabCompleter {
             return true;
         }
         if (!manager.getChannelService().canControlChannelPlayback(player, state)) {
-            sender.sendMessage("该频道为私有频道，只有创建者、公开控制用户或 OP 可以控制播放。");
+            sender.sendMessage("该频道未开启公开控制，只有创建者或拥有 mtv.channel.control.others 权限的玩家可以控制播放。");
             return false;
         }
         return true;
     }
 
-    private void sendNearbyList(Player player, List<ManagedMtvPlayer> results) {
-        player.getScheduler().run(manager.getPlugin(), task -> {
-            if (results.isEmpty()) {
-                player.sendMessage("附近 " + (int) RANGE + " 米内没有 MTV 播放器。");
-                return;
-            }
-            player.sendMessage("附近 MTV 播放器列表（最近优先）:");
-            Location origin = player.getLocation();
-            for (int i = 0; i < Math.min(results.size(), 10); i++) {
-                ManagedMtvPlayer snapshot = results.get(i);
-                Location target = snapshot.toLocation();
-                int distance = target == null || origin.getWorld() == null || target.getWorld() == null
-                        ? -1
-                        : (int) Math.sqrt(origin.distanceSquared(target));
-                String binding = manager.getChannelService().resolveBinding(snapshot).channelId();
-                String suffix = distance < 0 ? "" : ("，距离 " + distance + "m");
-                player.sendMessage("- " + snapshot.getName() + " [" + snapshot.getUuid() + "]，频道 " + binding + suffix);
-            }
-            if (results.size() > 10) {
-                player.sendMessage("... 其余 " + (results.size() - 10) + " 个结果请使用 GUI 查看。");
-            }
-        }, null);
-    }
-
     private void sendHelp(CommandSender sender) {
         sender.sendMessage("/mtv - 打开 MTV 主菜单");
         sender.sendMessage("/mtv gui - 打开 MTV 主菜单");
-        sender.sendMessage("/mtv list - 列出附近 MTV 播放器");
         sender.sendMessage("/mtv create <name> - 在自己位置创建 MTV 播放器");
         sender.sendMessage("player 与 channel 的控制已改为通过 GUI 完成。请使用 /mtv 进入界面操作。");
     }

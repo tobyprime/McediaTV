@@ -238,7 +238,7 @@ public class ScreenSettingsPage extends GuiPage {
                 case 49 -> context.updateAndRefresh(player, uuid,
                         done -> context.manager().setScreenOffsetToPlayer(uuid, periphId, player, done));
                 case 53 -> {
-                    if (!MtvPeripheralController.checkPerm(player, "mcedia.mtv.delete")) return;
+                    if (!MtvPeripheralController.checkPerm(player, "mtv.player.edit")) return;
                     context.updateAndRefresh(player, uuid,
                             done -> context.manager().removePeripheral(uuid, "screen", periphId, done));
                 }

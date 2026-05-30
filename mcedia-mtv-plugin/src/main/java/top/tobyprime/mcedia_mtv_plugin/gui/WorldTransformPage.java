@@ -73,7 +73,7 @@ public class WorldTransformPage extends GuiPage {
                     done -> context.manager().snapEntityPosition(uuid, done));
             case 16 -> {
                 if (!top.tobyprime.mcedia_mtv_plugin.controller.MtvPeripheralController
-                        .checkPerm(player, "mcedia.mtv.movehere")) return true;
+                        .checkPerm(player, "mtv.player.edit")) return true;
                 context.updateAndRefresh(player, uuid,
                         done -> context.manager().teleportToPlayer(uuid, player, done));
             }
