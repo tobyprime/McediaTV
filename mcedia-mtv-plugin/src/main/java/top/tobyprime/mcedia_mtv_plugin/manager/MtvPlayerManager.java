@@ -84,6 +84,7 @@ public class MtvPlayerManager {
             player.setYaw(entityConfig.getFloatOr("yaw", player.getYaw()));
             player.setPitch(entityConfig.getFloatOr("pitch", player.getPitch()));
             player.setMasterVolume(entityConfig.getFloatOr("master_volume", player.getMasterVolume()));
+            player.setMaxActiveRange(entityConfig.getFloatOr("max_active_range", player.getMaxActiveRange()));
             player.setPowered(entityConfig.getBooleanOr("powered", player.isPowered()));
             String ownerStr = entityConfig.getStringOr("owner", "");
             if (!ownerStr.isBlank()) {
@@ -333,6 +334,13 @@ public class MtvPlayerManager {
     public void setPowered(UUID uuid, boolean powered, Consumer<Boolean> done) {
         mutate(uuid, p -> {
             p.setPowered(powered);
+            return true;
+        }, done);
+    }
+
+    public void setMaxActiveRange(UUID uuid, float maxActiveRange, Consumer<Boolean> done) {
+        mutate(uuid, p -> {
+            p.setMaxActiveRange(maxActiveRange);
             return true;
         }, done);
     }

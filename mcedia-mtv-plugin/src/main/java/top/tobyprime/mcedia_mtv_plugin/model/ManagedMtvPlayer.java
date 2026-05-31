@@ -20,6 +20,7 @@ public class ManagedMtvPlayer {
     private float yaw;
     private float pitch;
     private float masterVolume = DEFAULT_MASTER_VOLUME;
+    private float maxActiveRange;
     private boolean powered = true;
     private MtvChannelBinding channelBinding;
     private UUID owner;
@@ -33,6 +34,7 @@ public class ManagedMtvPlayer {
         player.name = name;
         player.captureLocation(location);
         player.channelBinding = MtvChannelBinding.self();
+        player.maxActiveRange = 0.0F;
         player.screens.add(new ScreenPeripheralConfigModel("screen_0"));
 
         var leftSpeaker = new SpeakerPeripheralConfigModel("speaker_0");
@@ -126,6 +128,8 @@ public class ManagedMtvPlayer {
     public void setPitch(float pitch) { this.pitch = pitch; }
     public float getMasterVolume() { return masterVolume; }
     public void setMasterVolume(float masterVolume) { this.masterVolume = Math.max(0.0F, Math.min(1.0F, masterVolume)); }
+    public float getMaxActiveRange() { return maxActiveRange; }
+    public void setMaxActiveRange(float maxActiveRange) { this.maxActiveRange = Math.max(0.0F, maxActiveRange); }
     public boolean isPowered() { return powered; }
     public void setPowered(boolean powered) { this.powered = powered; }
     public MtvChannelBinding getChannelBinding() { return channelBinding; }

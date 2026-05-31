@@ -330,10 +330,12 @@ public class EntityPlayerHandle {
         }
 
         boolean powered = configTag.getBooleanOr("powered", true);
+        float maxActiveRange = Math.max(0.0F, configTag.getFloatOr("max_active_range", 0.0F));
+        boolean effectivePowered = powered && isWithinActiveRange(maxActiveRange);
 
         var peripherals = readPeripheralList(configTag.getListOrEmpty("peripherals"));
         float masterVolume = Math.max(0.0F, Math.min(1.0F, configTag.getFloatOr("master_volume", 1.0F)));
-        return new HostConfig(powered, boundChannelId, masterVolume, peripherals);
+        return new HostConfig(effectivePowered, boundChannelId, masterVolume, maxActiveRange, peripherals);
     }
 
     private List<PeripheralConfig> readPeripheralList(ListTag peripheralsTag) {
@@ -424,6 +426,18 @@ public class EntityPlayerHandle {
         return id != null ? id : DEFAULT_BACKGROUND_TEXTURE;
     }
 
+    private boolean isWithinActiveRange(float maxActiveRange) {
+        if (maxActiveRange <= 0.0F) {
+            return true;
+        }
+        var clientPlayer = Minecraft.getInstance().player;
+        if (clientPlayer == null || clientPlayer.level() != display.level()) {
+            return false;
+        }
+        double maxDistanceSquared = maxActiveRange * maxActiveRange;
+        return clientPlayer.distanceToSqr(display) <= maxDistanceSquared;
+    }
+
     public void destroy(String reason) {
         LOGGER.info(
                 "Destroy MTV handle: entityId={}, uuid={}, reason={}, runtimeCount={}, channelId={}",
@@ -482,9 +496,10 @@ public class EntityPlayerHandle {
             boolean powered,
             @Nullable String channelId,
             float masterVolume,
+            float maxActiveRange,
             List<PeripheralConfig> peripherals
     ) {
-        private static final HostConfig DEFAULT = new HostConfig(true, null, 1.0F, List.of());
+        private static final HostConfig DEFAULT = new HostConfig(true, null, 1.0F, 0.0F, List.of());
     }
 
     private sealed interface PeripheralConfig permits ScreenPeripheralConfig, SpeakerPeripheralConfig {

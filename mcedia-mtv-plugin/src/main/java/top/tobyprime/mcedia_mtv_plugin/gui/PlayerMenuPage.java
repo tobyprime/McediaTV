@@ -56,6 +56,15 @@ public class PlayerMenuPage extends GuiPage {
                     "§6⇕ 位置与朝向",
                     "§7调整此 MTV 的位置、偏航与俯仰角"));
 
+            String activeRangeText = snapshot.getMaxActiveRange() <= 0.0F
+                    ? "§f无限制"
+                    : "§f" + String.format("%.1f", snapshot.getMaxActiveRange()) + " 格";
+            inv.setItem(33, item(Material.SPYGLASS,
+                    "§b📏 激活范围",
+                    "§7当前: " + activeRangeText,
+                    "§7超出该距离时，此客户端将临时关闭该播放器",
+                    "§7点击调整最大激活范围"));
+
             var owner = snapshot.getOwner();
             String ownerName = owner == null ? "§7未知" : "§f" + Bukkit.getOfflinePlayer(owner).getName();
             var publicIcon = snapshot.isPublic() ? Material.LIME_WOOL : Material.RED_WOOL;
@@ -137,6 +146,7 @@ public class PlayerMenuPage extends GuiPage {
                     context.updateAndRefresh(player, uuid,
                             done -> context.manager().setPublicAsync(uuid, next, done));
                 }
+                case 33 -> context.navigateTo(player, MtvGui.GuiType.PLAYER_ACTIVATION_RANGE, uuid);
 
                 // ── Row 5: 频道管理 ──
                 case 47 -> {

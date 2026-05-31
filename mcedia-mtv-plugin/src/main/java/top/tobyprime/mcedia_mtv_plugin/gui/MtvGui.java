@@ -34,6 +34,7 @@ public class MtvGui {
         SCREEN_SETTINGS,
         SPEAKER_SETTINGS,
         ADD_PERIPHERAL,
+        PLAYER_ACTIVATION_RANGE,
         WORLD_TRANSFORM,
         CHANNEL_MENU,
         REMOTE_MENU,
@@ -128,6 +129,7 @@ public class MtvGui {
         registerPage(new ScreenSettingsPage());
         registerPage(new SpeakerSettingsPage());
         registerPage(new AddPeripheralPage());
+        registerPage(new PlayerActivationRangePage());
         registerPage(new WorldTransformPage());
         registerPage(new ChannelMenuPage());
         registerPage(new RemoteMenuPage());
