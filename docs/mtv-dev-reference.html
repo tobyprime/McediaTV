@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<!-- ==================================================================
+     LONG DOCUMENT TEMPLATE · parchment design system
+     MTV 开发者实现参考（独立文档）
+     ================================================================== -->
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>MTV 开发者实现参考</title>
+<meta name="author" content="McediaTV">
+<meta name="description" content="MTV 客户端-服务端分离架构、Channel 核心模型、服务端权威时间轴、网络包同步流程与持久化设计。">
+<meta name="keywords" content="MTV, McediaTV, 开发者文档, 架构, Channel, 网络包, Minecraft">
+<meta name="generator" content="Kami">
+<style>
+  @font-face {
+    font-family: "TsangerJinKai02";
+    src: url("../fonts/TsangerJinKai02-W04.ttf") format("truetype"),
+       url("https://cdn.jsdelivr.net/gh/tw93/Kami@main/assets/fonts/TsangerJinKai02-W04.ttf") format("truetype");
+    font-weight: 400;
+    font-style: normal;
+  }
+  @font-face {
+    font-family: "TsangerJinKai02";
+    src: url("../fonts/TsangerJinKai02-W05.ttf") format("truetype"),
+       url("https://cdn.jsdelivr.net/gh/tw93/Kami@main/assets/fonts/TsangerJinKai02-W05.ttf") format("truetype");
+    font-weight: 500;
+    font-style: normal;
+  }
+  @page {
+    size: A4;
+    margin: 20mm 22mm 22mm 22mm;
+    background: #f5f4ed;
+    @top-right {
+      content: string(section-title);
+      font-family: "TsangerJinKai02", "Source Han Serif SC",
+                   "Noto Serif CJK SC", "Songti SC", Georgia, serif;
+      font-size: 8pt;
+      color: #6b6a64;
+    }
+    @bottom-center {
+      content: counter(page) "  ·  MTV 开发者实现参考";
+      font-family: "TsangerJinKai02", "Source Han Serif SC",
+                   "Noto Serif CJK SC", "Songti SC", Georgia, serif;
+      font-size: 9pt;
+      color: #6b6a64;
+    }
+  }
+  @page:first {
+    @top-right { content: ""; }
+    @bottom-center { content: ""; }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --parchment: #f5f4ed;
+    --ivory:     #faf9f5;
+    --near-black:#141413;
+    --dark-warm: #3d3d3a;
+    --olive:     #504e49;
+    --stone:     #6b6a64;
+    --brand:     #1B365D;
+    --border:    #e8e6dc;
+    --border-soft:#e5e3d8;
+    --tag-bg:    #E4ECF5;
+    --serif: "TsangerJinKai02", "Source Han Serif SC", "Noto Serif CJK SC", "Songti SC", "STSong", Georgia, serif;
+    --sans: var(--serif);
+    --rhythm-module:  14pt;
+    --rhythm-section: 18pt;
+  }
+  html, body { background: var(--parchment); }
+  @media screen {
+    body { max-width: 210mm; margin: 0 auto; padding: 20mm 22mm 22mm 22mm; }
+  }
+  body {
+    color: var(--near-black);
+    font-family: var(--serif);
+    font-size: 10.5pt;
+    line-height: 1.55;
+    letter-spacing: 0.3pt;
+    widows: 3;
+    orphans: 3;
+  }
+  .sans { font-family: var(--sans); }
+
+  /* ========== COVER ========== */
+  .cover {
+    min-height: 240mm;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 40mm 0 0 0;
+    break-after: page;
+  }
+  .cover-eyebrow {
+    font-family: var(--sans);
+    font-size: 10pt;
+    color: var(--brand);
+    letter-spacing: 1pt;
+    text-transform: uppercase;
+    margin-bottom: 18pt;
+  }
+  .cover-title {
+    font-size: 36pt;
+    font-weight: 500;
+    color: var(--near-black);
+    line-height: 1.15;
+    letter-spacing: 0.3pt;
+    margin-bottom: 16pt;
+  }
+  .cover-sub {
+    font-family: var(--sans);
+    font-size: 14pt;
+    color: var(--olive);
+    line-height: 1.5;
+    max-width: 85%;
+    margin-bottom: 30pt;
+  }
+  .cover-meta {
+    font-family: var(--sans);
+    font-size: 10pt;
+    color: var(--stone);
+    line-height: 1.5;
+  }
+  .cover-meta strong { color: var(--dark-warm); font-weight: 500; }
+
+  /* ========== HEADINGS ========== */
+  h1 {
+    font-size: 22pt;
+    font-weight: 500;
+    line-height: 1.2;
+    margin: 0 0 10pt 0;
+    border-left: 2.5pt solid var(--brand);
+    border-radius: 1.5pt;
+    padding-left: 8pt;
+    color: var(--near-black);
+    break-after: avoid;
+  }
+  h2 {
+    font-size: 16pt;
+    font-weight: 500;
+    line-height: 1.25;
+    margin: 18pt 0 6pt 0;
+    color: var(--near-black);
+    break-after: avoid;
+    string-set: section-title content();
+  }
+  h3 {
+    font-size: 13pt;
+    font-weight: 500;
+    line-height: 1.3;
+    margin: 14pt 0 4pt 0;
+    color: var(--dark-warm);
+    break-after: avoid;
+  }
+
+  /* ========== PARAGRAPHS ========== */
+  p {
+    margin: 0 0 10pt 0;
+    line-height: 1.55;
+    color: var(--near-black);
+    widows: 2;
+    orphans: 2;
+  }
+  .lead {
+    font-size: 12pt;
+    line-height: 1.55;
+    color: var(--dark-warm);
+    margin-bottom: var(--rhythm-module);
+  }
+  .hl { color: var(--brand); font-weight: 500; }
+  strong { font-weight: 500; }
+
+  /* ========== LISTS ========== */
+  ul, ol {
+    margin: 6pt 0 10pt 0;
+    padding-left: 20pt;
+    line-height: 1.55;
+  }
+  ul li::marker { color: var(--brand); }
+  ol li::marker { color: var(--brand); font-weight: 500; }
+
+  /* ========== CODE ========== */
+  code {
+    font-family: "JetBrains Mono", "SF Mono", Consolas,
+                 "TsangerJinKai02", "Source Han Serif SC",
+                 "Noto Serif CJK SC", "Songti SC", monospace;
+    font-size: 9pt;
+    background: var(--ivory);
+    padding: 1pt 4pt;
+    border-radius: 2pt;
+    color: var(--dark-warm);
+  }
+  pre {
+    font-family: "JetBrains Mono", "SF Mono", Consolas,
+                 "TsangerJinKai02", "Source Han Serif SC",
+                 "Noto Serif CJK SC", "Songti SC", monospace;
+    font-size: 9pt;
+    line-height: 1.5;
+    background: var(--ivory);
+    border-radius: 4pt;
+    padding: 10pt 14pt;
+    margin: 10pt 0;
+    white-space: pre-wrap;
+    color: var(--near-black);
+    break-inside: avoid;
+  }
+  pre code { background: transparent; padding: 0; font-size: inherit; }
+
+  /* ========== TABLE ========== */
+  table, .kami-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 9.5pt;
+    margin: 12pt 0;
+    break-inside: avoid;
+  }
+  table th, .kami-table th {
+    text-align: left;
+    font-weight: 500;
+    color: var(--dark-warm);
+    padding: 6pt 8pt;
+    border-bottom: 1pt solid var(--border);
+    background: transparent;
+  }
+  table td, .kami-table td {
+    padding: 5pt 8pt;
+    border-bottom: 0.3pt solid var(--border-soft);
+    vertical-align: top;
+  }
+  table.striped tbody tr:nth-child(even) td, .kami-table.striped tbody tr:nth-child(even) td {
+    background: var(--ivory);
+  }
+
+  /* ========== CALLOUT ========== */
+  .callout {
+    background: var(--ivory);
+    border-left: 2pt solid var(--brand);
+    padding: 10pt 14pt;
+    border-radius: 3pt;
+    margin: 12pt 0;
+    line-height: 1.55;
+    break-inside: avoid;
+  }
+  .takeaway {
+    background: var(--ivory);
+    border-radius: 4pt;
+    padding: 10pt 14pt;
+    margin: 14pt 0;
+    break-inside: avoid;
+  }
+  .takeaway-label {
+    font-family: var(--sans);
+    font-size: 9pt;
+    color: var(--brand);
+    letter-spacing: 0.5pt;
+    text-transform: uppercase;
+    margin-bottom: 4pt;
+  }
+
+  /* ========== TWO-COLUMN ========== */
+  .two-col { display: flex; gap: 16pt; margin: 10pt 0; }
+  .two-col > div { flex: 1; }
+
+  /* ========== CHAPTER BREAK ========== */
+  .chapter { break-before: page; }
+</style>
+</head>
+<body>
+
+<!-- ═════════════ COVER ═════════════ -->
+<section class="cover">
+  <div>
+    <div class="cover-eyebrow">独立文档 · 实现参考</div>
+    <div class="cover-title">MTV 开发者实现参考</div>
+    <div class="cover-sub">客户端-服务端分离架构、Channel 核心模型、时间轴与网络包同步流程。</div>
+  </div>
+  <div class="cover-meta">
+    <strong>McediaTV</strong><br>
+    文档版 1.0  ·  2026.06<br>
+    基于当前项目实现整理
+  </div>
+</section>
+
+<!-- ═════════════ C/S 分离架构 ═════════════ -->
+<section class="chapter">
+  <h1>C/S 分离架构</h1>
+
+  <p class="lead">MTV 采用客户端 Mod（运行在玩家本地）与服务端插件（运行在 Minecraft 服务端）分离的架构。两者通过自定义网络包通信。</p>
+
+  <div class="two-col">
+    <div>
+      <h3>服务端插件职责</h3>
+      <ul>
+        <li>维护 Channel 的<strong>权威状态</strong></li>
+        <li>管理 Audience 加入、心跳、超时与退出</li>
+        <li>维护播放器与频道的绑定关系</li>
+        <li>播放列表推进逻辑</li>
+        <li>向客户端广播状态更新</li>
+        <li>Channel 状态持久化</li>
+      </ul>
+    </div>
+    <div>
+      <h3>客户端 Mod 职责</h3>
+      <ul>
+        <li>维护多个播放器外设实例</li>
+        <li>将 Screen/Speaker 外设挂接到指定 Channel</li>
+        <li>接收服务端状态并执行媒体加载、播放、暂停、跳转</li>
+        <li>周期性发送心跳附带本地观测状态</li>
+        <li>媒体加载完成后上报元信息</li>
+      </ul>
+    </div>
+  </div>
+
+  <p>客户端是控制发起者，但不是权威状态写入者。所有"设置链接、播放、暂停、快进、调速"等操作，都必须先作为请求发送到服务端，由服务端修改 Channel 状态，再通过状态同步广播给所有受众。客户端收到更新后才执行本地播放器调整。</p>
+
+  <div class="callout">
+    <strong>核心原则：</strong>服务端是权威状态写入者。客户端播放器只是 snapshot 的执行者。客户端 heartbeat 只负责观测与反馈，不直接写权威状态。该链路追求的是"状态一致 + 5 秒级收敛"，不是逐帧严格同步。
+  </div>
+</section>
+
+<!-- ═════════════ Channel 核心模型 ═════════════ -->
+<section class="chapter">
+  <h1>Channel 核心模型</h1>
+
+  <p>Channel 是管理媒体播放进度、播放状态、播放列表与 Audience 会话的核心对象。它<strong>不负责</strong>实际视频解码或音频播放，也<strong>不持有</strong>客户端播放器实体实例。</p>
+
+  <h2>两种 Channel 类型</h2>
+  <table class="kami-table striped">
+    <thead>
+      <tr><th>类型</th><th>绑定限制</th><th>可搜索</th><th>主要用途</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>Broadcast Channel</strong>（公共频道）</td><td>多个播放器可绑定</td><td>是</td><td>多屏同播，公共展示</td></tr>
+      <tr><td><strong>Private Player Channel</strong>（私有 self 频道）</td><td>仅一个播放器绑定</td><td>否</td><td>独立播放，默认频道</td></tr>
+    </tbody>
+  </table>
+
+  <p>私有频道不是临时 fallback 对象，而是 Channel 体系中的一等成员，同样需要持久化。</p>
+
+  <h2>关键组件</h2>
+  <table class="kami-table">
+    <thead>
+      <tr><th>服务端组件</th><th>职责</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>MtvChannelService</code></td><td>维护频道权威状态，负责持久化与触发 snapshot 广播。</td></tr>
+      <tr><td><code>MtvChannelNetworkService</code></td><td>处理 subscribe/unsubscribe/heartbeat，向客户端发送 snapshot/sync/remove。</td></tr>
+      <tr><td><code>AudienceSessionManager</code></td><td>维护 channel→audience 映射，active audience 过滤与多数派统计。</td></tr>
+      <tr><td><code>MtvPlaybackController</code></td><td>承接播放控制命令，转发给 <code>MtvChannelService</code>。</td></tr>
+      <tr><td><code>EntityPlayerHandle</code></td><td>每 tick 读取实体配置，解析目标 channelId，挂接或切换外设。</td></tr>
+    </tbody>
+  </table>
+
+  <table class="kami-table">
+    <thead>
+      <tr><th>客户端组件</th><th>职责</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>ClientChannelPlaybackManager</code></td><td>管理 channelId→session 映射，处理 snapshot/sync/remove，决定何时 subscribe/unsubscribe。</td></tr>
+      <tr><td><code>ClientChannelSession</code></td><td>执行本地加载、seek、pause、speed 同步，周期性发送 heartbeat。</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ═════════════ 服务端权威时间轴 ═════════════ -->
+<section class="chapter">
+  <h1>服务端权威时间轴</h1>
+
+  <p class="lead">播放进度以服务端为权威，但服务端不会逐 tick 主动推进当前时间。它只保存权威播放核心状态与时间轴锚点。</p>
+
+  <h2>核心字段</h2>
+  <p>一个运行中的 Channel 至少需要维护：<code>channelId</code>、<code>channelType</code>、<code>playState</code>（包含 <code>mediaUrl</code>、<code>state</code>、<code>speed</code>、<code>mediaTime</code>、<code>playTime</code>）、<code>duration</code>、<code>playlistCursor</code>、<code>playlist</code> 和 <code>revision</code>。</p>
+
+  <h2>播放位置推导公式</h2>
+  <pre><code>if playState.state == PLAYING:
+  currentMediaTime = (currentSystemTime - playState.playTime)
+                     * playState.speed + playState.mediaTime
+else:
+  currentMediaTime = playState.mediaTime</code></pre>
+
+  <p>所有影响时间轴的操作都遵循同一规则：先根据当前锚点结算最新位置，再更新目标状态，重建新的时间轴锚点。</p>
+
+  <h2>关键操作的时间轴语义</h2>
+  <table class="kami-table striped">
+    <thead>
+      <tr><th>操作</th><th>时间轴更新逻辑</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>开始/恢复播放</td><td>state=PLAYING, mediaTime=当前位置, playTime=serverNow</td></tr>
+      <tr><td>暂停</td><td>先结算 currentMediaTime → mediaTime=currentMediaTime, state=PAUSED, playTime=serverNow</td></tr>
+      <tr><td>跳转</td><td>mediaTime=目标时间, playTime=serverNow, state 保持</td></tr>
+      <tr><td>调速</td><td>先结算 → mediaTime=currentMediaTime, speed=newRate, playTime=serverNow</td></tr>
+      <tr><td>切下一首</td><td>mediaUrl 切换, mediaTime=0, playTime=serverNow, 重置 duration, playlistCursor 前进</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ═════════════ 网络包同步 ═════════════ -->
+<section class="chapter">
+  <h1>网络包与同步流程</h1>
+
+  <h2>C2S 包</h2>
+  <table class="kami-table">
+    <thead>
+      <tr><th>包</th><th>发送时机</th><th>载荷</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>channel_subscribe</code></td><td>客户端对某 channel 的引用计数从 0→1</td><td><code>channelId</code></td></tr>
+      <tr><td><code>channel_unsubscribe</code></td><td>引用计数从 1→0</td><td><code>channelId</code></td></tr>
+      <tr><td><code>channel_heartbeat</code></td><td>每 5 秒，session 仍有 attachment 且有媒体</td><td><code>channelId</code>, <code>revision</code>, <code>loaded</code>, <code>completed</code>, <code>durationUs</code>, <code>error</code></td></tr>
+    </tbody>
+  </table>
+
+  <h2>S2C 包</h2>
+  <table class="kami-table">
+    <thead>
+      <tr><th>包</th><th>发送时机</th><th>作用</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>channel_snapshot</code></td><td>状态变更后、周期性广播（~5s）、新订阅后</td><td>软刷新，纠偏用，含时间轴锚点</td></tr>
+      <tr><td><code>channel_sync</code></td><td>新订阅首包、客户端上报 error 时</td><td>强校准，触发更积极的 seek 对齐</td></tr>
+      <tr><td><code>channel_remove</code></td><td>服务端认为频道失效时</td><td>客户端置空对应 session 的 snapshot</td></tr>
+    </tbody>
+  </table>
+
+  <h2>订阅机制要点</h2>
+  <p>subscribe/unsubscribe 不按"实体"维度发送，而是按"整个客户端是否仍需要该 channel"发送。同一客户端内的多个实体可复用同一个 channelId，避免重复订阅和误退订。</p>
+
+  <h2>客户端位置同步</h2>
+  <pre><code>位置 = anchorMediaTimeUs + elapsedTimeMs * 1000
+      + localElapsedAfterReceiveMs * 1000 * speed</code></pre>
+  <p>普通 snapshot 使用软阈值纠偏（3 秒），channel_sync 或 revision 明显变化时触发强校准（1 秒）。</p>
+</section>
+
+<!-- ═════════════ Audience 与持久化 ═════════════ -->
+<section class="chapter">
+  <h1>Audience 与持久化</h1>
+
+  <h2>Audience 生命周期</h2>
+  <ul>
+    <li><strong>加入</strong>：客户端通过首次 <code>subscribe(channelId)</code> 进入频道的 audience 集合。服务端立即下发当前状态。</li>
+    <li><strong>心跳</strong>：每 5 秒一次。承担保活和状态观测上报两个职责。</li>
+    <li><strong>超时</strong>：30 秒未收到心跳 → 标记断联并移除。失去全部 audience 的频道停止服务但保留持久化数据。</li>
+  </ul>
+
+  <h2>多数派统计口径</h2>
+  <p>当前 active audience 必须同时满足：未超时 + 仍订阅当前 channel。在此范围内统计 loaded 和 completed 的多数派：</p>
+  <pre><code>matched > 0 && loaded * 2 > matched  // 多数派已加载
+matched > 0 && completed * 2 > matched // 多数派已播完</code></pre>
+  <p>duration 汇总取 active sessions 中上报的最大值。</p>
+
+  <h2>新媒体加载到正式播放的流程</h2>
+  <ol>
+    <li>服务端切换 mediaUrl → ChannelRuntimeState 进入 <code>LOADING</code> → 广播 snapshot</li>
+    <li>客户端收到 snapshot，开始异步加载媒体，上报 <code>loaded = false</code></li>
+    <li>客户端媒体 ready 后开始上报 <code>loaded = true</code> 与 <code>durationUs</code></li>
+    <li>服务端判断多数派已加载 → 状态切到 <code>PLAYING</code> → 再次广播</li>
+    <li>客户端按新 snapshot 正式进入统一播放状态</li>
+  </ol>
+
+  <h2>持久化设计</h2>
+  <p>系统定义统一的 <code>ChannelRepository</code> 抽象，不把业务逻辑绑定到某一种存储实现。未来可支持多种后端：</p>
+  <ul>
+    <li>filesystem</li>
+    <li>sqlite</li>
+    <li>postgres</li>
+    <li>mongodb</li>
+  </ul>
+
+  <p><strong>需持久化</strong>：channelId、channelType、mediaUrl、mediaTime、playTime、speed、state、duration、播放列表、playlistCursor、绑定关系。</p>
+  <p><strong>不持久化</strong>：audience 在线集合、心跳到达时间、客户端瞬时观测值、会话期临时缓存。</p>
+
+  <div class="takeaway">
+    <div class="takeaway-label">设计决策记录</div>
+    <ul>
+      <li>停止服务 ≠ 删除频道。失去全部 audience 只停止服务，持久化数据仍保留。</li>
+      <li>快进、快退、拖进度条在协议层统一归一为 <code>Seek(targetMediaTime)</code> 命令。</li>
+      <li>调速必须先结算旧时间轴再切换新倍率，否则导致位置跳变。</li>
+      <li>未拿到 duration 时，服务端不能做基于时长的自动切歌判断。</li>
+    </ul>
+  </div>
+</section>
+
+</body>
+</html>

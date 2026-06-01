@@ -34,15 +34,17 @@ public class ManagedMtvPlayer {
         player.name = name;
         player.captureLocation(location);
         player.channelBinding = MtvChannelBinding.self();
-        player.maxActiveRange = 0.0F;
+        player.maxActiveRange = 50.0F;
         player.screens.add(new ScreenPeripheralConfigModel("screen_0"));
 
         var leftSpeaker = new SpeakerPeripheralConfigModel("speaker_0");
         leftSpeaker.setChannelMode("left");
+        leftSpeaker.setOffsetX(-0.75F);
         player.speakers.add(leftSpeaker);
 
         var rightSpeaker = new SpeakerPeripheralConfigModel("speaker_1");
         rightSpeaker.setChannelMode("right");
+        rightSpeaker.setOffsetX(0.75F);
         player.speakers.add(rightSpeaker);
         return player;
     }

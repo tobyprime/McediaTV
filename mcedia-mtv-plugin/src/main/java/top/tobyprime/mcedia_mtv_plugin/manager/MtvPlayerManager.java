@@ -588,6 +588,14 @@ public class MtvPlayerManager {
                 || player.hasPermission("mtv.player.edit.others");
     }
 
+    public static boolean canToggleVisibility(Player player, ManagedMtvPlayer snapshot) {
+        if (snapshot == null || player == null) return false;
+        if (!snapshot.isPublic()) return canEditPlayer(player, snapshot);
+        if (snapshot.getOwner() == null) return true;
+        return player.getUniqueId().equals(snapshot.getOwner())
+                || player.hasPermission("mtv.player.edit.others");
+    }
+
     private ItemDisplay spawnItemDisplay(Location location) {
         ItemDisplay itemDisplay = location.getWorld().spawn(location, ItemDisplay.class);
         itemDisplay.setRotation(location.getYaw(), location.getPitch());

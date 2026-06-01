@@ -73,7 +73,9 @@ public class PlayerMenuPage extends GuiPage {
                     publicText,
                     "§7拥有者: " + ownerName,
                     "§7点击切换公开/私有模式",
-                    snapshot.isPublic() ? "§7任何人都可以编辑此播放器" : "§7只有创建者可以编辑此播放器"));
+                    snapshot.isPublic()
+                            ? "§7仅拥有者或拥有 mtv.player.edit.others 权限的玩家可切回私有"
+                            : "§7只有创建者可以编辑此播放器"));
 
             // ── Row 5 (45-53): 📡 频道管理 + ⚠️ 危险操作 ──
 
@@ -141,7 +143,10 @@ public class PlayerMenuPage extends GuiPage {
                 // ── Row 3: 播放器设置 ──
                 case 29 -> context.navigateTo(player, MtvGui.GuiType.WORLD_TRANSFORM, uuid);
                 case 31 -> {
-                    if (!MtvPeripheralController.canEdit(player, snap)) return;
+                    if (!context.manager().canToggleVisibility(player, snap)) {
+                        player.sendMessage("当前为公开播放器，只有拥有者或拥有 mtv.player.edit.others 权限的玩家可以切回私有。");
+                        return;
+                    }
                     boolean next = !snap.isPublic();
                     context.updateAndRefresh(player, uuid,
                             done -> context.manager().setPublicAsync(uuid, next, done));
