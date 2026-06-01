@@ -42,7 +42,9 @@ public class RemoteMenuPage extends GuiPage {
             var binding = context.manager().getChannelService().resolveBinding(snapshot);
             var channelState = context.manager().getChannelService()
                     .ensureChannelState(binding.channelId());
-            var playState = channelState != null ? channelState.getPlayState() : null;
+            var audience = channelState == null ? null : context.manager().getChannelService()
+                    .getAudienceSessionManager().summarize(binding.channelId(), channelState.getRevision(), System.currentTimeMillis());
+            boolean audienceSuspended = audience != null && audience.majoritySuspended();
 
             var inv = createInventory(entry);
 
@@ -56,6 +58,15 @@ public class RemoteMenuPage extends GuiPage {
 
             inv.setItem(27, item(Material.JUKEBOX,
                     "§6📻 频道设置", "§7打开当前播放器的频道页面"));
+
+            inv.setItem(36, item(audienceSuspended ? Material.ORANGE_DYE : Material.LIME_DYE,
+                    audienceSuspended ? "§6⏸ 运行状态: 观众端已挂起" : "§a▶ 运行状态: 正常",
+                    audienceSuspended
+                            ? "§7当前频道对应的多数观众端播放器因 decoder limit 被临时挂起"
+                            : "§7当前频道对应的观众端播放器正在正常参与解码与上传",
+                    audienceSuspended
+                            ? "§7优先级恢复后会自动恢复播放画面"
+                            : "§7频道控制通常会立即体现在观众端播放器上"));
 
             // ── 右栏: 🔊 音量 — 竖向排列 ──
 

@@ -10,6 +10,7 @@ public record ChannelSnapshot(
         String state,
         boolean paused,
         long resolvedDurationUs,
-        boolean completed
+        boolean completed,
+        boolean audienceSuspended
 ) {
 }

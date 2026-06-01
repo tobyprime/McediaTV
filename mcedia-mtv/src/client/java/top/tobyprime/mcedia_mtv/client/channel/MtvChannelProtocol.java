@@ -36,6 +36,7 @@ public final class MtvChannelProtocol {
                 buffer.readBoolean(),
                 buffer.readLong(),
                 buffer.readBoolean(),
+                buffer.isReadable() && buffer.readBoolean(),
                 0L
         );
         ensureFullyRead(buffer, "snapshot");
@@ -53,6 +54,7 @@ public final class MtvChannelProtocol {
         buffer.writeBoolean(snapshot.paused());
         buffer.writeLong(snapshot.resolvedDurationUs());
         buffer.writeBoolean(snapshot.completed());
+        buffer.writeBoolean(snapshot.audienceSuspended());
     }
 
     public static String readRemove(FriendlyByteBuf buffer) {
@@ -72,8 +74,9 @@ public final class MtvChannelProtocol {
         boolean completed = buffer.readBoolean();
         long durationUs = buffer.readLong();
         boolean error = buffer.isReadable() && buffer.readBoolean();
+        boolean suspended = buffer.isReadable() && buffer.readBoolean();
         ensureFullyRead(buffer, "heartbeat");
-        return new MtvAudienceHeartbeat(channelId, revision, loaded, completed, durationUs, error);
+        return new MtvAudienceHeartbeat(channelId, revision, loaded, completed, durationUs, error, suspended);
     }
 
     public static void writeHeartbeat(FriendlyByteBuf buffer, MtvAudienceHeartbeat heartbeat) {
@@ -83,6 +86,7 @@ public final class MtvChannelProtocol {
         buffer.writeBoolean(heartbeat.completed());
         buffer.writeLong(heartbeat.durationUs());
         buffer.writeBoolean(heartbeat.error());
+        buffer.writeBoolean(heartbeat.suspended());
     }
 
 

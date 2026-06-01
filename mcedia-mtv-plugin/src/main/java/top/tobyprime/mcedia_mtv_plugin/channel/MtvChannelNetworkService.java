@@ -116,8 +116,8 @@ public final class MtvChannelNetworkService implements PluginMessageListener, Li
         var snapshot = toSnapshot(state, summarizeAudience(state, nowMs), nowMs);
         sendSnapshot(player, snapshot);
         sendSync(player, snapshot);
-        LOGGER.debug("Published MTV channel snapshot to player: player={}, channel={}, revision={}, mediaUrl={}, paused={}, completed={}",
-                player.getName(), snapshot.channelId(), snapshot.revision(), snapshot.mediaUrl(), snapshot.paused(), snapshot.completed());
+        LOGGER.debug("Published MTV channel snapshot to player: player={}, channel={}, revision={}, mediaUrl={}, paused={}, completed={}, audienceSuspended={}",
+                player.getName(), snapshot.channelId(), snapshot.revision(), snapshot.mediaUrl(), snapshot.paused(), snapshot.completed(), snapshot.audienceSuspended());
     }
 
     public void invalidateChannel(String channelId) {
@@ -182,6 +182,7 @@ public final class MtvChannelNetworkService implements PluginMessageListener, Li
                     heartbeat.loaded(),
                     heartbeat.completed(),
                     heartbeat.error(),
+                    heartbeat.suspended(),
                     Math.max(0L, heartbeat.durationUs() / 1000L),
                     nowMs
             );
@@ -213,7 +214,12 @@ public final class MtvChannelNetworkService implements PluginMessageListener, Li
     }
 
     private ChannelSnapshot toSnapshot(ChannelRuntimeState state, AudienceSessionManager.AudienceSummary audience, long nowMs) {
-        return state.toSnapshot(nowMs, Math.max(0L, audience.resolvedDurationMs() * 1000L), audience.completed());
+        return state.toSnapshot(
+                nowMs,
+                Math.max(0L, audience.resolvedDurationMs() * 1000L),
+                audience.completed(),
+                audience.majoritySuspended()
+        );
     }
 
     private void maybeStartLoadedChannel(ChannelRuntimeState state, long nowMs, AudienceSessionManager.AudienceSummary audience) {
@@ -253,8 +259,8 @@ public final class MtvChannelNetworkService implements PluginMessageListener, Li
         long nowMs = System.currentTimeMillis();
         var snapshot = toSnapshot(state, audience, nowMs);
         int recipients = broadcast(snapshot, sender);
-        LOGGER.debug("Published MTV channel {}: channel={}, revision={}, mediaUrl={}, paused={}, completed={}, recipients={}",
-                kind, snapshot.channelId(), snapshot.revision(), snapshot.mediaUrl(), snapshot.paused(), snapshot.completed(), recipients);
+        LOGGER.debug("Published MTV channel {}: channel={}, revision={}, mediaUrl={}, paused={}, completed={}, audienceSuspended={}, recipients={}",
+                kind, snapshot.channelId(), snapshot.revision(), snapshot.mediaUrl(), snapshot.paused(), snapshot.completed(), snapshot.audienceSuspended(), recipients);
     }
 
     private int broadcastSnapshot(ChannelSnapshot snapshot) {

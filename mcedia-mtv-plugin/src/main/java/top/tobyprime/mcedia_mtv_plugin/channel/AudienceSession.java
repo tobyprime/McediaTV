@@ -10,6 +10,7 @@ public final class AudienceSession {
     private boolean loaded;
     private boolean completed;
     private boolean error;
+    private boolean suspended;
     private long durationMs;
 
     public AudienceSession(UUID playerUuid, String channelId, long nowMs) {
@@ -64,6 +65,14 @@ public final class AudienceSession {
 
     public void setError(boolean error) {
         this.error = error;
+    }
+
+    public boolean isSuspended() {
+        return suspended;
+    }
+
+    public void setSuspended(boolean suspended) {
+        this.suspended = suspended;
     }
 
     public long getDurationMs() {

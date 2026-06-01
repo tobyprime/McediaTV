@@ -59,10 +59,16 @@ public class PlayerMenuPage extends GuiPage {
             String activeRangeText = snapshot.getMaxActiveRange() <= 0.0F
                     ? "§f无限制"
                     : "§f" + String.format("%.1f", snapshot.getMaxActiveRange()) + " 格";
+            var channelState = context.manager().getChannelService().ensureChannelState(binding.channelId());
+            var audience = channelState == null ? null : context.manager().getChannelService().getAudienceSessionManager()
+                    .summarize(binding.channelId(), channelState.getRevision(), System.currentTimeMillis());
+            boolean audienceSuspended = audience != null && audience.majoritySuspended();
             inv.setItem(33, item(Material.SPYGLASS,
                     "§b📏 激活范围",
                     "§7当前: " + activeRangeText,
                     "§7超出该距离时，此客户端将临时关闭该播放器",
+                    "§7decoder limit 挂起是另一种运行态，不等同于激活范围",
+                    "§7当前观众端运行状态: " + (audienceSuspended ? "§6多数已挂起" : "§a正常"),
                     "§7点击调整最大激活范围"));
 
             var owner = snapshot.getOwner();

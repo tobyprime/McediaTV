@@ -6,6 +6,7 @@ public record MtvAudienceHeartbeat(
         boolean loaded,
         boolean completed,
         long durationUs,
-        boolean error
+        boolean error,
+        boolean suspended
 ) {
 }

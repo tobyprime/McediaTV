@@ -58,9 +58,17 @@ public class ChannelMenuPage extends GuiPage {
         entry.putState("channel_name", state.getChannelName());
 
         var playState = state.getPlayState();
+        var audience = context.manager().getChannelService().getAudienceSessionManager()
+                .summarize(channelId, state.getRevision(), System.currentTimeMillis());
         boolean paused = playState.getState() != ChannelPlaybackStatus.PLAYING;
+        boolean audienceSuspended = audience.majoritySuspended();
         String nowPlaying = playState.getMediaUrl().isBlank() ? "未设置"
                 : MtvGui.summarize(playState.getMediaUrl());
+        String runtimeStatus = audienceSuspended
+                ? (playState.getState() == ChannelPlaybackStatus.LOADING
+                ? "多数观众端当前因 decoder limit 挂起，加载可能不会立即完成"
+                : "多数观众端当前因 decoder limit 挂起")
+                : "观众端运行状态正常";
 
         // Create inventory with resolved title showing channel name instead of ID
         String title = "频道 - " + MtvGui.fallback(state.getChannelName(), state.getChannelId());
@@ -113,7 +121,7 @@ public class ChannelMenuPage extends GuiPage {
         // ── Row 3 (27-35): Play/pause (above FF/RW) ──
         var pauseIcon = paused ? Material.YELLOW_WOOL : Material.RED_WOOL;
         var pauseName = paused ? "▶ 播放" : "⏸ 暂停";
-        inv.setItem(31, item(pauseIcon, pauseName, "当前: " + nowPlaying));
+        inv.setItem(31, item(pauseIcon, pauseName, "当前: " + nowPlaying, "运行态: " + runtimeStatus));
 
         // ── Row 5 (45-53): FF/RW + 设置URL (底部居中) ──
         //     [⏮][⏪−20s][◀−5s][设置URL][▶+5s][⏩+20s][⏭]

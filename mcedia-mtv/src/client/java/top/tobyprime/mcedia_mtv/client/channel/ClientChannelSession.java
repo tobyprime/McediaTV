@@ -25,6 +25,7 @@ public final class ClientChannelSession {
     private boolean loadingMedia;
     private boolean errorMedia;
     private boolean forceResyncRequested;
+    private boolean lastDecoderSuspended;
 
     public ClientChannelSession(String channelId) {
         this.channelId = channelId;
@@ -59,6 +60,7 @@ public final class ClientChannelSession {
         if (this.snapshot.revision() != snapshot.revision()
                 || !this.snapshot.mediaUrl().equals(snapshot.mediaUrl())
                 || this.snapshot.paused() != snapshot.paused()
+                || this.snapshot.audienceSuspended() != snapshot.audienceSuspended()
                 || Double.compare(this.snapshot.speed(), snapshot.speed()) != 0) {
             forceResyncRequested = true;
         }
@@ -88,6 +90,7 @@ public final class ClientChannelSession {
         loadingMedia = false;
         errorMedia = false;
         forceResyncRequested = false;
+        lastDecoderSuspended = false;
         lastAppliedSpeed = Double.NaN;
         lastHeartbeatAtMs = 0L;
         stopMedia();
@@ -216,13 +219,18 @@ public final class ClientChannelSession {
         }
         var media = singlePlayer.getMedia();
         long resolvedDurationUs = 0L;
+        boolean suspended = isDecoderSuspended(singlePlayer);
+        if (lastDecoderSuspended && !suspended) {
+            forceResyncRequested = true;
+        }
+        lastDecoderSuspended = suspended;
         boolean loaded = false;
         boolean completed = false;
         if (media != null) {
             long localPositionUs = Math.max(0L, media.getEstimatedTime());
             resolvedDurationUs = Math.max(0L, media.getDuration());
-            loaded = true;
-            completed = resolvedDurationUs > 0L && localPositionUs >= resolvedDurationUs;
+            loaded = !suspended;
+            completed = loaded && resolvedDurationUs > 0L && localPositionUs >= resolvedDurationUs;
         }
         MtvChannelHeartbeatSender.send(new MtvAudienceHeartbeat(
                 snapshot.channelId(),
@@ -230,7 +238,8 @@ public final class ClientChannelSession {
                 loaded,
                 completed,
                 resolvedDurationUs,
-                errorMedia
+                errorMedia,
+                suspended
         ));
     }
 
@@ -238,6 +247,15 @@ public final class ClientChannelSession {
         var player = host.getPlayer();
         if (player instanceof SingleMediaPlayer singlePlayer) {
             singlePlayer.close();
+        }
+    }
+
+    private boolean isDecoderSuspended(SingleMediaPlayer singlePlayer) {
+        try {
+            Object result = singlePlayer.getClass().getMethod("isDecoderSuspended").invoke(singlePlayer);
+            return result instanceof Boolean value && value;
+        } catch (ReflectiveOperationException ignored) {
+            return false;
         }
     }
 

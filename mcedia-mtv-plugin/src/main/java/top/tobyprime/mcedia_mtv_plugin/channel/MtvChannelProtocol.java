@@ -80,6 +80,7 @@ public final class MtvChannelProtocol {
         buffer.writeBoolean(snapshot.paused());
         buffer.writeLong(snapshot.resolvedDurationUs());
         buffer.writeBoolean(snapshot.completed());
+        buffer.writeBoolean(snapshot.audienceSuspended());
     }
 
     public static void writeSubscription(FriendlyByteBuf buffer, MtvChannelSubscriptionRequest request) {
@@ -97,7 +98,8 @@ public final class MtvChannelProtocol {
                 buffer.readUtf(),
                 buffer.readBoolean(),
                 buffer.readLong(),
-                buffer.readBoolean()
+                buffer.readBoolean(),
+                buffer.isReadable() && buffer.readBoolean()
         );
         ensureFullyRead(buffer, "snapshot");
         return snapshot;
@@ -126,6 +128,7 @@ public final class MtvChannelProtocol {
         buffer.writeBoolean(heartbeat.completed());
         buffer.writeLong(heartbeat.durationUs());
         buffer.writeBoolean(heartbeat.error());
+        buffer.writeBoolean(heartbeat.suspended());
     }
 
     public static MtvAudienceHeartbeat readHeartbeat(FriendlyByteBuf buffer) {
@@ -135,8 +138,9 @@ public final class MtvChannelProtocol {
         boolean completed = buffer.readBoolean();
         long durationUs = buffer.readLong();
         boolean error = buffer.isReadable() && buffer.readBoolean();
+        boolean suspended = buffer.isReadable() && buffer.readBoolean();
         ensureFullyRead(buffer, "heartbeat");
-        return new MtvAudienceHeartbeat(channelId, revision, loaded, completed, durationUs, error);
+        return new MtvAudienceHeartbeat(channelId, revision, loaded, completed, durationUs, error, suspended);
     }
 
 

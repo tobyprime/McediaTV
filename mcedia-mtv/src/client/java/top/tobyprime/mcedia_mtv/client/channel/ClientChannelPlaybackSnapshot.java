@@ -11,9 +11,10 @@ public record ClientChannelPlaybackSnapshot(
         boolean paused,
         long resolvedDurationUs,
         boolean completed,
+        boolean audienceSuspended,
         long receivedAtMonotonicMs
 ) {
-    public static final ClientChannelPlaybackSnapshot EMPTY = new ClientChannelPlaybackSnapshot("", 0L, "", 1.0F, 0L, 0L, "STOPPED", false, 0L, false, 0L);
+    public static final ClientChannelPlaybackSnapshot EMPTY = new ClientChannelPlaybackSnapshot("", 0L, "", 1.0F, 0L, 0L, "STOPPED", false, 0L, false, false, 0L);
 
     public boolean hasMedia() {
         return mediaUrl != null && !mediaUrl.isBlank();
@@ -31,6 +32,7 @@ public record ClientChannelPlaybackSnapshot(
                 paused,
                 resolvedDurationUs,
                 completed,
+                audienceSuspended,
                 receivedAtMonotonicMs
         );
     }

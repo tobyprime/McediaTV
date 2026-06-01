@@ -14,7 +14,7 @@ public final class AudienceSessionManager {
     public record AudienceTouch(boolean stateChanged, boolean durationChanged) {
     }
 
-    public record AudienceSummary(long resolvedDurationMs, boolean completed, boolean majorityLoaded) {
+    public record AudienceSummary(long resolvedDurationMs, boolean completed, boolean majorityLoaded, boolean majoritySuspended) {
     }
 
     public void setActiveTimeoutMs(long activeTimeoutMs) {
@@ -56,20 +56,22 @@ public final class AudienceSessionManager {
         return nowMs - session.getLastHeartbeatAtMs() <= activeTimeoutMs && isSubscribed(session.getPlayerUuid(), session.getChannelId());
     }
 
-    public AudienceTouch touch(UUID playerUuid, String channelId, long revision, boolean loaded, boolean completed, boolean error, long durationMs, long nowMs) {
+    public AudienceTouch touch(UUID playerUuid, String channelId, long revision, boolean loaded, boolean completed, boolean error, boolean suspended, long durationMs, long nowMs) {
         var sessions = sessionsByChannel.computeIfAbsent(channelId, key -> new ConcurrentHashMap<>());
         var session = sessions.computeIfAbsent(playerUuid, key -> new AudienceSession(playerUuid, channelId, nowMs));
         long nextDurationMs = Math.max(0L, durationMs);
         boolean stateChanged = session.getLastRevision() != revision
                 || session.isLoaded() != loaded
                 || session.isCompleted() != completed
-                || session.isError() != error;
+                || session.isError() != error
+                || session.isSuspended() != suspended;
         boolean durationChanged = session.getDurationMs() != nextDurationMs;
         session.setLastHeartbeatAtMs(nowMs);
         session.setLastRevision(revision);
         session.setLoaded(loaded);
         session.setCompleted(completed);
         session.setError(error);
+        session.setSuspended(suspended);
         session.setDurationMs(nextDurationMs);
         return new AudienceTouch(stateChanged || durationChanged, durationChanged);
     }
@@ -96,12 +98,14 @@ public final class AudienceSessionManager {
     public AudienceSummary summarize(String channelId, long revision, long nowMs) {
         var sessions = getActiveSessions(channelId, nowMs);
         if (sessions.isEmpty()) {
-            return new AudienceSummary(0L, false, false);
+            return new AudienceSummary(0L, false, false, false);
         }
         long resolvedDurationMs = 0L;
+        int observed = 0;
         int matched = 0;
         int loaded = 0;
         int completed = 0;
+        int suspended = 0;
         for (var session : sessions) {
             if (session.isError()) {
                 continue;
@@ -109,8 +113,13 @@ public final class AudienceSessionManager {
             if (session.getLastRevision() != revision) {
                 continue;
             }
-            matched++;
+            observed++;
             resolvedDurationMs = Math.max(resolvedDurationMs, session.getDurationMs());
+            if (session.isSuspended()) {
+                suspended++;
+                continue;
+            }
+            matched++;
             if (session.isLoaded()) {
                 loaded++;
             }
@@ -121,7 +130,8 @@ public final class AudienceSessionManager {
         return new AudienceSummary(
                 resolvedDurationMs,
                 matched > 0 && completed * 2 > matched,
-                matched > 0 && loaded * 2 > matched
+                matched > 0 && loaded * 2 > matched,
+                observed > 0 && suspended * 2 > observed
         );
     }
 
