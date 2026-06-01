@@ -20,8 +20,11 @@ public class ManagedMtvPlayer {
     private float yaw;
     private float pitch;
     private float masterVolume = DEFAULT_MASTER_VOLUME;
+    private float maxActiveRange;
     private boolean powered = true;
     private MtvChannelBinding channelBinding;
+    private UUID owner;
+    private boolean isPublic = false;
     private final List<ScreenPeripheralConfigModel> screens = new ArrayList<>();
     private final List<SpeakerPeripheralConfigModel> speakers = new ArrayList<>();
 
@@ -31,14 +34,17 @@ public class ManagedMtvPlayer {
         player.name = name;
         player.captureLocation(location);
         player.channelBinding = MtvChannelBinding.self();
+        player.maxActiveRange = 50.0F;
         player.screens.add(new ScreenPeripheralConfigModel("screen_0"));
 
         var leftSpeaker = new SpeakerPeripheralConfigModel("speaker_0");
         leftSpeaker.setChannelMode("left");
+        leftSpeaker.setOffsetX(-0.75F);
         player.speakers.add(leftSpeaker);
 
         var rightSpeaker = new SpeakerPeripheralConfigModel("speaker_1");
         rightSpeaker.setChannelMode("right");
+        rightSpeaker.setOffsetX(0.75F);
         player.speakers.add(rightSpeaker);
         return player;
     }
@@ -124,8 +130,14 @@ public class ManagedMtvPlayer {
     public void setPitch(float pitch) { this.pitch = pitch; }
     public float getMasterVolume() { return masterVolume; }
     public void setMasterVolume(float masterVolume) { this.masterVolume = Math.max(0.0F, Math.min(1.0F, masterVolume)); }
+    public float getMaxActiveRange() { return maxActiveRange; }
+    public void setMaxActiveRange(float maxActiveRange) { this.maxActiveRange = Math.max(0.0F, maxActiveRange); }
     public boolean isPowered() { return powered; }
     public void setPowered(boolean powered) { this.powered = powered; }
     public MtvChannelBinding getChannelBinding() { return channelBinding; }
     public void setChannelBinding(MtvChannelBinding channelBinding) { this.channelBinding = channelBinding; }
+    public UUID getOwner() { return owner; }
+    public void setOwner(UUID owner) { this.owner = owner; }
+    public boolean isPublic() { return isPublic; }
+    public void setPublic(boolean isPublic) { this.isPublic = isPublic; }
 }

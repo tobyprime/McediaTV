@@ -3,48 +3,40 @@ version: '1.0-SNAPSHOT'
 main: top.tobyprime.mcedia_mtv_plugin.Mcedia_mtv_plugin
 api-version: '1.21'
 folia-supported: true
-commands:
-  mtv:
-    description: Manage MTV interaction players
-    usage: /mtv
 permissions:
-  mcedia.mtv.admin:
+  mtv.admin:
     description: 所有 MTV 管理权限
     default: op
     children:
-      mcedia.mtv.create: true
-      mcedia.mtv.delete: true
-      mcedia.mtv.edit: true
-      mcedia.mtv.teleport: true
-      mcedia.mtv.movehere: true
-      mcedia.mtv.gui: true
-      mcedia.mtv.list: true
-      mcedia.mtv.channel.create: true
-      mcedia.mtv.channel.manage.others: true
-  mcedia.mtv.create:
+      mtv.player.create: true
+      mtv.player.edit: true
+      mtv.player.edit.others: true
+      mtv.player.teleport: true
+      mtv.gui: true
+      mtv.channel.create: true
+      mtv.channel.manage.others: true
+      mtv.channel.control.others: true
+  mtv.player.edit.others:
+    description: 编辑/删除别人创建的私有 MTV 播放器
+    default: op
+  mtv.player.create:
     description: 创建 MTV 播放器
-    default: op
-  mcedia.mtv.delete:
-    description: 删除 MTV 播放器
-    default: op
-  mcedia.mtv.edit:
-    description: 编辑 MTV 设置（屏幕/扬声器/播放/移动）
     default: true
-  mcedia.mtv.teleport:
+  mtv.player.edit:
+    description: 编辑 MTV 设置（屏幕/扬声器/播放/移动/删除）
+    default: true
+  mtv.player.teleport:
     description: 传送到 MTV 播放器
     default: op
-  mcedia.mtv.movehere:
-    description: 将 MTV 播放器传送到自己位置
-    default: true
-  mcedia.mtv.gui:
+  mtv.gui:
     description: 打开 MTV 管理 GUI
     default: true
-  mcedia.mtv.list:
-    description: 列出附近的 MTV 播放器
-    default: true
-  mcedia.mtv.channel.create:
+  mtv.channel.create:
     description: 创建公共频道
     default: true
-  mcedia.mtv.channel.manage.others:
+  mtv.channel.manage.others:
     description: 管理别人创建的公共频道
+    default: op
+  mtv.channel.control.others:
+    description: 控制别人创建且未公开控制的公共频道播放
     default: op

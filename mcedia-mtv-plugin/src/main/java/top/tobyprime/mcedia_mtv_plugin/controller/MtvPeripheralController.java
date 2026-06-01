@@ -39,6 +39,11 @@ public class MtvPeripheralController {
         return true;
     }
 
+    /** 检查玩家是否可以编辑该 MTV 播放器（处理私有/公开模式）。 */
+    public static boolean canEdit(Player player, ManagedMtvPlayer snapshot) {
+        return MtvPlayerManager.canEditPlayer(player, snapshot);
+    }
+
     // ====== Peripheral resolution ======
 
     /**

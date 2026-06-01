@@ -57,6 +57,14 @@ public final class MtvPlaybackController {
         updatePlayback(uuid, channelId -> channelService.appendPlaylistItem(channelId, mediaUrl), done);
     }
 
+    public void insertNextPlaylistItem(UUID uuid, String mediaUrl, Consumer<Boolean> done) {
+        updatePlayback(uuid, channelId -> channelService.insertNextPlaylistItem(channelId, mediaUrl), done);
+    }
+
+    public void insertNextAndPlay(UUID uuid, String mediaUrl, Consumer<Boolean> done) {
+        updatePlayback(uuid, channelId -> channelService.insertNextAndPlay(channelId, mediaUrl), done);
+    }
+
     public void prependPlaylistItem(UUID uuid, String mediaUrl, Consumer<Boolean> done) {
         updatePlayback(uuid, channelId -> channelService.prependPlaylistItem(channelId, mediaUrl), done);
     }

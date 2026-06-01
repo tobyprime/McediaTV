@@ -78,13 +78,23 @@ public final class ClientChannelSession {
         applySnapshot(snapshot);
         long now = System.currentTimeMillis();
         if (now - lastHeartbeatAtMs >= HEARTBEAT_INTERVAL_MS) {
-            reportPlayback(snapshot);
-            lastHeartbeatAtMs = now;
+            sendHeartbeat(snapshot, now);
         }
     }
 
-    public void destroy() {
+    public void suspend() {
+        snapshot = ClientChannelPlaybackSnapshot.EMPTY;
+        playingUrl = null;
+        loadingMedia = false;
+        errorMedia = false;
+        forceResyncRequested = false;
+        lastAppliedSpeed = Double.NaN;
+        lastHeartbeatAtMs = 0L;
         stopMedia();
+    }
+
+    public void destroy() {
+        suspend();
         MediaPlayerHostManager.get().requestDestroy(host);
     }
 
@@ -161,17 +171,20 @@ public final class ClientChannelSession {
                         singlePlayer.seekAsync(seekTarget);
                         singlePlayer.setSpeed(snapshot.speed());
                         singlePlayer.setPaused(snapshot.paused());
+                        sendHeartbeat(snapshot, System.currentTimeMillis());
                     })
                     .exceptionally(throwable -> {
                         loadingMedia = false;
                         errorMedia = true;
                         LOGGER.error("Failed to load media from channel: {}", snapshot.mediaUrl(), throwable);
+                        sendHeartbeat(snapshot, System.currentTimeMillis());
                         return null;
                     });
         } catch (Exception e) {
             loadingMedia = false;
             errorMedia = true;
             LOGGER.error("Failed to start media load from channel: {}", snapshot.mediaUrl(), e);
+            sendHeartbeat(snapshot, System.currentTimeMillis());
         }
     }
 
@@ -185,6 +198,11 @@ public final class ClientChannelSession {
             target = Math.min(target, snapshot.resolvedDurationUs());
         }
         return Math.max(0L, target);
+    }
+
+    private void sendHeartbeat(ClientChannelPlaybackSnapshot snapshot, long nowMs) {
+        reportPlayback(snapshot);
+        lastHeartbeatAtMs = nowMs;
     }
 
     private void reportPlayback(ClientChannelPlaybackSnapshot snapshot) {

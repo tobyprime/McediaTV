@@ -22,12 +22,8 @@ import top.tobyprime.mcedia_mtv_plugin.model.ScreenPeripheralConfigModel;
 import top.tobyprime.mcedia_mtv_plugin.model.SpeakerPeripheralConfigModel;
 import top.tobyprime.mcedia_mtv_plugin.util.InteractionDataCommandBridge;
 
-import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -50,105 +46,6 @@ public class MtvPlayerManager {
         return plugin;
     }
 
-    public void findNearbyAsync(Player player, double range, Consumer<List<ManagedMtvPlayer>> done) {
-        runOnPlayer(player, () -> scanNearby(player, range, done));
-    }
-
-    public void findNearbyChannelAsync(Player player, String channelId, double range, Consumer<ManagedMtvPlayer> done) {
-        if (channelId == null || channelId.isBlank()) {
-            done.accept(null);
-            return;
-        }
-        runOnPlayer(player, () -> scanNearbyChannel(player, channelId, range, done));
-    }
-
-    private void scanNearby(Player player, double range, Consumer<List<ManagedMtvPlayer>> done) {
-        double rangeSq = range * range;
-        var origin = player.getLocation();
-        var candidates = player.getNearbyEntities(range, range, range).stream()
-                .filter(ItemDisplay.class::isInstance)
-                .map(ItemDisplay.class::cast)
-                .toList();
-
-        if (candidates.isEmpty()) {
-            done.accept(List.of());
-            return;
-        }
-
-        var result = new ConcurrentLinkedQueue<ManagedMtvPlayer>();
-        var remaining = new AtomicInteger(candidates.size());
-
-        for (var display : candidates) {
-            display.getScheduler().run(plugin, task -> {
-                if (isManagedItemDisplay(display)) {
-                    var snapshot = readFromEntity(display);
-                    if (sameWorld(origin, snapshot) && distanceSquared(origin, snapshot) <= rangeSq) {
-                        result.add(snapshot);
-                    }
-                }
-                onNearbySnapshotDone(player, origin, result, remaining, done);
-            }, () -> onNearbySnapshotDone(player, origin, result, remaining, done));
-        }
-    }
-
-    private void scanNearbyChannel(Player player, String channelId, double range, Consumer<ManagedMtvPlayer> done) {
-        double rangeSq = range * range;
-        var origin = player.getLocation();
-        var candidates = player.getNearbyEntities(range, range, range).stream()
-                .filter(ItemDisplay.class::isInstance)
-                .map(ItemDisplay.class::cast)
-                .toList();
-
-        if (candidates.isEmpty()) {
-            done.accept(null);
-            return;
-        }
-
-        var result = new ConcurrentLinkedQueue<ManagedMtvPlayer>();
-        var remaining = new AtomicInteger(candidates.size());
-
-        for (var display : candidates) {
-            display.getScheduler().run(plugin, task -> {
-                if (isManagedItemDisplay(display)) {
-                    var snapshot = readFromEntity(display);
-                    if (sameWorld(origin, snapshot)
-                            && distanceSquared(origin, snapshot) <= rangeSq
-                            && channelId.equals(channelService.resolveBinding(snapshot).channelId())) {
-                        result.add(snapshot);
-                    }
-                }
-                onNearbyChannelDone(player, origin, result, remaining, done);
-            }, () -> onNearbyChannelDone(player, origin, result, remaining, done));
-        }
-    }
-
-    private void onNearbySnapshotDone(Player player,
-                                      Location origin,
-                                      ConcurrentLinkedQueue<ManagedMtvPlayer> result,
-                                      AtomicInteger remaining,
-                                      Consumer<List<ManagedMtvPlayer>> done) {
-        if (remaining.decrementAndGet() != 0) {
-            return;
-        }
-        runOnPlayer(player, () -> {
-            var sorted = new ArrayList<>(result);
-            sorted.sort(Comparator.comparingDouble(snapshot -> distanceSquared(origin, snapshot)));
-            done.accept(sorted);
-        });
-    }
-
-    private void onNearbyChannelDone(Player player,
-                                     Location origin,
-                                     ConcurrentLinkedQueue<ManagedMtvPlayer> result,
-                                     AtomicInteger remaining,
-                                     Consumer<ManagedMtvPlayer> done) {
-        if (remaining.decrementAndGet() != 0) {
-            return;
-        }
-        runOnPlayer(player, () -> done.accept(result.stream()
-                .min(Comparator.comparingDouble(snapshot -> distanceSquared(origin, snapshot)))
-                .orElse(null)));
-    }
 
     public void readSnapshot(UUID uuid, Consumer<ManagedMtvPlayer> done) {
         withDisplay(uuid, display -> readFromEntity(display), done);
@@ -187,7 +84,16 @@ public class MtvPlayerManager {
             player.setYaw(entityConfig.getFloatOr("yaw", player.getYaw()));
             player.setPitch(entityConfig.getFloatOr("pitch", player.getPitch()));
             player.setMasterVolume(entityConfig.getFloatOr("master_volume", player.getMasterVolume()));
+            player.setMaxActiveRange(entityConfig.getFloatOr("max_active_range", player.getMaxActiveRange()));
             player.setPowered(entityConfig.getBooleanOr("powered", player.isPowered()));
+            String ownerStr = entityConfig.getStringOr("owner", "");
+            if (!ownerStr.isBlank()) {
+                try {
+                    player.setOwner(UUID.fromString(ownerStr));
+                } catch (IllegalArgumentException ignored) {
+                }
+            }
+            player.setPublic(entityConfig.getBooleanOr("is_public", player.isPublic()));
 
             var peripherals = entityConfig.getListOrEmpty("peripherals");
             for (int i = 0; i < peripherals.size(); i++) {
@@ -267,7 +173,7 @@ public class MtvPlayerManager {
         return c;
     }
 
-    public void createPlayerAsync(Location location, String name, Consumer<ManagedMtvPlayer> done) {
+    public void createPlayerAsync(Location location, String name, Player creator, Consumer<ManagedMtvPlayer> done) {
         if (location.getWorld() == null) {
             done.accept(null);
             return;
@@ -275,6 +181,12 @@ public class MtvPlayerManager {
         plugin.getServer().getRegionScheduler().execute(plugin, location, () -> {
             ItemDisplay itemDisplay = spawnItemDisplay(location);
             var player = ManagedMtvPlayer.create(itemDisplay.getUniqueId(), name, location);
+            if (creator != null) {
+                player.setOwner(creator.getUniqueId());
+            }
+            player.setPublic(false);
+            // Create the self channel state before exposing the binding to clients.
+            channelService.createSelfChannelState(itemDisplay.getUniqueId());
             applyEntityState(itemDisplay, player);
             done.accept(player);
         });
@@ -422,6 +334,20 @@ public class MtvPlayerManager {
     public void setPowered(UUID uuid, boolean powered, Consumer<Boolean> done) {
         mutate(uuid, p -> {
             p.setPowered(powered);
+            return true;
+        }, done);
+    }
+
+    public void setMaxActiveRange(UUID uuid, float maxActiveRange, Consumer<Boolean> done) {
+        mutate(uuid, p -> {
+            p.setMaxActiveRange(maxActiveRange);
+            return true;
+        }, done);
+    }
+
+    public void setPublicAsync(UUID uuid, boolean isPublic, Consumer<Boolean> done) {
+        mutate(uuid, p -> {
+            p.setPublic(isPublic);
             return true;
         }, done);
     }
@@ -653,6 +579,23 @@ public class MtvPlayerManager {
         InteractionDataCommandBridge.apply(itemDisplay, player);
     }
 
+    public static boolean canEditPlayer(Player player, ManagedMtvPlayer snapshot) {
+        if (snapshot == null) return false;
+        if (snapshot.isPublic()) return true;
+        if (snapshot.getOwner() == null) return true;
+        if (player == null) return false;
+        return player.getUniqueId().equals(snapshot.getOwner())
+                || player.hasPermission("mtv.player.edit.others");
+    }
+
+    public static boolean canToggleVisibility(Player player, ManagedMtvPlayer snapshot) {
+        if (snapshot == null || player == null) return false;
+        if (!snapshot.isPublic()) return canEditPlayer(player, snapshot);
+        if (snapshot.getOwner() == null) return true;
+        return player.getUniqueId().equals(snapshot.getOwner())
+                || player.hasPermission("mtv.player.edit.others");
+    }
+
     private ItemDisplay spawnItemDisplay(Location location) {
         ItemDisplay itemDisplay = location.getWorld().spawn(location, ItemDisplay.class);
         itemDisplay.setRotation(location.getYaw(), location.getPitch());
@@ -692,12 +635,6 @@ public class MtvPlayerManager {
         player.getScheduler().run(plugin, task -> action.run(), null);
     }
 
-    private static boolean sameWorld(Location origin, ManagedMtvPlayer snapshot) {
-        return origin.getWorld() != null
-                && snapshot.getWorld() != null
-                && origin.getWorld().getName().equals(snapshot.getWorld());
-    }
-
     private static boolean sameWorld(Location left, Location right) {
         return left.getWorld() != null
                 && right.getWorld() != null
@@ -717,13 +654,4 @@ public class MtvPlayerManager {
         return offset;
     }
 
-    private static double distanceSquared(Location origin, ManagedMtvPlayer snapshot) {
-        if (!sameWorld(origin, snapshot)) {
-            return Double.MAX_VALUE;
-        }
-        double dx = origin.getX() - snapshot.getX();
-        double dy = origin.getY() - snapshot.getY();
-        double dz = origin.getZ() - snapshot.getZ();
-        return dx * dx + dy * dy + dz * dz;
-    }
 }

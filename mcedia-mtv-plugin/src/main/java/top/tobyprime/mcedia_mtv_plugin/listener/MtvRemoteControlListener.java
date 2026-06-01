@@ -32,13 +32,13 @@ public final class MtvRemoteControlListener implements Listener {
         if (!isRemoteControl(event.getItem())) {
             return;
         }
-        if (!MtvPeripheralController.checkPerm(event.getPlayer(), "mcedia.mtv.gui")) {
+        if (!MtvPeripheralController.checkPerm(event.getPlayer(), "mtv.gui")) {
             return;
         }
         event.setUseInteractedBlock(Event.Result.DENY);
         event.setUseItemInHand(Event.Result.DENY);
         event.setCancelled(true);
-        gui.openRemoteMenu(event.getPlayer());
+        gui.navigateTo(event.getPlayer(), MtvGui.GuiType.REMOTE_MENU, null, null, null);
     }
 
     private static boolean isRemoteControl(ItemStack stack) {

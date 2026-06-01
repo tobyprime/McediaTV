@@ -131,11 +131,16 @@ public final class MtvChannelService {
 
     public boolean updateStartAt(String channelId, long startAt) {
         return mutatePlayback(channelId, state -> {
+            long nowMs = System.currentTimeMillis();
             long normalizedMs = Math.max(0L, startAt) / 1000L;
-            if (normalizedMs == state.getPlayState().getMediaTimeMs() && !state.getPlayState().getMediaUrl().isBlank()) {
+            if (state.getPlayState().getMediaUrl().isBlank()) {
                 return false;
             }
-            ChannelTimelineCalculator.seek(state.getPlayState(), normalizedMs, System.currentTimeMillis());
+            long currentMs = state.computeCurrentMediaTimeMs(nowMs);
+            if (normalizedMs == currentMs) {
+                return false;
+            }
+            ChannelTimelineCalculator.seek(state.getPlayState(), normalizedMs, nowMs);
             return true;
         });
     }
@@ -187,6 +192,27 @@ public final class MtvChannelService {
         return mutatePlayback(channelId, state -> addPlaylistItem(state, mediaUrl, false));
     }
 
+    public boolean insertNextPlaylistItem(String channelId, String mediaUrl) {
+        return mutatePlayback(channelId, state -> {
+            var normalized = MediaUrlNormalizer.normalize(mediaUrl);
+            if (normalized.isBlank()) return false;
+
+            var item = new ChannelPlaylistItem(normalized);
+            if (state.getPlaylist().isEmpty()) {
+                state.getPlaylist().add(item);
+                if (state.getPlayState().getMediaUrl().isBlank()) {
+                    return selectPlaylistIndex(state, 0, System.currentTimeMillis());
+                }
+                return true;
+            }
+
+            int cursor = state.getPlaylistCursor();
+            int insertPos = Math.min(cursor + 1, state.getPlaylist().size());
+            state.getPlaylist().add(insertPos, item);
+            return true;
+        });
+    }
+
     public boolean prependPlaylistItem(String channelId, String mediaUrl) {
         return mutatePlayback(channelId, state -> addPlaylistItem(state, mediaUrl, true));
     }
@@ -216,6 +242,26 @@ public final class MtvChannelService {
         });
     }
 
+    public boolean insertNextAndPlay(String channelId, String mediaUrl) {
+        return mutatePlayback(channelId, state -> {
+            var normalized = MediaUrlNormalizer.normalize(mediaUrl);
+            if (normalized.isBlank()) return false;
+
+            long nowMs = System.currentTimeMillis();
+            var item = new ChannelPlaylistItem(normalized);
+
+            if (state.getPlaylist().isEmpty()) {
+                state.getPlaylist().add(item);
+                return selectPlaylistIndex(state, 0, nowMs);
+            }
+
+            int cursor = state.getPlaylistCursor();
+            int insertPos = Math.min(cursor + 1, state.getPlaylist().size());
+            state.getPlaylist().add(insertPos, item);
+            return selectPlaylistIndex(state, insertPos, nowMs);
+        });
+    }
+
     public boolean movePlaylistItemToFront(String channelId, int index) {
         return mutatePlayback(channelId, state -> movePlaylistItem(state, index, 0));
     }
@@ -232,7 +278,7 @@ public final class MtvChannelService {
     }
 
     public ChannelRuntimeState createPublicChannel(Player player, String channelName, String description) {
-        if (player == null) {
+        if (player == null || !player.hasPermission("mtv.channel.create")) {
             return null;
         }
         String normalizedName = channelName == null ? "" : channelName.trim();
@@ -320,9 +366,8 @@ public final class MtvChannelService {
         if (player == null) {
             return false;
         }
-        return player.hasPermission("mcedia.mtv.channel.manage.others")
-                || player.isOp()
-                || player.getUniqueId().toString().equals(state.getCreatorUuid());
+        return player.getUniqueId().toString().equals(state.getCreatorUuid())
+                || player.hasPermission("mtv.channel.manage.others");
     }
 
     public boolean canControlChannelPlayback(Player player, ChannelRuntimeState state) {
@@ -332,7 +377,8 @@ public final class MtvChannelService {
         if (player == null) {
             return false;
         }
-        if (player.isOp() || player.getUniqueId().toString().equals(state.getCreatorUuid())) {
+        if (player.getUniqueId().toString().equals(state.getCreatorUuid())
+                || player.hasPermission("mtv.channel.control.others")) {
             return true;
         }
         return state.isPublicControl();
@@ -476,6 +522,19 @@ public final class MtvChannelService {
         return null;
     }
 
+    /**
+     * Create a fresh {@link ChannelRuntimeState} for a self (private) channel
+     * and persist it immediately.  Should be called when the entity is created
+     * so the state exists before any peripheral tries to subscribe.
+     */
+    public ChannelRuntimeState createSelfChannelState(UUID entityUuid) {
+        String channelId = MtvChannelBinding.runtimeSelfChannelId(entityUuid);
+        var state = new ChannelRuntimeState(channelId, MtvChannelType.SELF);
+        channelStates.put(channelId, state);
+        persistState(state);
+        return state;
+    }
+
     public Collection<ChannelRuntimeState> getChannelStates() {
         return List.copyOf(channelStates.values());
     }
@@ -493,15 +552,18 @@ public final class MtvChannelService {
     }
 
     public void unregister(UUID entityUuid) {
-        var binding = entityBindings.remove(entityUuid);
-        if (binding == null) {
+        if (entityUuid == null) {
             return;
         }
-        if (binding.isSelf()) {
-            channelStates.remove(binding.channelId());
-            removeListener.accept(binding.channelId());
-            audienceSessionManager.invalidateChannel(binding.channelId());
-        }
+        entityBindings.remove(entityUuid);
+
+        // Self channel state was created in createSelfChannelState when the
+        // entity was created — always clean it up regardless of cached binding.
+        String channelId = MtvChannelBinding.runtimeSelfChannelId(entityUuid);
+        channelStates.remove(channelId);
+        repository.delete(channelId);
+        removeListener.accept(channelId);
+        audienceSessionManager.invalidateChannel(channelId);
     }
 
     public void shutdown() {
