@@ -231,6 +231,71 @@ tasks.register('buildAndCollect', Copy) {
     into(rootProject.layout.buildDirectory.dir("libs/${mcVersion}"))
 }
 
+// ── All-in-one bundle ──────────────────────────────────────────────
+// Produces a fat jar containing mcedia-mtv + mcedia-core (Windows native)
+// + mcedia-cn-platforms. Requires McediaCore as a sibling directory.
+
+def mcediaCoreDir = rootProject.file('../McediaCore')
+def hasMcediaCoreSibling = mcediaCoreDir.exists() \
+    && file("${mcediaCoreDir}/settings.gradle").exists()
+
+def buildCoreWindows = tasks.register('buildCoreWindows', GradleBuild) {
+    onlyIf { hasMcediaCoreSibling }
+    group = 'build'
+    description = 'Builds mcedia-core for Windows x86-64 (all-in-one prerequisite).'
+    dir = mcediaCoreDir
+    tasks = [":mcedia-core-${mcVersion}:buildAndCollect"]
+    startParameter.projectProperties = [
+        'platformName': 'windows-x86_64',
+        'supported_mc_versions': mcVersion,
+        'buildTimestamp': buildTimestamp
+    ]
+}
+
+def buildCnPlatforms = tasks.register('buildCnPlatforms', GradleBuild) {
+    onlyIf { hasMcediaCoreSibling }
+    group = 'build'
+    description = 'Builds mcedia-cn-platforms (all-in-one prerequisite).'
+    dir = mcediaCoreDir
+    tasks = [":mcedia-cn-platforms-${mcVersion}:buildAndCollect"]
+    startParameter.projectProperties = [
+        'supported_mc_versions': mcVersion,
+        'buildTimestamp': buildTimestamp
+    ]
+}
+
+tasks.register('allInOneJar', Jar) {
+    group = 'build'
+    description = 'Assembles a fat jar with mcedia-core (Windows) and mcedia-cn-platforms bundled.'
+    dependsOn(buildCoreWindows, buildCnPlatforms, tasks.named('jar'))
+
+    archiveBaseName = moduleProp('archives_base_name')
+    archiveAppendix = "allinone-mc${mcVersion}"
+    archiveVersion = project.version
+
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+
+    from(tasks.named('jar').map { it.archiveFile.map { zipTree(it) } })
+
+    from({
+        def libsDir = file("${mcediaCoreDir}/build/libs/${mcVersion}")
+        if (!libsDir.exists()) return files().asFileTree
+        libsDir.listFiles()
+            .findAll { it.name.endsWith('.jar') }
+            .collect { zipTree(it) }
+    }) {
+        exclude 'META-INF/*.SF', 'META-INF/*.DSA', 'META-INF/*.RSA'
+    }
+}
+
+tasks.register('buildAndCollectAllInOne', Copy) {
+    group = 'build'
+    description = 'Builds the all-in-one jar and copies it to the build output directory.'
+    dependsOn('allInOneJar')
+    from({ tasks.named('allInOneJar').get().archiveFile.get().asFile })
+    into(rootProject.layout.buildDirectory.dir("libs/${mcVersion}"))
+}
+
 publishing {
     publications {
         def mavenJava = findByName('mavenJava')
