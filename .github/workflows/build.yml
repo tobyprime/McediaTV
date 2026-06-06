@@ -87,16 +87,15 @@ jobs:
           TAG="v1.0.1"
           echo "Fetching release $TAG from tobyprime/Mcedia ..."
           API_JSON=$(curl -sL "https://api.github.com/repos/tobyprime/Mcedia/releases/tags/$TAG")
-          DL_URLS=$(echo "$API_JSON" | jq -r '.assets[].browser_download_url')
-          if [ -z "$DL_URLS" ] || [ "$DL_URLS" = "null" ]; then
+          if echo "$API_JSON" | jq -e '.assets | length == 0' > /dev/null 2>&1; then
             echo "ERROR: no assets found — API response:" >&2
             echo "$API_JSON" | head -5 >&2
             exit 1
           fi
-          echo "$DL_URLS" | while read url; do
-            # URL-decode the filename (github encodes + as %2B)
-            raw=$(basename "$url")
-            name=$(printf '%b' "${raw//%/\\x}")
+          # Use name + browser_download_url pairs: API 'name' has real
+          # '+' while the download URL has '%2B' (valid in URLs).
+          echo "$API_JSON" | jq -r '.assets[] | "\(.name)\t\(.browser_download_url)"' | \
+          while IFS=$'\t' read -r name url; do
             echo "  -> $name"
             curl -sL "$url" -o "release-jars/$name"
           done
