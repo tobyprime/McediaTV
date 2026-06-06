@@ -176,6 +176,7 @@ jobs:
     needs: [discover, mcedia-core-deps]
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         mc_version: ${{ fromJSON(needs.discover.outputs.mc_versions) }}
     steps:
@@ -275,6 +276,7 @@ jobs:
     needs: [discover, mcedia-core-deps]
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         mc_version: ${{ fromJSON(needs.discover.outputs.mc_versions) }}
     steps:
