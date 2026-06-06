@@ -94,7 +94,9 @@ jobs:
             exit 1
           fi
           echo "$DL_URLS" | while read url; do
-            name=$(basename "$url")
+            # URL-decode the filename (github encodes + as %2B)
+            raw=$(basename "$url")
+            name=$(printf '%b' "${raw//%/\\x}")
             echo "  -> $name"
             curl -sL "$url" -o "release-jars/$name"
           done
