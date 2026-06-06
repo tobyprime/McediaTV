@@ -1,0 +1,265 @@
+# Build workflow for McediaTV
+#
+# Builds the Fabric mod and Paper plugin across supported Minecraft versions.
+# Fabric mod (mcedia-mtv) requires McediaCore's published artifacts to resolve
+# its dependencies — the mcedia-core-publish job builds McediaCore first.
+# Paper plugin (mcedia-mtv-plugin) builds independently.
+#
+# Job structure:
+#   discover → mcedia-core-publish (matrix: mc_version) → mcedia-mtv (matrix: mc_version)
+#   discover → mcedia-mtv-plugin (matrix: server_version)
+#                                                        ↓
+#                                                     release
+name: Build
+
+on:
+  push:
+    branches: [main, dev]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      mc_versions:
+        description: 'Minecraft versions (comma-separated, e.g. 1.21.11 or 1.21.11,26.1)'
+        default: '1.21.11'
+        required: true
+        type: string
+      create_release:
+        description: 'Create a GitHub Release with the built artifacts'
+        default: false
+        type: boolean
+
+env:
+  GRADLE_OPTS: '-Dorg.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=512m -Dfile.encoding=UTF-8'
+
+jobs:
+  # ── Discover ────────────────────────────────────────────────────────
+  # Normalizes MC versions from gradle.properties or workflow_dispatch
+  # input into a JSON array consumed by downstream matrix jobs.
+  discover:
+    runs-on: ubuntu-latest
+    outputs:
+      mc_versions: ${{ steps.set-mc.outputs.mc_versions }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve Minecraft versions
+        id: set-mc
+        run: |
+          if [ '${{ github.event_name }}' = 'workflow_dispatch' ]; then
+            INPUT='${{ github.event.inputs.mc_versions }}'
+          else
+            INPUT=$(grep '^supported_mc_versions' gradle.properties | cut -d= -f2-)
+          fi
+          JSON=$(echo "$INPUT" | tr ',' '\n' \
+            | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' \
+            | jq --raw-input --slurp --compact-output \
+              'split("\n") | map(select(length > 0))')
+          echo "mc_versions=$JSON" >> "$GITHUB_OUTPUT"
+          echo "Resolved MC versions: $JSON"
+
+  # ── McediaCore publish ──────────────────────────────────────────────
+  # Builds and publishes McediaCore's artifacts so McediaTV can resolve
+  # its dependencies from the local publish/ directory.
+  mcedia-core-publish:
+    needs: discover
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        mc_version: ${{ fromJSON(needs.discover.outputs.mc_versions) }}
+    steps:
+      - name: Checkout McediaCore
+        uses: actions/checkout@v4
+        with:
+          repository: tobyprime/Mcedia
+          path: McediaCore
+
+      - name: Resolve Java version for ${{ matrix.mc_version }}
+        id: jdk
+        run: |
+          PROP="McediaCore/mcedia-core/versions/${{ matrix.mc_version }}/gradle.properties"
+          echo "java_version=$(grep '^java_version' "$PROP" | cut -d= -f2)" >> "$GITHUB_OUTPUT"
+
+      - name: Set up JDK ${{ steps.jdk.outputs.java_version }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ steps.jdk.outputs.java_version }}
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Publish non-versioned modules
+        run: |
+          cd McediaCore
+          ./gradlew :mcedia-api:publish \
+                    :mcedia-player:publish \
+                    :mcedia-decoder-ffmpeg:publish \
+                    -Psupported_mc_versions=${{ matrix.mc_version }}
+
+      - name: Build and publish versioned core for ${{ matrix.mc_version }}
+        run: |
+          cd McediaCore
+          ./gradlew :mcedia-core-${{ matrix.mc_version }}:publish \
+                    -Psupported_mc_versions=${{ matrix.mc_version }} \
+                    -x test
+
+      - name: Upload McediaCore publish directory
+        uses: actions/upload-artifact@v4
+        with:
+          name: mcedia-core-publish-${{ matrix.mc_version }}
+          path: McediaCore/publish/
+
+  # ── Fabric mod: mcedia-mtv ──────────────────────────────────────────
+  # Entity-synced media player mod. One build per MC version.
+  # Depends on McediaCore published artifacts (from mcedia-core-publish job).
+  # Tests are skipped: they depend on Minecraft's rendering infrastructure
+  # (GL context, OpenAL) not available on CI runners.
+  mcedia-mtv:
+    needs: [discover, mcedia-core-publish]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        mc_version: ${{ fromJSON(needs.discover.outputs.mc_versions) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download McediaCore publish directory
+        uses: actions/download-artifact@v4
+        with:
+          name: mcedia-core-publish-${{ matrix.mc_version }}
+          path: ../McediaCore/publish
+
+      - name: Resolve Java version for ${{ matrix.mc_version }}
+        id: jdk
+        run: |
+          PROP="mcedia-mtv/versions/${{ matrix.mc_version }}/gradle.properties"
+          echo "java_version=$(grep '^java_version' "$PROP" | cut -d= -f2)" >> "$GITHUB_OUTPUT"
+
+      - name: Set up JDK ${{ steps.jdk.outputs.java_version }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ steps.jdk.outputs.java_version }}
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build mcedia-mtv for ${{ matrix.mc_version }}
+        run: |
+          ./gradlew :mcedia-mtv-${{ matrix.mc_version }}:buildAndCollect \
+                    -Psupported_mc_versions=${{ matrix.mc_version }} \
+                    -x test
+
+      - name: Upload mcedia-mtv JAR (${{ matrix.mc_version }})
+        uses: actions/upload-artifact@v4
+        with:
+          name: mcedia-mtv-${{ matrix.mc_version }}
+          path: build/libs/${{ matrix.mc_version }}/*.jar
+          if-no-files-found: error
+
+  # ── Paper plugin: mcedia-mtv-plugin ─────────────────────────────────
+  # Channel management Paper plugin. Builds for each supported Paper
+  # server version. No McediaCore dependency.
+  mcedia-mtv-plugin:
+    needs: discover
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        server_version: ${{ fromJSON(needs.discover.outputs.mc_versions) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve Java version for Paper ${{ matrix.server_version }}
+        id: jdk
+        run: |
+          if [ '${{ matrix.server_version }}' = '26.1' ]; then
+            echo "java_version=25" >> "$GITHUB_OUTPUT"
+          else
+            echo "java_version=21" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up JDK ${{ steps.jdk.outputs.java_version }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ steps.jdk.outputs.java_version }}
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build plugin for Paper ${{ matrix.server_version }}
+        run: |
+          ./gradlew :mcedia-mtv-plugin:build \
+                    -PserverVersion=${{ matrix.server_version }}
+
+      - name: Upload plugin JAR (${{ matrix.server_version }})
+        uses: actions/upload-artifact@v4
+        with:
+          name: mcedia-mtv-plugin-${{ matrix.server_version }}
+          path: mcedia-mtv-plugin/build/libs/*.jar
+          if-no-files-found: error
+
+  # ── Release ──────────────────────────────────────────────────────────
+  # Creates a GitHub Release with all built JARs as assets.
+  # Triggered by:
+  #   - Push of a tag matching v* (e.g. v0.4.0, v1.0.0-rc1)
+  #   - workflow_dispatch with create_release=true
+  release:
+    if: |
+      startsWith(github.ref, 'refs/tags/v')
+      || (github.event_name == 'workflow_dispatch' && github.event.inputs.create_release == 'true')
+    needs: [mcedia-mtv, mcedia-mtv-plugin]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Gather JAR files
+        run: |
+          mkdir -p release-assets
+          find artifacts -name '*.jar' -type f | while read jar; do
+            echo "Collected: $jar"
+            cp "$jar" release-assets/
+          done
+          echo "---"
+          ls -lh release-assets/
+
+      - name: Determine release tag and name
+        id: tag
+        run: |
+          if [ '${{ github.event_name }}' = 'workflow_dispatch' ]; then
+            VERSION=$(grep '^version=' gradle.properties | cut -d= -f2)
+            echo "tag=v${VERSION}" >> "$GITHUB_OUTPUT"
+            echo "name=v${VERSION} (manual release)"
+          else
+            TAG=${GITHUB_REF_NAME}
+            echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+            echo "name=${TAG}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: ${{ steps.tag.outputs.name }}
+          body: |
+            Automated build from commit ${{ github.sha }}.
+
+            ## Modules
+
+            - **mcedia-mtv** — Fabric mod for entity-synced media playback
+            - **mcedia-mtv-plugin** — Paper plugin for channel management
+
+            ## Supported Minecraft Versions
+
+            ${{ needs.discover.outputs.mc_versions }}
+          files: release-assets/*.jar
+          fail_on_unmatched_files: true

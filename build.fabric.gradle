@@ -1,9 +1,11 @@
-import groovy.json.JsonSlurper
 import org.gradle.api.GradleException
 import org.gradle.api.file.DuplicatesStrategy
 import org.gradle.api.tasks.Copy
+import org.gradle.api.tasks.GradleBuild
 import org.gradle.api.tasks.Sync
 import org.gradle.api.tasks.bundling.Jar
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 
 plugins {
     id 'maven-publish'
@@ -30,11 +32,16 @@ def targetJavaLauncher = javaToolchains.launcherFor {
 }
 def artifactBaseName = "${moduleProp('archives_base_name')}-mc${mcVersion}"
 def splitClientSources = moduleName == 'mcedia-mtv'
+def licenseFile = rootProject.file('LICENSE')
 def coreGav = "top.tobyprime:mcedia_core-mc${mcVersion}:${rootProject.property('mcedia_core_version')}"
 def apiGav = "top.tobyprime:mcedia-api:${rootProject.property('mcedia_base_version')}"
 def playerGav = "top.tobyprime:mcedia-player:${rootProject.property('mcedia_base_version')}"
 def decoderGav = "top.tobyprime:mcedia-decoder-ffmpeg:${rootProject.property('mcedia_base_version')}"
-def licenseFile = rootProject.file('LICENSE')
+def buildTimestamp = rootProject.ext.has('buildTimestamp')
+    ? rootProject.ext.buildTimestamp.toString()
+    : LocalDateTime.now().format(DateTimeFormatter.ofPattern('yyyyMMddHHmmss'))
+rootProject.ext.buildTimestamp = buildTimestamp
+def finalArtifactFileName = "${moduleProp('archives_base_name')}-${project.version}+${mcVersion}+build${buildTimestamp}.jar"
 
 def generatedMainJavaDir = file("${buildDir}/generated/versionedSrc/${mcVersion}/main/java")
 def generatedMainResourcesDir = file("${buildDir}/generated/versionedSrc/${mcVersion}/main/resources")
@@ -84,35 +91,13 @@ base {
 }
 
 loom {
-    splitEnvironmentSourceSets()
-
-    def commonVmArgs = ['-Dmixin.debug.export=true', '-Dmixin.debug.verbose=true', '-Dmixin.env.remapRefMap=true']
-    def clientProgramArgs = ['--width', '1280', '--height', '720']
-    def profileFile = file('../../profile.json')
-    if (profileFile.exists()) {
-        @SuppressWarnings('unchecked')
-        def profile = (Map<String, Object>) new JsonSlurper().parseText(profileFile.readText())
-        def username = profile['username']?.toString()
-        def uuid = profile['uuid']?.toString()
-        def xuid = profile['xuid']?.toString()
-        def accessToken = profile['accessToken']?.toString()
-        clientProgramArgs += [
-            '--username', username,
-            '--uuid', uuid,
-            '--xuid', xuid,
-            '--accessToken', accessToken,
-            '--userType', 'msa',
-            '--versionType', 'release'
-        ]
-    } else {
-        clientProgramArgs += ['--username', 'McediaTest']
+    if (splitClientSources) {
+        splitEnvironmentSourceSets()
     }
 
     runs {
         named('client') {
             ideConfigGenerated(true)
-            vmArgs(commonVmArgs)
-            programArgs(clientProgramArgs)
             runDir = "../../../run/${moduleName}/${mcVersion}"
         }
     }
@@ -120,15 +105,19 @@ loom {
     mods {
         "${moduleProp('archives_base_name')}" {
             sourceSet sourceSets.main
-            sourceSet sourceSets.client
+            if (splitClientSources) {
+                sourceSet sourceSets.client
+            }
         }
     }
 }
 
 sourceSets.main.java.setSrcDirs([generatedMainJavaDir])
 sourceSets.main.resources.setSrcDirs([generatedMainResourcesDir])
-sourceSets.client.java.setSrcDirs([generatedClientJavaDir])
-sourceSets.client.resources.setSrcDirs([generatedClientResourcesDir])
+if (splitClientSources) {
+    sourceSets.client.java.setSrcDirs([generatedClientJavaDir])
+    sourceSets.client.resources.setSrcDirs([generatedClientResourcesDir])
+}
 
 tasks.named('compileJava') {
     dependsOn(syncVersionedMainSources)
@@ -136,17 +125,31 @@ tasks.named('compileJava') {
 tasks.named('processResources') {
     dependsOn(syncVersionedMainSources)
 }
-tasks.named('compileClientJava') {
-    dependsOn(syncVersionedClientSources)
-}
-tasks.named('processClientResources') {
-    dependsOn(syncVersionedClientSources)
+if (splitClientSources) {
+    tasks.named('compileClientJava') {
+        dependsOn(syncVersionedClientSources)
+    }
+    tasks.named('processClientResources') {
+        dependsOn(syncVersionedClientSources)
+    }
 }
 
 tasks.withType(Jar).configureEach {
+    if (name == 'jar') {
+        archiveFileName = finalArtifactFileName
+    }
+
     if (name == 'sourcesJar') {
         dependsOn(syncVersionedMainSources)
-        dependsOn(syncVersionedClientSources)
+        if (splitClientSources) {
+            dependsOn(syncVersionedClientSources)
+        }
+    }
+}
+
+if (tasks.names.contains('remapJar')) {
+    tasks.named('remapJar') {
+        archiveFileName = finalArtifactFileName
     }
 }
 
@@ -154,9 +157,11 @@ tasks.withType(JavaExec).configureEach {
     javaLauncher.set(targetJavaLauncher)
 }
 
-fabricApi {
-    configureDataGeneration {
-        client = true
+if (splitClientSources) {
+    fabricApi {
+        configureDataGeneration {
+            client = true
+        }
     }
 }
 
@@ -165,9 +170,11 @@ dependencies {
     implementation "net.fabricmc:fabric-loader:${loaderVersion}"
     implementation "net.fabricmc.fabric-api:fabric-api:${fabricApiVersion}"
 
+    compileOnly "org.jspecify:jspecify:1.0.0"
+
     switch (moduleName) {
         case 'mcedia-mtv':
-            modImplementation coreGav
+            implementation coreGav
             implementation apiGav
             implementation playerGav
             runtimeOnly decoderGav
@@ -180,6 +187,7 @@ dependencies {
 processResources {
     inputs.property 'version', project.version
     inputs.property 'minecraft_version', mcVersion
+    inputs.property 'minecraft_version_range', project.findProperty('minecraft_version_range') ?: mcVersion
     inputs.property 'loader_version', loaderVersion
     filteringCharset 'UTF-8'
 
@@ -187,6 +195,7 @@ processResources {
         expand(
             version: project.version,
             minecraft_version: mcVersion,
+            minecraft_version_range: project.findProperty('minecraft_version_range') ?: mcVersion,
             loader_version: loaderVersion
         )
     }
