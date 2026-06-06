@@ -2,8 +2,7 @@
 #
 # Builds the Fabric mod and Paper plugin across supported Minecraft versions.
 # McediaCore artifacts (api, player, decoder, core, cn-platforms) are obtained
-# by mcedia-core-deps — primary path downloads from McediaCore's GitHub Release,
-# with a fallback to source build when no Release exists yet.
+# by mcedia-core-deps — downloads from McediaCore's GitHub Release.
 # Paper plugin (mcedia-mtv-plugin) builds independently.
 # An all-in-one variant (mcedia-mtv-allinone) bundles mcedia-core (Windows
 # native) + mcedia-cn-platforms into a single jar.
@@ -64,10 +63,8 @@ jobs:
           echo "Resolved MC versions: $JSON"
 
   # ── McediaCore dependencies ─────────────────────────────────────────
-  # Obtains McediaCore artifacts (api, player, decoder, core, cn-platforms).
-  #
-  # Primary path: download from McediaCore's GitHub Release (fast).
-  # Fallback: build McediaCore from source when no Release exists yet.
+  # Downloads McediaCore artifacts (api, player, decoder, core, cn-platforms)
+  # from the latest GitHub Release. No source build.
   #
   # Produces two artifacts per MC version:
   #   mcedia-core-publish-*   — Maven repo layout (publish/) for dep resolution
@@ -81,37 +78,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Resolve Java version for ${{ matrix.mc_version }}
-        id: jdk
-        run: |
-          echo "java_version=$(grep '^java_version' "mcedia-mtv/versions/${{ matrix.mc_version }}/gradle.properties" | cut -d= -f2)" >> "$GITHUB_OUTPUT"
-
-      - name: Set up JDK ${{ steps.jdk.outputs.java_version }}
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: ${{ steps.jdk.outputs.java_version }}
-
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
-
-      # ── Primary: download from Release ──────────────────────────────
       - name: Download McediaCore Release artifacts
-        id: release
-        continue-on-error: true
         run: |
           mkdir -p release-jars
           gh release download --repo tobyprime/Mcedia --pattern '*.jar' --dir release-jars
           count=$(ls release-jars/*.jar 2>/dev/null | wc -l)
           if [ "$count" -eq 0 ]; then
-            echo "No jars found — no Release exists yet" >&2
+            echo "ERROR: No McediaCore Release found." >&2
+            echo "Push a v* tag to github.com/tobyprime/Mcedia to create one." >&2
             exit 1
           fi
           echo "Downloaded $count jars from McediaCore Release"
           ls -la release-jars/
 
-      - name: Setup publish/ and build-libs/ from Release
-        if: steps.release.outcome == 'success'
+      - name: Setup Maven publish/ and build-libs/ directories
         run: |
           setup_artifact() {
             local g=$1 a=$2 v=$3 j=$4
@@ -162,37 +142,6 @@ jobs:
                 ;;
             esac
           done
-
-      # ── Fallback: build from source ──────────────────────────────────
-      - name: Checkout McediaCore (fallback)
-        if: steps.release.outcome != 'success'
-        uses: actions/checkout@v4
-        with:
-          repository: tobyprime/Mcedia
-          path: McediaCore
-
-      - name: Build and publish from source (fallback)
-        if: steps.release.outcome != 'success'
-        run: |
-          gradle -p McediaCore :mcedia-api:publish \
-                    :mcedia-player:publish \
-                    :mcedia-decoder-ffmpeg:publish \
-                    -Psupported_mc_versions=${{ matrix.mc_version }}
-          gradle -p McediaCore :mcedia-core-${{ matrix.mc_version }}:publish \
-                    -Psupported_mc_versions=${{ matrix.mc_version }} \
-                    -x test
-          mkdir -p build-libs/${{ matrix.mc_version }}
-          gradle -p McediaCore :mcedia-core-${{ matrix.mc_version }}:buildAndCollect \
-                    -PplatformName=windows-x86_64 \
-                    -Psupported_mc_versions=${{ matrix.mc_version }} \
-                    -x test
-          cp McediaCore/build/libs/${{ matrix.mc_version }}/*mcedia_core*.jar \
-             build-libs/${{ matrix.mc_version }}/
-          gradle -p McediaCore :mcedia-cn-platforms-${{ matrix.mc_version }}:buildAndCollect \
-                    -Psupported_mc_versions=${{ matrix.mc_version }} \
-                    -x test
-          cp McediaCore/build/libs/${{ matrix.mc_version }}/*.jar \
-             build-libs/${{ matrix.mc_version }}/
 
       - name: Upload publish directory
         uses: actions/upload-artifact@v4
