@@ -206,11 +206,17 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x gradlew
 
+      - name: Verify publish directory
+        run: |
+          echo "=== Published mcedia_core artifacts ==="
+          find ../McediaCore/publish -name '*.jar' | sort | head -10
+          echo "=== (count: $(find ../McediaCore/publish -name '*.jar' | wc -l)) ==="
+
       - name: Build mcedia-mtv for ${{ matrix.mc_version }}
         run: |
           ./gradlew :mcedia-mtv-${{ matrix.mc_version }}:buildAndCollect \
                     -Psupported_mc_versions=${{ matrix.mc_version }} \
-                    -x test
+                    -x test --refresh-dependencies
 
       - name: Upload mcedia-mtv JAR (${{ matrix.mc_version }})
         uses: actions/upload-artifact@v4
@@ -315,7 +321,7 @@ jobs:
         run: |
           ./gradlew :mcedia-mtv-${{ matrix.mc_version }}:buildAndCollectAllInOne \
                     -Psupported_mc_versions=${{ matrix.mc_version }} \
-                    -x test
+                    -x test --refresh-dependencies
 
       - name: Upload all-in-one JAR (${{ matrix.mc_version }})
         uses: actions/upload-artifact@v4
