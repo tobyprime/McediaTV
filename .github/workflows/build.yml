@@ -94,7 +94,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
 
       - name: Make gradlew executable
-        run: chmod +x gradlew McediaCore/gradlew
+        run: chmod +x McediaCore/gradlew
 
       - name: Publish non-versioned modules
         run: |
@@ -252,7 +252,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
 
       - name: Make gradlew executable
-        run: chmod +x gradlew McediaCore/gradlew
+        run: chmod +x McediaTV/gradlew McediaCore/gradlew
 
       - name: Publish McediaCore non-versioned modules
         run: |
