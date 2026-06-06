@@ -93,21 +93,19 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Make gradlew executable
-        run: chmod +x McediaCore/gradlew
-
       - name: Publish non-versioned modules
+        # Use `gradle` command (from setup-gradle) instead of McediaCore's
+        # gradlew — the remote repo's wrapper may not resolve correctly
+        # on CI for subdirectory checkouts.
         run: |
-          cd McediaCore
-          ./gradlew :mcedia-api:publish \
+          gradle -p McediaCore :mcedia-api:publish \
                     :mcedia-player:publish \
                     :mcedia-decoder-ffmpeg:publish \
                     -Psupported_mc_versions=${{ matrix.mc_version }}
 
       - name: Build and publish versioned core for ${{ matrix.mc_version }}
         run: |
-          cd McediaCore
-          ./gradlew :mcedia-core-${{ matrix.mc_version }}:publish \
+          gradle -p McediaCore :mcedia-core-${{ matrix.mc_version }}:publish \
                     -Psupported_mc_versions=${{ matrix.mc_version }} \
                     -x test
 
@@ -202,9 +200,12 @@ jobs:
         run: chmod +x gradlew
 
       - name: Build plugin for Paper ${{ matrix.server_version }}
+        # --configure-on-demand avoids configuring Fabric projects (which
+        # require McediaCore's publish directory) when only building the plugin.
         run: |
           ./gradlew :mcedia-mtv-plugin:build \
-                    -PserverVersion=${{ matrix.server_version }}
+                    -PserverVersion=${{ matrix.server_version }} \
+                    --configure-on-demand
 
       - name: Upload plugin JAR (${{ matrix.server_version }})
         uses: actions/upload-artifact@v4
@@ -252,28 +253,25 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
 
       - name: Make gradlew executable
-        run: chmod +x McediaTV/gradlew McediaCore/gradlew
+        run: chmod +x McediaTV/gradlew
 
       - name: Publish McediaCore non-versioned modules
         run: |
-          cd McediaCore
-          ./gradlew :mcedia-api:publish \
+          gradle -p McediaCore :mcedia-api:publish \
                     :mcedia-player:publish \
                     :mcedia-decoder-ffmpeg:publish \
                     -Psupported_mc_versions=${{ matrix.mc_version }}
 
       - name: Build mcedia-core (Windows native) for ${{ matrix.mc_version }}
         run: |
-          cd McediaCore
-          ./gradlew :mcedia-core-${{ matrix.mc_version }}:buildAndCollect \
+          gradle -p McediaCore :mcedia-core-${{ matrix.mc_version }}:buildAndCollect \
                     -PplatformName=windows-x86_64 \
                     -Psupported_mc_versions=${{ matrix.mc_version }} \
                     -x test
 
       - name: Build mcedia-cn-platforms for ${{ matrix.mc_version }}
         run: |
-          cd McediaCore
-          ./gradlew :mcedia-cn-platforms-${{ matrix.mc_version }}:buildAndCollect \
+          gradle -p McediaCore :mcedia-cn-platforms-${{ matrix.mc_version }}:buildAndCollect \
                     -Psupported_mc_versions=${{ matrix.mc_version }} \
                     -x test
 
