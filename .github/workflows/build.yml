@@ -216,7 +216,7 @@ jobs:
         run: |
           ./gradlew :mcedia-mtv-${{ matrix.mc_version }}:buildAndCollect \
                     -Psupported_mc_versions=${{ matrix.mc_version }} \
-                    -x test --refresh-dependencies
+                    -x test
 
       - name: Upload mcedia-mtv JAR (${{ matrix.mc_version }})
         uses: actions/upload-artifact@v4
@@ -321,7 +321,7 @@ jobs:
         run: |
           ./gradlew :mcedia-mtv-${{ matrix.mc_version }}:buildAndCollectAllInOne \
                     -Psupported_mc_versions=${{ matrix.mc_version }} \
-                    -x test --refresh-dependencies
+                    -x test
 
       - name: Upload all-in-one JAR (${{ matrix.mc_version }})
         uses: actions/upload-artifact@v4
