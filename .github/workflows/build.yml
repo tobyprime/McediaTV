@@ -93,6 +93,9 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      - name: Make gradlew executable
+        run: chmod +x gradlew McediaCore/gradlew
+
       - name: Publish non-versioned modules
         run: |
           cd McediaCore
@@ -149,6 +152,9 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      - name: Make gradlew executable
+        run: chmod +x gradlew
+
       - name: Build mcedia-mtv for ${{ matrix.mc_version }}
         run: |
           ./gradlew :mcedia-mtv-${{ matrix.mc_version }}:buildAndCollect \
@@ -191,6 +197,9 @@ jobs:
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
+
+      - name: Make gradlew executable
+        run: chmod +x gradlew
 
       - name: Build plugin for Paper ${{ matrix.server_version }}
         run: |
@@ -241,6 +250,9 @@ jobs:
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
+
+      - name: Make gradlew executable
+        run: chmod +x gradlew McediaCore/gradlew
 
       - name: Publish McediaCore non-versioned modules
         run: |
