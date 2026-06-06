@@ -134,7 +134,7 @@ jobs:
                 setup_artifact top.tobyprime mcedia-decoder-ffmpeg "${name#mcedia-decoder-ffmpeg-}" "$jar" ;;
               mcedia_core-*)
                 rest="${name#mcedia_core-}"; v="${rest%%+*}"
-                mc="${rest#*+}"; mc="${mc%%.*}"
+                mc=$(echo "${rest#*+}" | sed 's/\.[a-zA-Z].*//')
                 [ "$mc" != "$MCV" ] && continue
                 aid="mcedia_core-mc$mc"
                 [ -f "publish/top.tobyprime/$aid/$v/$aid-$v.jar" ] || \
@@ -145,7 +145,7 @@ jobs:
                 ;;
               mcedia_cn_platforms-*)
                 rest="${name#mcedia_cn_platforms-}"; v="${rest%%+*}"
-                mc="${rest#*+}"; mc="${mc%%.*}"
+                mc=$(echo "${rest#*+}" | sed 's/\.[a-zA-Z].*//')
                 [ "$mc" != "$MCV" ] && continue
                 aid="mcedia_cn_platforms-mc$mc"
                 [ -f "publish/top.tobyprime/$aid/$v/$aid-$v.jar" ] || \
