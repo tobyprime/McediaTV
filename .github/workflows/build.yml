@@ -1,16 +1,17 @@
 # Build workflow for McediaTV
 #
 # Builds the Fabric mod and Paper plugin across supported Minecraft versions.
-# Fabric mod (mcedia-mtv) requires McediaCore's published artifacts to resolve
-# its dependencies — the mcedia-core-publish job builds McediaCore first.
+# McediaCore artifacts (api, player, decoder, core, cn-platforms) are obtained
+# by mcedia-core-deps — primary path downloads from McediaCore's GitHub Release,
+# with a fallback to source build when no Release exists yet.
 # Paper plugin (mcedia-mtv-plugin) builds independently.
 # An all-in-one variant (mcedia-mtv-allinone) bundles mcedia-core (Windows
 # native) + mcedia-cn-platforms into a single jar.
 #
 # Job structure:
-#   discover → mcedia-core-publish (matrix: mc_version) → mcedia-mtv (matrix: mc_version)
+#   discover → mcedia-core-deps (matrix: mc_version) → mcedia-mtv (matrix: mc_version)
 #   discover → mcedia-mtv-plugin (matrix: server_version)
-#   discover → mcedia-mtv-allinone (matrix: mc_version)
+#   discover → mcedia-core-deps → mcedia-mtv-allinone (matrix: mc_version)
 #                                                        ↓
 #                                                     release
 name: Build
@@ -62,27 +63,28 @@ jobs:
           echo "mc_versions=$JSON" >> "$GITHUB_OUTPUT"
           echo "Resolved MC versions: $JSON"
 
-  # ── McediaCore publish ──────────────────────────────────────────────
-  # Builds and publishes McediaCore's artifacts so McediaTV can resolve
-  # its dependencies from the local publish/ directory.
-  mcedia-core-publish:
+  # ── McediaCore dependencies ─────────────────────────────────────────
+  # Obtains McediaCore artifacts (api, player, decoder, core, cn-platforms).
+  #
+  # Primary path: download from McediaCore's GitHub Release (fast).
+  # Fallback: build McediaCore from source when no Release exists yet.
+  #
+  # Produces two artifacts per MC version:
+  #   mcedia-core-publish-*   — Maven repo layout (publish/) for dep resolution
+  #   mcedia-core-build-libs-* — raw jars (build-libs/) for all-in-one bundling
+  mcedia-core-deps:
     needs: discover
     runs-on: ubuntu-latest
     strategy:
       matrix:
         mc_version: ${{ fromJSON(needs.discover.outputs.mc_versions) }}
     steps:
-      - name: Checkout McediaCore
-        uses: actions/checkout@v4
-        with:
-          repository: tobyprime/Mcedia
-          path: McediaCore
+      - uses: actions/checkout@v4
 
       - name: Resolve Java version for ${{ matrix.mc_version }}
         id: jdk
         run: |
-          PROP="McediaCore/mcedia-core/versions/${{ matrix.mc_version }}/gradle.properties"
-          echo "java_version=$(grep '^java_version' "$PROP" | cut -d= -f2)" >> "$GITHUB_OUTPUT"
+          echo "java_version=$(grep '^java_version' "mcedia-mtv/versions/${{ matrix.mc_version }}/gradle.properties" | cut -d= -f2)" >> "$GITHUB_OUTPUT"
 
       - name: Set up JDK ${{ steps.jdk.outputs.java_version }}
         uses: actions/setup-java@v4
@@ -93,27 +95,116 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Publish non-versioned modules
-        # Use `gradle` command (from setup-gradle) instead of McediaCore's
-        # gradlew — the remote repo's wrapper may not resolve correctly
-        # on CI for subdirectory checkouts.
+      # ── Primary: download from Release ──────────────────────────────
+      - name: Download McediaCore Release artifacts
+        id: release
+        continue-on-error: true
+        run: |
+          mkdir -p release-jars
+          gh release download --repo tobyprime/Mcedia --pattern '*.jar' --dir release-jars
+          count=$(ls release-jars/*.jar 2>/dev/null | wc -l)
+          if [ "$count" -eq 0 ]; then
+            echo "No jars found — no Release exists yet" >&2
+            exit 1
+          fi
+          echo "Downloaded $count jars from McediaCore Release"
+          ls -la release-jars/
+
+      - name: Setup publish/ and build-libs/ from Release
+        if: steps.release.outcome == 'success'
+        run: |
+          setup_artifact() {
+            local g=$1 a=$2 v=$3 j=$4
+            local d="publish/${g//.//}/$a/$v"
+            mkdir -p "$d"
+            cp "$j" "$d/$a-$v.jar"
+            cat > "$d/$a-$v.pom" <<POM
+          <?xml version="1.0" encoding="UTF-8"?>
+          <project xmlns="http://maven.apache.org/POM/4.0.0"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+            <modelVersion>4.0.0</modelVersion>
+            <groupId>$g</groupId>
+            <artifactId>$a</artifactId>
+            <version>$v</version>
+          </project>
+          POM
+          }
+          MCV=${{ matrix.mc_version }}
+          for jar in release-jars/*.jar; do
+            name=$(basename "$jar" .jar)
+            case "$name" in
+              mcedia-api-*)
+                setup_artifact top.tobyprime mcedia-api "${name#mcedia-api-}" "$jar" ;;
+              mcedia-player-*)
+                setup_artifact top.tobyprime mcedia-player "${name#mcedia-player-}" "$jar" ;;
+              mcedia-decoder-ffmpeg-*)
+                setup_artifact top.tobyprime mcedia-decoder-ffmpeg "${name#mcedia-decoder-ffmpeg-}" "$jar" ;;
+              mcedia_core-*)
+                rest="${name#mcedia_core-}"; v="${rest%%+*}"
+                mc="${rest#*+}"; mc="${mc%%.*}"
+                [ "$mc" != "$MCV" ] && continue
+                aid="mcedia_core-mc$mc"
+                [ -f "publish/top.tobyprime/$aid/$v/$aid-$v.jar" ] || \
+                  setup_artifact top.tobyprime "$aid" "$v" "$jar"
+                if echo "$name" | grep -q windows-x86_64; then
+                  mkdir -p "build-libs/$MCV" && cp "$jar" "build-libs/$MCV/"
+                fi
+                ;;
+              mcedia_cn_platforms-*)
+                rest="${name#mcedia_cn_platforms-}"; v="${rest%%+*}"
+                mc="${rest#*+}"; mc="${mc%%.*}"
+                [ "$mc" != "$MCV" ] && continue
+                aid="mcedia_cn_platforms-mc$mc"
+                [ -f "publish/top.tobyprime/$aid/$v/$aid-$v.jar" ] || \
+                  setup_artifact top.tobyprime "$aid" "$v" "$jar"
+                mkdir -p "build-libs/$MCV" && cp "$jar" "build-libs/$MCV/"
+                ;;
+            esac
+          done
+
+      # ── Fallback: build from source ──────────────────────────────────
+      - name: Checkout McediaCore (fallback)
+        if: steps.release.outcome != 'success'
+        uses: actions/checkout@v4
+        with:
+          repository: tobyprime/Mcedia
+          path: McediaCore
+
+      - name: Build and publish from source (fallback)
+        if: steps.release.outcome != 'success'
         run: |
           gradle -p McediaCore :mcedia-api:publish \
                     :mcedia-player:publish \
                     :mcedia-decoder-ffmpeg:publish \
                     -Psupported_mc_versions=${{ matrix.mc_version }}
-
-      - name: Build and publish versioned core for ${{ matrix.mc_version }}
-        run: |
           gradle -p McediaCore :mcedia-core-${{ matrix.mc_version }}:publish \
                     -Psupported_mc_versions=${{ matrix.mc_version }} \
                     -x test
+          mkdir -p build-libs/${{ matrix.mc_version }}
+          gradle -p McediaCore :mcedia-core-${{ matrix.mc_version }}:buildAndCollect \
+                    -PplatformName=windows-x86_64 \
+                    -Psupported_mc_versions=${{ matrix.mc_version }} \
+                    -x test
+          cp McediaCore/build/libs/${{ matrix.mc_version }}/*mcedia_core*.jar \
+             build-libs/${{ matrix.mc_version }}/
+          gradle -p McediaCore :mcedia-cn-platforms-${{ matrix.mc_version }}:buildAndCollect \
+                    -Psupported_mc_versions=${{ matrix.mc_version }} \
+                    -x test
+          cp McediaCore/build/libs/${{ matrix.mc_version }}/*.jar \
+             build-libs/${{ matrix.mc_version }}/
 
-      - name: Upload McediaCore publish directory
+      - name: Upload publish directory
         uses: actions/upload-artifact@v4
         with:
           name: mcedia-core-publish-${{ matrix.mc_version }}
-          path: McediaCore/publish/
+          path: publish/
+
+      - name: Upload build-libs (for all-in-one)
+        uses: actions/upload-artifact@v4
+        with:
+          name: mcedia-core-build-libs-${{ matrix.mc_version }}
+          path: build-libs/
 
   # ── Fabric mod: mcedia-mtv ──────────────────────────────────────────
   # Entity-synced media player mod. One build per MC version.
@@ -121,7 +212,7 @@ jobs:
   # Tests are skipped: they depend on Minecraft's rendering infrastructure
   # (GL context, OpenAL) not available on CI runners.
   mcedia-mtv:
-    needs: [discover, mcedia-core-publish]
+    needs: [discover, mcedia-core-deps]
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -216,32 +307,34 @@ jobs:
 
   # ── Fabric mod: mcedia-mtv all-in-one ────────────────────────────────
   # Builds a fat jar containing mcedia-mtv + mcedia-core (Windows native) +
-  # mcedia-cn-platforms. Checks out McediaCore sibling and builds its
-  # artifacts with platformName=windows-x86_64 so the FFmpeg Windows native
-  # libraries are bundled. Requires no Maven publish — consumes build
-  # outputs directly from McediaCore's build/libs/ directory.
+  # mcedia-cn-platforms. Sources jars from mcedia-core-deps artifacts
+  # (downloaded Release or source build), placing them at ../McediaCore/
+  # paths expected by the Gradle allInOneJar task.
   mcedia-mtv-allinone:
-    needs: discover
+    needs: [discover, mcedia-core-deps]
     runs-on: ubuntu-latest
     strategy:
       matrix:
         mc_version: ${{ fromJSON(needs.discover.outputs.mc_versions) }}
     steps:
       - uses: actions/checkout@v4
-        with:
-          path: McediaTV
 
-      - name: Checkout McediaCore
-        uses: actions/checkout@v4
+      - name: Download McediaCore publish directory
+        uses: actions/download-artifact@v4
         with:
-          repository: tobyprime/Mcedia
-          path: McediaCore
+          name: mcedia-core-publish-${{ matrix.mc_version }}
+          path: ../McediaCore/publish
+
+      - name: Download McediaCore build-libs (for all-in-one)
+        uses: actions/download-artifact@v4
+        with:
+          name: mcedia-core-build-libs-${{ matrix.mc_version }}
+          path: ../McediaCore/build/libs/${{ matrix.mc_version }}
 
       - name: Resolve Java version for ${{ matrix.mc_version }}
         id: jdk
         run: |
-          PROP="McediaCore/mcedia-core/versions/${{ matrix.mc_version }}/gradle.properties"
-          echo "java_version=$(grep '^java_version' "$PROP" | cut -d= -f2)" >> "$GITHUB_OUTPUT"
+          echo "java_version=$(grep '^java_version' "mcedia-mtv/versions/${{ matrix.mc_version }}/gradle.properties" | cut -d= -f2)" >> "$GITHUB_OUTPUT"
 
       - name: Set up JDK ${{ steps.jdk.outputs.java_version }}
         uses: actions/setup-java@v4
@@ -253,31 +346,10 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
 
       - name: Make gradlew executable
-        run: chmod +x McediaTV/gradlew
-
-      - name: Publish McediaCore non-versioned modules
-        run: |
-          gradle -p McediaCore :mcedia-api:publish \
-                    :mcedia-player:publish \
-                    :mcedia-decoder-ffmpeg:publish \
-                    -Psupported_mc_versions=${{ matrix.mc_version }}
-
-      - name: Build mcedia-core (Windows native) for ${{ matrix.mc_version }}
-        run: |
-          gradle -p McediaCore :mcedia-core-${{ matrix.mc_version }}:buildAndCollect \
-                    -PplatformName=windows-x86_64 \
-                    -Psupported_mc_versions=${{ matrix.mc_version }} \
-                    -x test
-
-      - name: Build mcedia-cn-platforms for ${{ matrix.mc_version }}
-        run: |
-          gradle -p McediaCore :mcedia-cn-platforms-${{ matrix.mc_version }}:buildAndCollect \
-                    -Psupported_mc_versions=${{ matrix.mc_version }} \
-                    -x test
+        run: chmod +x gradlew
 
       - name: Build all-in-one for ${{ matrix.mc_version }}
         run: |
-          cd McediaTV
           ./gradlew :mcedia-mtv-${{ matrix.mc_version }}:buildAndCollectAllInOne \
                     -Psupported_mc_versions=${{ matrix.mc_version }} \
                     -x test
