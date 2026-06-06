@@ -79,16 +79,27 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Download McediaCore Release artifacts
+        # curl directly (not gh CLI): GH_TOKEN is scoped to McediaTV and
+        # can't access tobyprime/Mcedia's releases.  Public repo so
+        # unauthenticated API access is fine (60 req/hr limit).
         run: |
           mkdir -p release-jars
-          gh release download --repo tobyprime/Mcedia --pattern '*.jar' --dir release-jars
-          count=$(ls release-jars/*.jar 2>/dev/null | wc -l)
-          if [ "$count" -eq 0 ]; then
-            echo "ERROR: No McediaCore Release found." >&2
-            echo "Push a v* tag to github.com/tobyprime/Mcedia to create one." >&2
+          TAG="v1.0.1"
+          echo "Fetching release $TAG from tobyprime/Mcedia ..."
+          API_JSON=$(curl -sL "https://api.github.com/repos/tobyprime/Mcedia/releases/tags/$TAG")
+          DL_URLS=$(echo "$API_JSON" | jq -r '.assets[].browser_download_url')
+          if [ -z "$DL_URLS" ] || [ "$DL_URLS" = "null" ]; then
+            echo "ERROR: no assets found — API response:" >&2
+            echo "$API_JSON" | head -5 >&2
             exit 1
           fi
-          echo "Downloaded $count jars from McediaCore Release"
+          echo "$DL_URLS" | while read url; do
+            name=$(basename "$url")
+            echo "  -> $name"
+            curl -sL "$url" -o "release-jars/$name"
+          done
+          count=$(ls release-jars/*.jar 2>/dev/null | wc -l)
+          echo "Downloaded $count jars from McediaCore $TAG"
           ls -la release-jars/
 
       - name: Setup Maven publish/ and build-libs/ directories
