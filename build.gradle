@@ -14,7 +14,7 @@ subprojects {
         mavenLocal()
         maven {
             name = 'McediaCoreLocal'
-            url = uri('../McediaCore/publish')
+            url = uri("${rootProject.projectDir}/../McediaCore/publish")
         }
         mavenCentral()
         maven {
