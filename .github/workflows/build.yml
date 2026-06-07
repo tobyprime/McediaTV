@@ -314,7 +314,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: mcedia-mtv-allinone-${{ matrix.mc_version }}
-          path: build/libs/${{ matrix.mc_version }}/mcedia_mtv-allinone-*.jar
+          path: build/libs/${{ matrix.mc_version }}/mcedia-mtv-allinone-*.jar
           if-no-files-found: error
 
   # ── Release ──────────────────────────────────────────────────────────
