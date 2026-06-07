@@ -103,7 +103,7 @@ jobs:
           echo "Downloaded $count jars from McediaCore $TAG"
           ls -la release-jars/
 
-      - name: Setup Maven publish/ and build-libs/ directories
+      - name: Setup Maven publish/ directory
         run: |
           setup_artifact() {
             local g=$1 a=$2 v=$3 j=$4
@@ -133,14 +133,13 @@ jobs:
                 setup_artifact top.tobyprime mcedia-decoder-ffmpeg "${name#mcedia-decoder-ffmpeg-}" "$jar" ;;
               mcedia_core-*)
                 rest="${name#mcedia_core-}"; v="${rest%%+*}"
+                # Only publish windows-x86_64 variant (for all-in-one include bundling)
+                echo "$name" | grep -q windows-x86_64 || continue
                 mc=$(echo "${rest#*+}" | sed 's/\.[a-zA-Z].*//')
                 [ "$mc" != "$MCV" ] && continue
                 aid="mcedia_core-mc$mc"
                 [ -f "publish/top.tobyprime/$aid/$v/$aid-$v.jar" ] || \
                   setup_artifact top.tobyprime "$aid" "$v" "$jar"
-                if echo "$name" | grep -q windows-x86_64; then
-                  mkdir -p "build-libs/$MCV" && cp "$jar" "build-libs/$MCV/"
-                fi
                 ;;
               mcedia_cn_platforms-*)
                 rest="${name#mcedia_cn_platforms-}"; v="${rest%%+*}"
@@ -149,7 +148,6 @@ jobs:
                 aid="mcedia_cn_platforms-mc$mc"
                 [ -f "publish/top.tobyprime/$aid/$v/$aid-$v.jar" ] || \
                   setup_artifact top.tobyprime "$aid" "$v" "$jar"
-                mkdir -p "build-libs/$MCV" && cp "$jar" "build-libs/$MCV/"
                 ;;
             esac
           done
@@ -159,12 +157,6 @@ jobs:
         with:
           name: mcedia-core-publish-${{ matrix.mc_version }}
           path: publish/
-
-      - name: Upload build-libs (for all-in-one)
-        uses: actions/upload-artifact@v4
-        with:
-          name: mcedia-core-build-libs-${{ matrix.mc_version }}
-          path: build-libs/
 
   # ── Fabric mod: mcedia-mtv ──────────────────────────────────────────
   # Entity-synced media player mod. One build per MC version.
@@ -273,10 +265,10 @@ jobs:
           if-no-files-found: error
 
   # ── Fabric mod: mcedia-mtv all-in-one ────────────────────────────────
-  # Builds a fat jar containing mcedia-mtv + mcedia-core (Windows native) +
-  # mcedia-cn-platforms. Sources jars from mcedia-core-deps artifacts
-  # (downloaded Release or source build), placing them at ../McediaCore/
-  # paths expected by the Gradle allInOneJar task.
+  # Builds mcedia-mtv with mcedia-core (Windows native) bundled via
+  # Fabric Loom's include mechanism. The core is resolved from the
+  # publish directory (already filtered to windows-x86_64 by mcedia-core-deps).
+  # The output jar has "-allinone" in the filename automatically.
   mcedia-mtv-allinone:
     needs: [discover, mcedia-core-deps]
     runs-on: ubuntu-latest
@@ -292,12 +284,6 @@ jobs:
         with:
           name: mcedia-core-publish-${{ matrix.mc_version }}
           path: ../McediaCore/publish
-
-      - name: Download McediaCore build-libs (for all-in-one)
-        uses: actions/download-artifact@v4
-        with:
-          name: mcedia-core-build-libs-${{ matrix.mc_version }}
-          path: ../McediaCore/build/libs/${{ matrix.mc_version }}
 
       - name: Resolve Java version for ${{ matrix.mc_version }}
         id: jdk
@@ -317,9 +303,11 @@ jobs:
         run: chmod +x gradlew
 
       - name: Build all-in-one for ${{ matrix.mc_version }}
+        # Uses Loom's include to bundle core into the mod jar
         run: |
-          ./gradlew :mcedia-mtv-${{ matrix.mc_version }}:buildAndCollectAllInOne \
+          ./gradlew :mcedia-mtv-${{ matrix.mc_version }}:buildAndCollect \
                     -Psupported_mc_versions=${{ matrix.mc_version }} \
+                    -PallInOne=true \
                     -x test
 
       - name: Upload all-in-one JAR (${{ matrix.mc_version }})
