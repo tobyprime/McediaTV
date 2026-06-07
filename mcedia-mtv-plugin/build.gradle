@@ -5,8 +5,61 @@ plugins {
 }
 
 group = 'top.tobyprime'
-version = '1.0-SNAPSHOT'
+version = '1.0.0'
 
+// ========== 版本切换 ==========
+// 通过 -PserverVersion=26.1 切换目标服务端版本
+// 默认值可在 gradle.properties 或此处修改
+def serverVersion = findProperty('serverVersion') ?: '1.21.11'
+
+// 版本配置映射 —— 新增版本只需在此添加条目
+def versionConfig = [
+    '1.21.11': [
+        paperBundle : '1.21.11-R0.1-SNAPSHOT',
+        paperApi    : '1.21.11-R0.1-SNAPSHOT',
+        paperVersion: '1.21.11',
+        javaVersion : 21,
+        apiLevel    : '1.21',
+        javaFlags   : [
+            '-XX:+UseG1GC'
+        ]
+    ],
+    '26.1': [
+        paperBundle : '26.1.2.build.69-stable',
+        paperApi    : '26.1.2.build.69-stable',
+        paperVersion: '26.1.2',
+        javaVersion : 25,
+        apiLevel    : '26.1',
+        javaFlags   : [
+            '-XX:+AlwaysPreTouch', '-XX:+DisableExplicitGC',
+            '-XX:+ParallelRefProcEnabled', '-XX:+PerfDisableSharedMem',
+            '-XX:+UnlockExperimentalVMOptions', '-XX:+UseG1GC',
+            '-XX:G1HeapRegionSize=8M', '-XX:G1HeapWastePercent=5',
+            '-XX:G1MaxNewSizePercent=40', '-XX:G1MixedGCCountTarget=4',
+            '-XX:G1MixedGCLiveThresholdPercent=90', '-XX:G1NewSizePercent=30',
+            '-XX:G1RSetUpdatingPauseTimePercent=5', '-XX:G1ReservePercent=20',
+            '-XX:InitiatingHeapOccupancyPercent=15', '-XX:MaxGCPauseMillis=200',
+            '-XX:MaxTenuringThreshold=1', '-XX:SurvivorRatio=32'
+        ]
+    ]
+]
+
+def cfg = versionConfig[serverVersion]
+if (cfg == null) {
+    throw new GradleException("Unsupported server version: ${serverVersion}. " +
+            "Supported versions: ${versionConfig.keySet().join(', ')}. " +
+            "Usage: -PserverVersion=<version>")
+}
+
+println "Building for Paper ${serverVersion} (Java ${cfg.javaVersion}, API ${cfg.apiLevel})"
+
+// ========== 版本特定源码目录（可选） ==========
+// 若 versions/<serverVersion>/src/main/java/ 存在，会作为额外的源码目录
+// 用于覆盖共享源码中因 API 变更需要适配的部分
+def versionedSrcDir = file("versions/${serverVersion}/src/main/java")
+def hasVersionedSrc = versionedSrcDir.exists()
+
+// ========== 仓库 ==========
 repositories {
     mavenCentral()
     maven {
@@ -15,19 +68,29 @@ repositories {
     }
 }
 
+// ========== 依赖 ==========
 dependencies {
-    paperweight.paperDevBundle("1.21.11-R0.1-SNAPSHOT")
-    compileOnly("io.papermc.paper:paper-api:1.21.11-R0.1-SNAPSHOT")
+    paperweight.paperDevBundle(cfg.paperBundle)
+    compileOnly("io.papermc.paper:paper-api:${cfg.paperApi}")
     compileOnly("com.google.code.gson:gson:2.11.0")
+    implementation("org.xerial:sqlite-jdbc:3.45.3.0")
 }
 
+// 如果有版本特定源码，添加到主源码集
+if (hasVersionedSrc) {
+    sourceSets.main.java.srcDirs(versionedSrcDir)
+    println "Including version-specific source: ${versionedSrcDir}"
+}
+
+// ========== 运行为服务端 ==========
 tasks {
-  runServer {
-    minecraftVersion("1.21.11")
-  }
+    runServer {
+        minecraftVersion(cfg.paperVersion)
+    }
 }
 
-def targetJavaVersion = 21
+// ========== Java 编译 ==========
+def targetJavaVersion = cfg.javaVersion
 java {
     def javaVersion = JavaVersion.toVersion(targetJavaVersion)
     sourceCompatibility = javaVersion
@@ -45,8 +108,13 @@ tasks.withType(JavaCompile).configureEach {
     }
 }
 
+// ========== 资源处理 ==========
 processResources {
-    def props = [version: version]
+    def props = [
+        version      : version,
+        serverVersion: serverVersion,
+        apiLevel     : cfg.apiLevel
+    ]
     inputs.properties props
     filteringCharset 'UTF-8'
     filesMatching('plugin.yml') {
