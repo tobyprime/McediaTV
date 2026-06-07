@@ -1,0 +1,56 @@
+package top.tobyprime.mcedia_mtv.client.channel;
+
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
+import net.fabricmc.fabric.api.networking.v1.PacketSender;
+import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.ClientPacketListener;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+public final class MtvClientChannelPayloads {
+    private static final Logger LOGGER = LoggerFactory.getLogger(MtvClientChannelPayloads.class);
+
+    private MtvClientChannelPayloads() {
+    }
+
+    public static void register() {
+        PayloadTypeRegistry.clientboundPlay().register(MtvChannelClientSnapshotPayload.TYPE, MtvChannelClientSnapshotPayload.CODEC);
+        PayloadTypeRegistry.clientboundPlay().register(MtvChannelClientSyncPayload.TYPE, MtvChannelClientSyncPayload.CODEC);
+        PayloadTypeRegistry.clientboundPlay().register(MtvChannelRemovePayload.TYPE, MtvChannelRemovePayload.CODEC);
+        PayloadTypeRegistry.serverboundPlay().register(MtvChannelClientSubscribePayload.TYPE, MtvChannelClientSubscribePayload.CODEC);
+        PayloadTypeRegistry.serverboundPlay().register(MtvChannelClientUnsubscribePayload.TYPE, MtvChannelClientUnsubscribePayload.CODEC);
+        PayloadTypeRegistry.serverboundPlay().register(MtvChannelClientHeartbeatPayload.TYPE, MtvChannelClientHeartbeatPayload.CODEC);
+        ClientPlayNetworking.registerGlobalReceiver(MtvChannelClientSnapshotPayload.TYPE, (payload, context) ->
+                safeHandle("snapshot", payload.snapshot().channelId(), payload.snapshot().revision(), () ->
+                        ClientChannelPlaybackManager.getInstance().onSnapshot(payload.snapshot())));
+        ClientPlayNetworking.registerGlobalReceiver(MtvChannelClientSyncPayload.TYPE, (payload, context) ->
+                safeHandle("sync", payload.snapshot().channelId(), payload.snapshot().revision(), () ->
+                        ClientChannelPlaybackManager.getInstance().onSync(payload.snapshot())));
+        ClientPlayNetworking.registerGlobalReceiver(MtvChannelRemovePayload.TYPE, (payload, context) ->
+                safeHandle("remove", payload.channelId(), null, () ->
+                        ClientChannelPlaybackManager.getInstance().onRemove(payload.channelId())));
+        ClientPlayConnectionEvents.JOIN.register(MtvClientChannelPayloads::onJoin);
+        ClientPlayConnectionEvents.DISCONNECT.register(MtvClientChannelPayloads::onDisconnect);
+        LOGGER.debug("Registered MTV client channel payloads and connection listeners");
+    }
+
+    private static void safeHandle(String packetType, String channelId, Long revision, Runnable action) {
+        try {
+            action.run();
+        } catch (Exception e) {
+            LOGGER.warn("Failed to handle MTV {} packet: channel={}, revision={}", packetType, channelId, revision, e);
+        }
+    }
+
+    private static void onJoin(ClientPacketListener handler, PacketSender sender, Minecraft client) {
+        ClientChannelPlaybackManager.getInstance().clear();
+        LOGGER.debug("Open MTV client channel state: server={}", client.getCurrentServer() == null ? "singleplayer" : client.getCurrentServer().ip);
+    }
+
+    private static void onDisconnect(ClientPacketListener handler, Minecraft client) {
+        LOGGER.debug("Close MTV client channel state");
+        ClientChannelPlaybackManager.getInstance().clear();
+    }
+}
