@@ -380,3 +380,159 @@ jobs:
             ${{ needs.discover.outputs.mc_versions }}
           files: release-assets/*.jar
           fail_on_unmatched_files: true
+
+      # ── Publish to Modrinth ───────────────────────────────────────────
+      - name: Publish to Modrinth
+        env:
+          MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
+          MODRINTH_FABRIC_PROJECT_ID: ${{ secrets.MODRINTH_FABRIC_PROJECT_ID }}
+          MODRINTH_PLUGIN_PROJECT_ID: ${{ secrets.MODRINTH_PLUGIN_PROJECT_ID }}
+          MCEDIA_CORE_PROJECT_ID: ${{ secrets.MCEDIA_CORE_PROJECT_ID }}
+        run: |
+          set -euo pipefail
+
+          publish_version() {
+            local jar="$1"
+            local project_id="$2"
+            local mcver="$3"
+            local version_number="$4"
+            local display_name="$5"
+            local loaders_json="$6"
+            local deps_json="$7"
+
+            # Read game_versions from minecraft_version in gradle.properties
+            local prop_file="mcedia-mtv/versions/${mcver}/gradle.properties"
+            local game_version="$mcver"
+            if [ -f "$prop_file" ]; then
+              local mv
+              mv=$(grep '^minecraft_version' "$prop_file" | cut -d= -f2 | tr -d ' ')
+              [ -n "$mv" ] && game_version="$mv"
+            fi
+
+            # Build metadata
+            local data
+            data=$(jq -n \
+              --arg name "$display_name" \
+              --arg version_number "$version_number" \
+              --argjson game_versions "[ \"$game_version\" ]" \
+              --arg version_type "release" \
+              --argjson loaders "$loaders_json" \
+              --argjson dependencies "$deps_json" \
+              --arg project_id "$project_id" \
+              --arg changelog "Automated build from commit ${GITHUB_SHA:0:7}." \
+              '{
+                name: $name,
+                version_number: $version_number,
+                changelog: $changelog,
+                game_versions: $game_versions,
+                version_type: $version_type,
+                loaders: $loaders,
+                dependencies: $dependencies,
+                project_id: $project_id,
+                featured: false,
+                file_parts: ["file"],
+                primary_file: "file"
+              }')
+
+            echo "  → ${display_name} (${mcver}, loader=$loaders_json)"
+            response=$(curl -sL -w "\n%{http_code}" -X POST "https://api.modrinth.com/v2/version" \
+              -H "Authorization: $MODRINTH_TOKEN" \
+              -F "data=$data" \
+              -F "file=@${jar}")
+            http_code=$(echo "$response" | tail -1)
+            body=$(echo "$response" | head -n -1)
+
+            if [ "$http_code" = "200" ]; then
+              echo "  ✓ Success"
+            else
+              echo "  ✗ Failed (HTTP $http_code): $(echo "$body" | head -c 200)"
+            fi
+          }
+
+          # === Fabric mod (mcedia-mtv) ===
+          if [ -n "${MODRINTH_TOKEN:-}" ] && [ -n "${MODRINTH_FABRIC_PROJECT_ID:-}" ]; then
+            echo "::group::Publish Fabric mod to Modrinth"
+            for jar in release-assets/mcedia-mtv-*.jar; do
+              [ -f "$jar" ] || continue
+              filename=$(basename "$jar")
+              # Skip plugin and sources JARs
+              [[ "$filename" == mcedia-mtv-plugin-* ]] && continue
+              [[ "$filename" == *-sources-* ]] && continue
+
+              # Determine variant
+              case "$filename" in
+                mcedia-mtv-allinone-*)
+                  is_allinone=true
+                  rest="${filename#mcedia-mtv-allinone-}"
+                  prefix="mcedia-mtv-allinone"
+                  ;;
+                *)
+                  is_allinone=false
+                  rest="${filename#mcedia-mtv-}"
+                  prefix="mcedia-mtv"
+                  ;;
+              esac
+
+              # Parse: <modver>+<mcver>+build<ts>.jar
+              modver="${rest%%+*}"
+              mcver="${rest#*+}"
+              mcver="${mcver%%+*}"
+              version_number="${modver}+${mcver}"
+              display_name="${prefix} ${modver}+${mcver}"
+
+              # Build dependencies
+              deps="[]"
+              if [ -n "${MCEDIA_CORE_PROJECT_ID:-}" ]; then
+                if [ "$is_allinone" = true ]; then
+                  deps="[{\"project_id\":\"${MCEDIA_CORE_PROJECT_ID}\",\"dependency_type\":\"embedded\"}]"
+                else
+                  deps="[{\"project_id\":\"${MCEDIA_CORE_PROJECT_ID}\",\"dependency_type\":\"required\"}]"
+                fi
+              fi
+
+              publish_version \
+                "$jar" \
+                "$MODRINTH_FABRIC_PROJECT_ID" \
+                "$mcver" \
+                "$version_number" \
+                "$display_name" \
+                '["fabric"]' \
+                "$deps" || true
+            done
+            echo "::endgroup::"
+          else
+            echo "::notice::Skip Modrinth Fabric publish: MODRINTH_TOKEN or MODRINTH_FABRIC_PROJECT_ID not set"
+          fi
+
+          # === Paper plugin (mcedia-mtv-plugin) ===
+          if [ -n "${MODRINTH_TOKEN:-}" ] && [ -n "${MODRINTH_PLUGIN_PROJECT_ID:-}" ]; then
+            echo "::group::Publish Paper plugin to Modrinth"
+            for dir in artifacts/mcedia-mtv-plugin-*; do
+              [ -d "$dir" ] || continue
+              dirname=$(basename "$dir")
+              mcver="${dirname#mcedia-mtv-plugin-}"
+
+              for jar in "$dir"/*.jar; do
+                [ -f "$jar" ] || continue
+                filename=$(basename "$jar")
+                [[ "$filename" == *-sources-* ]] && continue
+
+                modver="${filename#mcedia-mtv-plugin-}"
+                modver="${modver%.jar}"
+                version_number="${modver}+${mcver}"
+                display_name="mcedia-mtv-plugin ${modver}+${mcver}"
+
+                publish_version \
+                  "$jar" \
+                  "$MODRINTH_PLUGIN_PROJECT_ID" \
+                  "$mcver" \
+                  "$version_number" \
+                  "$display_name" \
+                  '["paper","folia"]' \
+                  '[]' || true
+              done
+            done
+            echo "::endgroup::"
+          else
+            echo "::notice::Skip Modrinth Plugin publish: MODRINTH_PLUGIN_PROJECT_ID not set"
+          fi
