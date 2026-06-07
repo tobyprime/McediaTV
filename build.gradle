@@ -7,7 +7,7 @@ plugins {
 }
 
 group = 'top.tobyprime'
-version = findProperty('version') ?: '0.4-SNAPSHOT'
+version = findProperty('version') ?: '1.0.0'
 
 subprojects {
     repositories {
