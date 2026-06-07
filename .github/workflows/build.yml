@@ -409,10 +409,9 @@ jobs:
               [ -n "$mv" ] && game_version="$mv"
             fi
 
-            # Build compact JSON metadata, write to temp file
-            local tmp
-            tmp=$(mktemp)
-            jq -c -n \
+            # Build metadata
+            local data
+            data=$(jq -n \
               --arg name "$display_name" \
               --arg version_number "$version_number" \
               --argjson game_versions "[ \"$game_version\" ]" \
@@ -433,21 +432,20 @@ jobs:
                 featured: false,
                 file_parts: ["file"],
                 primary_file: "file"
-              }' > "$tmp"
+              }')
 
             echo "  → ${display_name} (${mcver}, loader=$loaders_json)"
             response=$(curl -sL -w "\n%{http_code}" -X POST "https://api.modrinth.com/v2/version" \
               -H "Authorization: $MODRINTH_TOKEN" \
-              -F "data=@${tmp}" \
+              -F "data=$data" \
               -F "file=@${jar}")
-            rm -f "$tmp"
             http_code=$(echo "$response" | tail -1)
             body=$(echo "$response" | head -n -1)
 
             if [ "$http_code" = "200" ]; then
               echo "  ✓ Success"
             else
-              echo "  ✗ Failed (HTTP $http_code): $(echo "$body" | head -c 300)"
+              echo "  ✗ Failed (HTTP $http_code): $(echo "$body" | head -c 200)"
             fi
           }
 
