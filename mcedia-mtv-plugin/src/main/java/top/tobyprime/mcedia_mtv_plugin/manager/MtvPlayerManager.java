@@ -524,14 +524,18 @@ public class MtvPlayerManager {
     }
 
     public void snapEntityPosition(UUID uuid, Consumer<Boolean> done) {
-        withDisplay(uuid, display -> {
+        Entity entity = Bukkit.getEntity(uuid);
+        if (!(entity instanceof ItemDisplay display)) {
+            done.accept(false);
+            return;
+        }
+        display.getScheduler().run(plugin, task -> {
             var loc = display.getLocation();
             loc.setX(Math.round(loc.getX()));
             loc.setY(Math.round(loc.getY()));
             loc.setZ(Math.round(loc.getZ()));
-            display.teleportAsync(loc);
-            return Boolean.TRUE;
-        }, result -> done.accept(Boolean.TRUE.equals(result)));
+            display.teleportAsync(loc).thenRun(() -> done.accept(true));
+        }, () -> done.accept(false));
     }
 
     public void teleportToPlayer(UUID uuid, Player player, Consumer<Boolean> done) {
@@ -541,30 +545,40 @@ public class MtvPlayerManager {
         }
         player.getScheduler().run(plugin, task -> {
             var target = player.getLocation();
-            withDisplay(uuid, display -> {
-                display.teleportAsync(target);
-                return Boolean.TRUE;
-            }, result -> done.accept(Boolean.TRUE.equals(result)));
+            Entity entity = Bukkit.getEntity(uuid);
+            if (!(entity instanceof ItemDisplay display)) {
+                done.accept(false);
+                return;
+            }
+            display.teleportAsync(target).thenRun(() -> done.accept(true));
         }, () -> done.accept(Boolean.FALSE));
     }
 
     public void moveEntity(UUID uuid, double dx, double dy, double dz, Consumer<Boolean> done) {
-        withDisplay(uuid, display -> {
+        Entity entity = Bukkit.getEntity(uuid);
+        if (!(entity instanceof ItemDisplay display)) {
+            done.accept(false);
+            return;
+        }
+        display.getScheduler().run(plugin, task -> {
             var loc = display.getLocation();
             loc.add(dx, dy, dz);
-            display.teleportAsync(loc);
-            return Boolean.TRUE;
-        }, result -> done.accept(Boolean.TRUE.equals(result)));
+            display.teleportAsync(loc).thenRun(() -> done.accept(true));
+        }, () -> done.accept(false));
     }
 
     public void setEntityRotation(UUID uuid, float yaw, float pitch, Consumer<Boolean> done) {
-        withDisplay(uuid, display -> {
+        Entity entity = Bukkit.getEntity(uuid);
+        if (!(entity instanceof ItemDisplay display)) {
+            done.accept(false);
+            return;
+        }
+        display.getScheduler().run(plugin, task -> {
             var loc = display.getLocation();
             loc.setYaw(yaw);
             loc.setPitch(pitch);
-            display.teleportAsync(loc);
-            return Boolean.TRUE;
-        }, result -> done.accept(Boolean.TRUE.equals(result)));
+            display.teleportAsync(loc).thenRun(() -> done.accept(true));
+        }, () -> done.accept(false));
     }
 
     public boolean isManagedItemDisplay(Entity entity) {
