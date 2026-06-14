@@ -173,14 +173,25 @@ public class MtvPlayerManager {
         return c;
     }
 
+    private static Location snapPlacementLocation(Location location) {
+        var loc = location.clone();
+        loc.setX(Math.round(loc.getX() * 2) / 2.0);
+        loc.setY(Math.round(loc.getY() * 2) / 2.0);
+        loc.setZ(Math.round(loc.getZ() * 2) / 2.0);
+        loc.setYaw(Math.round(loc.getYaw() / 45) * 45.0F);
+        loc.setPitch(0);
+        return loc;
+    }
+
     public void createPlayerAsync(Location location, String name, Player creator, Consumer<ManagedMtvPlayer> done) {
         if (location.getWorld() == null) {
             done.accept(null);
             return;
         }
-        plugin.getServer().getRegionScheduler().execute(plugin, location, () -> {
-            ItemDisplay itemDisplay = spawnItemDisplay(location);
-            var player = ManagedMtvPlayer.create(itemDisplay.getUniqueId(), name, location);
+        var snapLoc = snapPlacementLocation(location);
+        plugin.getServer().getRegionScheduler().execute(plugin, snapLoc, () -> {
+            ItemDisplay itemDisplay = spawnItemDisplay(snapLoc);
+            var player = ManagedMtvPlayer.create(itemDisplay.getUniqueId(), name, snapLoc);
             if (creator != null) {
                 player.setOwner(creator.getUniqueId());
             }
