@@ -545,7 +545,11 @@ public class MtvPlayerManager {
             loc.setX(Math.round(loc.getX()));
             loc.setY(Math.round(loc.getY()));
             loc.setZ(Math.round(loc.getZ()));
-            display.teleportAsync(loc).thenRun(() -> done.accept(true));
+            display.teleportAsync(loc).thenRun(() -> {
+                var player = readFromEntity(display);
+                applyEntityState(display, player);
+                done.accept(true);
+            });
         }, () -> done.accept(false));
     }
 
@@ -561,7 +565,11 @@ public class MtvPlayerManager {
                 done.accept(false);
                 return;
             }
-            display.teleportAsync(target).thenRun(() -> done.accept(true));
+            display.teleportAsync(target).thenRun(() -> {
+                var snap = readFromEntity(display);
+                applyEntityState(display, snap);
+                done.accept(true);
+            });
         }, () -> done.accept(Boolean.FALSE));
     }
 
@@ -574,7 +582,11 @@ public class MtvPlayerManager {
         display.getScheduler().run(plugin, task -> {
             var loc = display.getLocation();
             loc.add(dx, dy, dz);
-            display.teleportAsync(loc).thenRun(() -> done.accept(true));
+            display.teleportAsync(loc).thenRun(() -> {
+                var player = readFromEntity(display);
+                applyEntityState(display, player);
+                done.accept(true);
+            });
         }, () -> done.accept(false));
     }
 
@@ -588,7 +600,11 @@ public class MtvPlayerManager {
             var loc = display.getLocation();
             loc.setYaw(yaw);
             loc.setPitch(pitch);
-            display.teleportAsync(loc).thenRun(() -> done.accept(true));
+            display.teleportAsync(loc).thenRun(() -> {
+                var player = readFromEntity(display);
+                applyEntityState(display, player);
+                done.accept(true);
+            });
         }, () -> done.accept(false));
     }
 
