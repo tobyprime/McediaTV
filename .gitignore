@@ -19,4 +19,5 @@ Thumbs.db
 hs_err_pid*
 replay_pid*
 
-.claude/settings.local.json
+.claude/
+.codegraph/

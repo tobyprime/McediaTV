@@ -117,6 +117,7 @@ public class PublicChannelManagePage extends GuiPage {
         String query = entry.getState(MtvGui.PUBLIC_QUERY_KEY, "");
         int page = MtvGui.parsePage(entry);
         boolean ownOnly = MtvGui.isPublicOwnOnly(entry);
+        var sort = MtvGui.parsePublicSort(entry);
 
         switch (slot) {
             // ── Row 3: 频道控制 ──
@@ -167,7 +168,7 @@ public class PublicChannelManagePage extends GuiPage {
                     player.sendMessage("删除公共频道失败，可能仍有播放器绑定该频道。");
                     return true;
                 }
-                var st = MtvGui.publicChannelState(query, page, ownOnly);
+                var st = MtvGui.publicChannelState(query, page, ownOnly, sort);
                 st.put("channel_id", channelId);
                 context.navigateTo(player, MtvGui.GuiType.PUBLIC_CHANNEL_LIST,
                         entityUuid, null, st);

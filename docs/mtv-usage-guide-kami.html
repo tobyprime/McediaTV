@@ -1,17 +1,19 @@
 <!DOCTYPE html>
 <!-- ==================================================================
      LONG DOCUMENT TEMPLATE · parchment design system
-     四部分结构：总览概述 → 用户指南 → 管理员指南 → 开发者参考
+     多页 A4 白皮书/技术报告/年度总结
+     结构：封面 -> 目录 -> 执行摘要 -> 正文章节 -> 附录
      ================================================================== -->
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<title>MTV 使用文档与教程</title>
-<meta name="author" content="McediaTV">
-<meta name="description" content="在 Minecraft 里和朋友们一起同步看视频听音乐。日常操作、服主配置、实现原理。">
-<meta name="keywords" content="MTV, McediaTV, 使用教程, 播放器, 频道, 媒体播放, Minecraft, 管理员, 开发文档">
+<title>Mcedia · MTV 使用文档</title>
+<meta name="author" content="toby">
+<meta name="description" content="面向玩家、服务器管理员与开发者的 Mcedia MTV 使用文档，说明播放器、频道、GUI 控制、权限与客户端同步机制。">
+<meta name="keywords" content="Mcedia,MTV,播放器,频道,GUI,服务器管理,开发接入">
 <meta name="generator" content="Kami">
 <style>
+  /* Regular weight */
   @font-face {
     font-family: "TsangerJinKai02";
     src: url("../fonts/TsangerJinKai02-W04.ttf") format("truetype"),
@@ -19,6 +21,8 @@
     font-weight: 400;
     font-style: normal;
   }
+
+  /* Bold weight - W05 for all bold variants */
   @font-face {
     font-family: "TsangerJinKai02";
     src: url("../fonts/TsangerJinKai02-W05.ttf") format("truetype"),
@@ -26,10 +30,12 @@
     font-weight: 500;
     font-style: normal;
   }
+
   @page {
     size: A4;
     margin: 20mm 22mm 22mm 22mm;
     background: #f5f4ed;
+
     @top-right {
       content: string(section-title);
       font-family: "TsangerJinKai02", "Source Han Serif SC",
@@ -37,19 +43,23 @@
       font-size: 8pt;
       color: #6b6a64;
     }
+
     @bottom-center {
-      content: counter(page) "  ·  MTV 完整手册";
+      content: counter(page) "  ·  Mcedia · MTV 使用文档";
       font-family: "TsangerJinKai02", "Source Han Serif SC",
                    "Noto Serif CJK SC", "Songti SC", Georgia, serif;
       font-size: 9pt;
       color: #6b6a64;
     }
   }
+
   @page:first {
     @top-right { content: ""; }
     @bottom-center { content: ""; }
   }
+
   * { box-sizing: border-box; margin: 0; padding: 0; }
+
   :root {
     --parchment: #f5f4ed;
     --ivory:     #faf9f5;
@@ -63,13 +73,17 @@
     --tag-bg:    #E4ECF5;
     --serif: "TsangerJinKai02", "Source Han Serif SC", "Noto Serif CJK SC", "Songti SC", "STSong", Georgia, serif;
     --sans: var(--serif);
+
     --rhythm-module:  14pt;
     --rhythm-section: 18pt;
   }
+
   html, body { background: var(--parchment); }
+
   @media screen {
     body { max-width: 210mm; margin: 0 auto; padding: 20mm 22mm 22mm 22mm; }
   }
+
   body {
     color: var(--near-black);
     font-family: var(--serif);
@@ -80,7 +94,10 @@
     orphans: 3;
   }
 
-  /* ========== COVER ========== */
+  .sans {
+    font-family: var(--sans);
+  }
+
   .cover {
     min-height: 240mm;
     display: flex;
@@ -119,9 +136,11 @@
     color: var(--stone);
     line-height: 1.5;
   }
-  .cover-meta strong { color: var(--dark-warm); font-weight: 500; }
+  .cover-meta strong {
+    color: var(--dark-warm);
+    font-weight: 500;
+  }
 
-  /* ========== TOC ========== */
   .toc { break-after: page; }
   .toc h2 {
     font-size: 22pt;
@@ -145,55 +164,16 @@
     font-weight: 500;
     min-width: 30pt;
   }
-  .toc-title { flex: 1; color: var(--near-black); padding-left: 6pt; }
+  .toc-title {
+    flex: 1;
+    color: var(--near-black);
+    padding-left: 6pt;
+  }
   .toc-page {
     color: var(--stone);
     font-variant-numeric: tabular-nums;
   }
-  .toc-part {
-    font-size: 9pt;
-    color: var(--stone);
-    letter-spacing: 1pt;
-    text-transform: uppercase;
-    font-weight: 500;
-    margin: 12pt 0 4pt 0;
-    padding-left: 2pt;
-  }
-  .toc-part:first-of-type { margin-top: 0; }
 
-  /* ========== PART DIVIDER ========== */
-  .part-divider {
-    min-height: 200mm;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    text-align: center;
-    break-after: page;
-  }
-  .part-divider .part-num {
-    font-family: var(--sans);
-    font-size: 11pt;
-    color: var(--brand);
-    letter-spacing: 1.5pt;
-    text-transform: uppercase;
-    margin-bottom: 14pt;
-  }
-  .part-divider .part-title {
-    font-size: 26pt;
-    font-weight: 500;
-    color: var(--near-black);
-    line-height: 1.15;
-    margin-bottom: 12pt;
-  }
-  .part-divider .part-desc {
-    font-size: 12pt;
-    color: var(--olive);
-    max-width: 70%;
-    line-height: 1.5;
-  }
-
-  /* ========== HEADINGS ========== */
   h1 {
     font-size: 22pt;
     font-weight: 500;
@@ -205,23 +185,26 @@
     color: var(--near-black);
     break-after: avoid;
   }
+
   h2 {
     font-size: 16pt;
     font-weight: 500;
     line-height: 1.25;
-    margin: 18pt 0 6pt 0;
+    margin: 24pt 0 8pt 0;
     color: var(--near-black);
     break-after: avoid;
     string-set: section-title content();
   }
+
   h3 {
     font-size: 13pt;
     font-weight: 500;
     line-height: 1.3;
-    margin: 14pt 0 4pt 0;
+    margin: 18pt 0 6pt 0;
     color: var(--dark-warm);
     break-after: avoid;
   }
+
   .chapter-num {
     font-family: var(--sans);
     font-size: 10pt;
@@ -231,7 +214,6 @@
     margin-bottom: 6pt;
   }
 
-  /* ========== PARAGRAPHS ========== */
   p {
     margin: 0 0 10pt 0;
     line-height: 1.55;
@@ -239,16 +221,17 @@
     widows: 2;
     orphans: 2;
   }
+
   .lead {
     font-size: 12pt;
     line-height: 1.55;
     color: var(--dark-warm);
     margin-bottom: var(--rhythm-module);
   }
+
   .hl { color: var(--brand); font-weight: 500; }
   strong { font-weight: 500; }
 
-  /* ========== LISTS ========== */
   ul, ol {
     margin: 6pt 0 10pt 0;
     padding-left: 20pt;
@@ -257,7 +240,6 @@
   ul li::marker { color: var(--brand); }
   ol li::marker { color: var(--brand); font-weight: 500; }
 
-  /* ========== QUOTE ========== */
   blockquote, .quote {
     border-left: 2pt solid var(--brand);
     margin: 12pt 0;
@@ -266,8 +248,13 @@
     line-height: 1.55;
     break-inside: avoid;
   }
+  blockquote .cite, .quote .cite {
+    display: block;
+    font-size: 9pt;
+    color: var(--stone);
+    margin-top: 4pt;
+  }
 
-  /* ========== CODE ========== */
   code {
     font-family: "JetBrains Mono", "SF Mono", Consolas,
                  "TsangerJinKai02", "Source Han Serif SC",
@@ -294,7 +281,6 @@
   }
   pre code { background: transparent; padding: 0; font-size: inherit; }
 
-  /* ========== TABLE ========== */
   table, .kami-table {
     width: 100%;
     border-collapse: collapse;
@@ -317,11 +303,7 @@
   }
   table.compact th, .kami-table.compact th { padding: 3pt 6pt; font-size: 8pt; }
   table.compact td, .kami-table.compact td { padding: 2pt 6pt; font-size: 8pt; line-height: 1.4; }
-  table.striped tbody tr:nth-child(even) td, .kami-table.striped tbody tr:nth-child(even) td {
-    background: var(--ivory);
-  }
 
-  /* ========== CALLOUT ========== */
   .callout {
     background: var(--ivory);
     border-left: 2pt solid var(--brand);
@@ -331,12 +313,7 @@
     line-height: 1.55;
     break-inside: avoid;
   }
-  .callout blockquote, .callout .quote {
-    border-left: none;
-    padding-left: 0;
-    margin: 6pt 0;
-    color: var(--olive);
-  }
+
   .takeaway {
     background: var(--ivory);
     border-radius: 4pt;
@@ -353,11 +330,30 @@
     margin-bottom: 4pt;
   }
 
-  /* ========== TWO-COLUMN ========== */
-  .two-col { display: flex; gap: 16pt; margin: 10pt 0; }
-  .two-col > div { flex: 1; }
+  .tag {
+    display: inline-block;
+    background: var(--tag-bg);
+    color: var(--brand);
+    font-family: var(--sans);
+    font-size: 9pt;
+    font-weight: 500;
+    padding: 1pt 6pt;
+    border-radius: 3pt;
+    margin-right: 4pt;
+  }
 
-  /* ========== EXECUTIVE SUMMARY ========== */
+  figure {
+    margin: 14pt 0;
+    break-inside: avoid;
+  }
+  figcaption {
+    font-family: var(--sans);
+    font-size: 9pt;
+    color: var(--stone);
+    margin-top: 6pt;
+    text-align: center;
+  }
+
   .exec-summary {
     background: var(--ivory);
     border-left: 1.4pt solid var(--brand);
@@ -366,471 +362,506 @@
     margin: 14pt 0;
     break-inside: avoid;
   }
-  .exec-summary h2 { margin-top: 0; font-size: 13pt; }
+  .exec-summary h2 {
+    margin-top: 0;
+    font-size: 13pt;
+  }
 
-  /* ========== CHAPTER BREAK ========== */
   .chapter { break-before: page; }
 </style>
 </head>
 <body>
 
-<!-- ═════════════ COVER ═════════════ -->
 <section class="cover">
   <div>
-    <div class="cover-eyebrow">完整手册 · 四个部分</div>
-    <div class="cover-title">MTV 使用文档与教程</div>
-    <div class="cover-sub">
-      在 Minecraft 里和朋友一起同步看视频听音乐。日常操作、服主配置、系统原理。
-    </div>
+    <div class="cover-eyebrow">Usage Guide</div>
+    <div class="cover-title">Mcedia · MTV<br>使用文档</div>
+    <div class="cover-sub">一份面向玩家、服务器管理员与开发者的操作说明，聚焦播放器、频道、GUI 控制与客户端同步机制。</div>
   </div>
   <div class="cover-meta">
-    <strong>McediaTV</strong><br>
-    文档版 3.0  ·  2026.06<br>
-    基于当前项目实现整理
+    <strong>McediaTV 项目文档</strong><br>
+    V1.0  ·  2026.06<br>
+    依据当前项目代码整理
   </div>
 </section>
 
-<!-- ═════════════ 目录 ═════════════ -->
 <section class="toc">
   <h2>目录</h2>
-
-  <div class="toc-part">Part I · 总览概述</div>
   <div class="toc-item">
-    <span class="toc-num">1.1</span>
-    <span class="toc-title">MTV 是什么</span>
+    <span class="toc-num">01</span>
+    <span class="toc-title">综合简述</span>
     <span class="toc-page">03</span>
   </div>
   <div class="toc-item">
-    <span class="toc-num">1.2</span>
-    <span class="toc-title">核心概念</span>
-    <span class="toc-page">03</span>
-  </div>
-
-  <div class="toc-part">Part II · 用户操作指南</div>
-  <div class="toc-item">
-    <span class="toc-num">2.1</span>
-    <span class="toc-title">快速上手</span>
+    <span class="toc-num">02</span>
+    <span class="toc-title">玩家使用指南</span>
     <span class="toc-page">05</span>
   </div>
   <div class="toc-item">
-    <span class="toc-num">2.2</span>
-    <span class="toc-title">主菜单导航</span>
-    <span class="toc-page">06</span>
-  </div>
-  <div class="toc-item">
-    <span class="toc-num">2.3</span>
-    <span class="toc-title">播放器页面</span>
-    <span class="toc-page">07</span>
-  </div>
-  <div class="toc-item">
-    <span class="toc-num">2.4</span>
-    <span class="toc-title">屏幕与扬声器设置</span>
+    <span class="toc-num">03</span>
+    <span class="toc-title">服务器管理员指南</span>
     <span class="toc-page">08</span>
   </div>
   <div class="toc-item">
-    <span class="toc-num">2.5</span>
-    <span class="toc-title">频道页操作</span>
-    <span class="toc-page">09</span>
+    <span class="toc-num">04</span>
+    <span class="toc-title">开发人员指南</span>
+    <span class="toc-page">11</span>
   </div>
   <div class="toc-item">
-    <span class="toc-num">2.6</span>
-    <span class="toc-title">遥控器</span>
-    <span class="toc-page">10</span>
-  </div>
-  <div class="toc-item">
-    <span class="toc-num">2.7</span>
-    <span class="toc-title">典型场景与 FAQ</span>
-    <span class="toc-page">10</span>
-  </div>
-
-  <div class="toc-part">Part III · 管理员配置手册</div>
-  <div class="toc-item">
-    <span class="toc-num">3.1</span>
-    <span class="toc-title">权限一览</span>
-    <span class="toc-page">12</span>
-  </div>
-  <div class="toc-item">
-    <span class="toc-num">3.2</span>
-    <span class="toc-title">公共频道管理</span>
-    <span class="toc-page">13</span>
-  </div>
-  <div class="toc-item">
-    <span class="toc-num">3.3</span>
-    <span class="toc-title">维护建议</span>
+    <span class="toc-num">05</span>
+    <span class="toc-title">附录</span>
     <span class="toc-page">14</span>
   </div>
 </section>
 
-<!-- ════════════════════════════════════════════════════════════════
-     PART I · 总览概述
-     ════════════════════════════════════════════════════════════════ -->
-<section class="part-divider">
-  <div class="part-num">Part I</div>
-  <div class="part-title">总览概述</div>
-  <div class="part-desc">在 Minecraft 里和朋友们一起同步看视频听音乐——这套系统怎么把画面、声音和播放内容分开管理。</div>
-</section>
-
 <section class="chapter">
-  <div class="chapter-num">I · Overview</div>
-  <h1>MTV 是什么</h1>
-
-  <div class="exec-summary">
-    <p>MTV 让多人一起看视频听音乐，画面和声音在多台电脑上同步。<br>
-    播放器就是一台电视机——屏幕、喇叭、摆放位置都在它身上。<br>
-    频道就是电视台——多台电视调到同一个台，播的就是同一套内容。<br>
-    日常入口 <code>/mtv</code>，操作管的是频道，不是电视机本身。</p>
-  </div>
+  <div class="chapter-num">01 · Overview</div>
+  <h1>综合简述</h1>
 
   <p class="lead">
-    每块画面都属于某个播放器，每个播放器都绑定了一个频道。调画面去播放器页，改内容去频道页。多台播放器绑同一个公共频道——<span class="hl">所有玩家看到的画面同步播放</span>。
+    MTV 是 McediaTV 在 Minecraft 中的媒体播放能力：<span class="hl">服务端插件</span>负责播放器实体、频道状态与权限控制，<span class="hl">客户端模组</span>负责实际解码、播放、心跳上报与时间轴对齐。它不是单机播放器，而是一套围绕 channel 运转的分布式播放系统。
   </p>
 
-  <h2>播放器是一台电视机，频道是一个电视台</h2>
-  <p>MTV 把硬件和内容分成两层：</p>
-  <ul>
-    <li><strong>播放器（Player）</strong>——物理层。屏幕挂哪、喇叭放哪、电源开没开，都由播放器管。屏幕和喇叭是播放器自带的部件。</li>
-    <li><strong>频道（Channel）</strong>——内容层。播什么视频、列表顺序、暂停还是播放，都由频道管。一个频道能被多个播放器绑定。</li>
-  </ul>
-
-  <table class="kami-table">
-    <thead>
-      <tr><th>部件</th><th>负责什么</th><th>类比</th></tr>
-    </thead>
-    <tbody>
-      <tr><td>播放器本体</td><td>名字、位置、电源、总音量、激活范围</td><td>电视机外壳</td></tr>
-      <tr><td>屏幕外设</td><td>画面——尺寸、亮度、偏移、旋转、弹幕</td><td>电视机屏幕</td></tr>
-      <tr><td>扬声器外设</td><td>声音——音量、声道、出声位置</td><td>电视机喇叭</td></tr>
-      <tr><td>频道</td><td>内容——媒体、列表、暂停、进度</td><td>电视台信号</td></tr>
-    </tbody>
-  </table>
-
-  <h2>默认配置</h2>
-  <p>新建播放器默认带 1 块屏幕、2 个喇叭，总音量 1.0，激活范围 50 格，绑定私有频道，状态为私有。其中两个喇叭默认分别偏向左右声道。</p>
-
-  <div class="callout">
-    <strong>快速定位：</strong>调画面→播放器页；改内容→频道页；多屏同播→公共频道列表；远程遥控→遥控器页。
-  </div>
-</section>
-
-<!-- ════════════════════════════════════════════════════════════════
-     PART II · 用户操作指南
-     ════════════════════════════════════════════════════════════════ -->
-<section class="part-divider">
-  <div class="part-num">Part II</div>
-  <div class="part-title">用户操作指南</div>
-  <div class="part-desc">打开 GUI、创建播放器、设置频道、调整画面和声音——每个操作要进哪个页面，怎么找到对应的按钮。</div>
-</section>
-
-<section class="chapter">
-  <div class="chapter-num">II · User Guide</div>
-  <h1>快速上手</h1>
-
-  <p class="lead">打开 <code>/mtv</code>，点"创建播放器"，聊天框里输个名字——播放器就出现在你脚下了。</p>
-  <p>自动跳转到控制页后，打开"频道设置"，点"设置 URL"，贴个播放链接进去，画面就出来了。嫌画面不对、喇叭没声，再去"外设管理"调。</p>
-  <p>也可以直接输 <code>/mtv create &lt;名字&gt;</code> 跳过主菜单。</p>
-
-  <!-- ======== 主菜单导航 ======== -->
-  <h1>主菜单导航</h1>
-  <p class="lead"><code>/mtv</code> 打开的主菜单分两块：左边管播放器，右边管频道。</p>
-
-  <div class="two-col">
-    <div>
-      <h3>播放器侧</h3>
-      <ul>
-        <li><strong>控制最近的播放器</strong>：自动找周围 50 格内最近的 MTV。</li>
-        <li><strong>附近的播放器</strong>：列出附近所有 MTV，显示名称、距离和绑定频道。</li>
-        <li><strong>创建播放器</strong>：在当前脚下位置新建一个。</li>
-      </ul>
-    </div>
-    <div>
-      <h3>频道侧</h3>
-      <ul>
-        <li><strong>频道控制</strong>：操作最近播放器的频道（切歌、暂停、列表）。</li>
-        <li><strong>频道列表</strong>：浏览全部公共频道。</li>
-        <li><strong>我的频道</strong>：只看自己创建的。</li>
-      </ul>
-    </div>
-  </div>
-
-  <!-- ======== 播放器页面 ======== -->
-  <h1>播放器页面</h1>
-  <p class="lead">播放器页管的是这一台机器的所有设置，从名字到绑定频道都在这里。</p>
-
-  <table class="kami-table striped">
-    <thead>
-      <tr><th>操作</th><th>说明</th></tr>
-    </thead>
-    <tbody>
-      <tr><td>重命名</td><td>聊天栏输新名字。</td></tr>
-      <tr><td>传送到位置</td><td>直接飞过去。</td></tr>
-      <tr><td>外设管理</td><td>调所有屏幕和喇叭的详细设置。</td></tr>
-      <tr><td>位置与朝向</td><td>微调坐标、朝向。左键减、右键加，潜行步进更大。支持吸附整数、传送到脚下、重置朝向。</td></tr>
-      <tr><td>激活范围</td><td>设多远距离内保持播放。支持快速增减或精确输入。</td></tr>
-      <tr><td>公开/私有切换</td><td>切换是否对其他人可见。</td></tr>
-      <tr><td>绑定频道</td><td>绑到一个公共频道，跟其他播放器共享内容。</td></tr>
-      <tr><td>切回私有频道</td><td>解除公共频道绑定，回到独立模式。</td></tr>
-      <tr><td>删除播放器</td><td>永久移除播放器和所有外设，没有撤销。</td></tr>
-    </tbody>
-  </table>
-
-  <!-- ======== 屏幕与扬声器 ======== -->
-  <h1>屏幕与扬声器设置</h1>
-  <p class="lead">"外设管理"里列出了所有的屏幕和喇叭，点进去就能细调。</p>
-
-  <h2>屏幕设置</h2>
-  <table class="kami-table striped">
-    <thead>
-      <tr><th>参数</th><th>如何调整</th></tr>
-    </thead>
-    <tbody>
-      <tr><td>尺寸（宽/高）</td><td>点击增减，潜行步进更大。</td></tr>
-      <tr><td>亮度</td><td>0 ~ 15 级。点按 1 级，潜行 5 级。</td></tr>
-      <tr><td>填充模式</td><td><strong>保持比例</strong>（留黑边）或<strong>铺满</strong>（填满屏幕）。</td></tr>
-      <tr><td>弹幕</td><td>直接切换开关。</td></tr>
-      <tr><td>偏移（X/Y/Z）</td><td>左键减、右键加；普通步进 0.1，潜行步进 1.0。支持重置、吸附整数、<strong>设到玩家位置</strong>。</td></tr>
-      <tr><td>旋转</td><td>三轴独立微调，步进 5°，潜行步进 25°。支持一键重置。</td></tr>
-    </tbody>
-  </table>
-
-  <div class="callout">
-    <strong>小技巧：</strong>先站到你想放屏幕的位置，点"设到玩家位置"，偏移自动对齐，再微调旋转和尺寸。
-  </div>
-
-  <p>屏幕页还提供"重置显示"（恢复默认显示参数）和"删除屏幕"两项操作。</p>
-
-  <h2>扬声器设置</h2>
-  <table class="kami-table striped">
-    <thead>
-      <tr><th>参数</th><th>如何调整</th></tr>
-    </thead>
-    <tbody>
-      <tr><td>音量</td><td>每个扬声器独立可调；普通步进 0.1，潜行步进 1.0。</td></tr>
-      <tr><td>范围</td><td>声音传播距离；普通步进 1，潜行步进 5。</td></tr>
-      <tr><td>声道</td><td>混合 / 左 / 右。单喇叭用混合，左右各一个就分别设左/右。</td></tr>
-      <tr><td>偏移</td><td>调整出声位置，操作跟屏幕偏移一样。</td></tr>
-    </tbody>
-  </table>
-
-  <p>扬声器页还提供"重置音频"（恢复默认音量、范围、声道）和"删除扬声器"两项操作。</p>
-
-  <!-- ======== 频道页操作 ======== -->
-  <h1>频道页操作</h1>
-  <p class="lead">频道页管的是在播什么。不管是你自己的频道还是跟别人共用的，页面操作都一样。</p>
-
-  <h2>播放列表</h2>
-  <p>顶部列表一次显示 7 项，可滚动：</p>
-  <table class="kami-table">
-    <thead>
-      <tr><th>操作</th><th>效果</th></tr>
-    </thead>
-    <tbody>
-      <tr><td>左键</td><td>立即播放</td></tr>
-      <tr><td>右键</td><td>删除该项</td></tr>
-      <tr><td>Shift + 左键</td><td>移到最前</td></tr>
-      <tr><td>Shift + 右键</td><td>移到最后</td></tr>
-    </tbody>
-  </table>
-  <p>左右箭头滚动列表。</p>
-
-  <h2>管理按钮</h2>
-  <ul>
-    <li><strong>首加 / 下一个加 / 尾加</strong>：加到列表不同位置，需要聊天栏输入链接。</li>
-    <li><strong>清空列表</strong>：清掉所有项并停播。</li>
-    <li><strong>播放顺序</strong>：循环切换播放模式。</li>
-  </ul>
-
-  <h2>播放顺序</h2>
-  <table class="kami-table striped">
-    <thead>
-      <tr><th>模式</th><th>效果</th></tr>
-    </thead>
-    <tbody>
-      <tr><td>列表播放</td><td>按顺序播一遍就停。</td></tr>
-      <tr><td>随机</td><td>打乱顺序轮播。</td></tr>
-      <tr><td>列表循环</td><td>播完自动重头。</td></tr>
-      <tr><td>当前媒体循环</td><td>单曲/单视频反复播。</td></tr>
-      <tr><td>播完当前停止</td><td>播完就停。</td></tr>
-    </tbody>
-  </table>
-
-  <h2>播放控制</h2>
-  <p>频道页中部是播放/暂停，底部一排从左到右：上一个、退 20 秒、退 5 秒、<strong>设置 URL</strong>、进 5 秒、进 20 秒、下一个。</p>
-
-  <div class="callout">
-    <strong>注意：</strong>"设置 URL"<strong>不是</strong>清空替换——它把新链接插到当前播放内容后面，然后立刻切过去。想彻底换掉，先点"清空列表"再设 URL。
-  </div>
-
-  <!-- ======== 遥控器 ======== -->
-  <h1>遥控器</h1>
-  <p class="lead">站远处随手控播，不用进菜单翻找。</p>
-
-  <table class="kami-table striped">
-    <thead>
-      <tr><th>功能</th><th>说明</th></tr>
-    </thead>
-    <tbody>
-      <tr><td>电源开关</td><td>暂时关掉或重新打开（不是删除设备）。</td></tr>
-      <tr><td>总音量</td><td>所有喇叭的总音量（不是单个喇叭的）。</td></tr>
-      <tr><td>上一首 / 下一首</td><td>切歌。</td></tr>
-      <tr><td>快退 / 快进</td><td>后退或前进 5 秒 / 20 秒。</td></tr>
-      <tr><td>设置 URL</td><td>输个链接直接放。</td></tr>
-      <tr><td>进入设置页</td><td>跳到播放器或频道设置。</td></tr>
-    </tbody>
-  </table>
-
-  <!-- ======== 场景与FAQ ======== -->
-  <h1>典型场景与常见问题</h1>
-
-  <h2>场景一：单人私有电视</h2>
-  <p>适合家园电视、小房间屏幕。创建播放器后保持默认（私有状态 + 自带频道），去频道页设个链接就能播。不改任何设置也能用。</p>
-
-  <h2>场景二：大厅公告大屏</h2>
-  <p>适合主城迎宾屏、活动预告屏。让服主建一个公共频道，把几台播放器都绑过去。都调到同一个频道后，所有屏幕播同一套内容。</p>
-
-  <h2>场景三：公共点歌屏</h2>
-  <p>适合酒吧、休闲区。频道需要开放公开控制，这样谁都可以点播。在频道页加链接或从列表里选一个就行。</p>
-
-  <h2>常见问题</h2>
-  <h3>为什么我能看到频道，但点了没反应</h3>
-  <p>频道没开公开控制，你也没有操作权限。能看，不能改。</p>
-
-  <h3>为什么播放器离远了就不播了</h3>
-  <p>超出激活范围了。走远会自动关，走回来自动恢复。</p>
-
-  <h3>为什么设置 URL 后不是替换，而是插入</h3>
-  <p>"设置 URL"是插到当前内容后面再切过去，不是清空重来。想彻底换掉，先点"清空列表"，再设 URL。</p>
-
-  <h2>功能与兼容性 QA</h2>
-
-  <h3>支持哪些视频格式、网络视频和直播流？</h3>
-  <p>这部分不是由 MTV 本体硬编码决定的，而是交给<strong>独立的视频平台解析 Mod</strong>来处理。你装了哪些平台的解析 Mod，就支持哪些平台的链接或分享文本。</p>
-  <p>可以把它理解成两步：<strong>先解析，再播放</strong>。服务端插件或客户端 MTV Mod 只负责把玩家输入的链接、分享文本分发出去；平台解析 Mod 再把它解析成 FFmpeg 能直接处理的真实媒体链接，然后客户端本地解码播放。</p>
-  <p>所以会出现一种情况：<strong>同一个链接，A 玩家能播，B 玩家不一定能播</strong>。原因通常不是频道坏了，而是 A 装了对应的平台解析 Mod，B 没装，或者两边装的解析能力不一样。</p>
-
-  <h3>支持多人同步观看同一个视频吗？中途加入或重新进入观看区域时会自动同步进度吗？</h3>
-  <p>支持。多个播放器绑到同一个公共频道后，会共享同一套播放状态和播放列表。玩家中途加入、重新靠近播放器，或者重新进入观看区域时，客户端会拿到当前频道状态并自动对齐到当前进度，不会各播各的。</p>
-
-  <h3>支持创建多个独立视频屏幕和播放列表吗？</h3>
-  <p>支持。你可以创建多台互不影响的播放器，每台保留自己的私有频道和播放列表；也可以让多台播放器绑定到同一个公共频道，做多屏同播。</p>
-
-  <h3>管理员可以通过哪些方式控制视频播放？</h3>
-  <p>主要有两种：<strong>GUI</strong> 和 <strong>命令</strong>。日常推荐直接用 <code>/mtv</code> 打开 GUI，通过播放器页、频道页、遥控器页控制；项目里也保留了旧式命令入口，更适合管理员调试、兼容或批量处理。</p>
-
-  <h3>支持哪些服务端和客户端平台（Paper、Fabric、Forge 等）？</h3>
-  <p><strong>客户端只支持 Fabric。</strong> <strong>服务端只支持类 Paper 平台</strong>，包括 Paper、Folia、Luminol。</p>
-
-  <h3>视频内容由服务器管理还是客户端获取？</h3>
-  <p><strong>服务器管状态，客户端拉内容。</strong> 服务器负责管理频道状态，例如当前 URL、播放进度、暂停状态、播放列表和同步时间轴；客户端收到这些状态后，再自己去解析 URL、加载媒体并播放。</p>
-
-  <h3>视频是否会占用服务器带宽？</h3>
-  <p>基本不会。服务端并不负责解码视频，也不负责转发视频流，只负责播放状态管理，并发送少量用于视频同步的轻量网络包。理论上，这部分性能和带宽开销可以忽略不计。</p>
-
-  <h3>玩家需要额外安装客户端 Mod 吗？</h3>
-  <p>需要。当前仓库包含独立的客户端 Fabric Mod，频道同步、本地媒体加载和实际播放都在客户端侧完成。没有装客户端 Mod，就没有这套同步播放能力。</p>
-</section>
-
-<!-- ════════════════════════════════════════════════════════════════
-     PART III · 管理员配置手册
-     包含完整权限节点名
-     ════════════════════════════════════════════════════════════════ -->
-<section class="part-divider">
-  <div class="part-num">Part III</div>
-  <div class="part-title">管理员配置手册</div>
-  <div class="part-desc">哪些权限给什么人、播放器公开还是私有、激活范围设多大、公共频道怎么管——服主需要知道的配置操作。</div>
-</section>
-
-<section class="chapter">
-  <div class="chapter-num">III · Admin Guide</div>
-  <h1>权限一览</h1>
-
-  <p class="lead">以下列出 MTV 的所有权限节点。面向管理员配置权限组时使用。</p>
-
-  <table class="kami-table striped">
-    <thead>
-      <tr><th>权限节点</th><th>作用</th></tr>
-    </thead>
-    <tbody>
-      <tr><td><code>mtv.gui</code></td><td>打开 MTV 主菜单。</td></tr>
-      <tr><td><code>mtv.player.create</code></td><td>创建播放器。</td></tr>
-      <tr><td><code>mtv.player.edit</code></td><td>编辑播放器设置、外设、播放、移动、删除等。</td></tr>
-      <tr><td><code>mtv.player.edit.others</code></td><td>编辑或删除别人创建的私有播放器。</td></tr>
-      <tr><td><code>mtv.player.teleport</code></td><td>传送到播放器所在位置。</td></tr>
-      <tr><td><code>mtv.channel.create</code></td><td>创建公共频道。</td></tr>
-      <tr><td><code>mtv.channel.manage.others</code></td><td>管理别人创建的公共频道资料（名称与介绍）。</td></tr>
-      <tr><td><code>mtv.channel.control.others</code></td><td>控制别人创建且未公开控制播放的公共频道。</td></tr>
-      <tr><td><code>mtv.admin</code></td><td>聚合以上全部管理权限。</td></tr>
-    </tbody>
-  </table>
-
-  <div class="callout">
-    如果你使用旧式命令的实体选择器子命令，还需要确保玩家有 <code>minecraft.command.selector</code> 权限。不过面向玩家的主要流程已经全部由 GUI 覆盖，旧式命令更适合作为调试入口。
-  </div>
-
-  <h2>公开播放器与私有播放器</h2>
-  <p>播放器的公开/私有状态决定的是谁能修改播放器的配置：</p>
-  <ul>
-    <li><strong>私有播放器</strong>：只有创建者，或拥有 <code>mtv.player.edit.others</code> 的玩家可以编辑。</li>
-    <li><strong>公开播放器</strong>：任何能打开 GUI 的玩家都能看到和进入。但切回私有仍然需要创建者或 <code>mtv.player.edit.others</code>。</li>
-  </ul>
-
-  <h2>激活范围</h2>
-  <p>播放器默认最大激活范围是 50 格。超出该距离后客户端会临时关闭播放器以减轻负担，回到范围内自动恢复。设为 0、<code>off</code> 或 <code>none</code> 表示无限制。</p>
-  <ul>
-    <li>室内小屏或私人屏幕 → 设置较小范围（如 10-20 格）。</li>
-    <li>公共大厅主屏 → 适当加大（如 50-100 格）。</li>
-    <li>极少数关键屏幕 → 设为无限制。</li>
-  </ul>
-
-  <!-- ======== 公共频道管理 ======== -->
-  <h1>公共频道管理</h1>
-
-  <h2>频道页核心功能</h2>
-  <p>频道页的操作在 Part II 中已经对所有用户说明。作为管理员，需要额外关注以下权限相关的内容。</p>
-
-  <h3>频道管理权限 vs 控制权限</h3>
-  <p>公共频道有两套独立的权限体系：</p>
-  <ul>
-    <li><strong>频道管理权限</strong>：修改频道名称和介绍——频道创建者，或拥有 <code>mtv.channel.manage.others</code> 的玩家。</li>
-    <li><strong>频道播放控制权限</strong>：控制频道播放内容——创建者始终可控；<code>mtv.channel.control.others</code> 始终可控；若频道开启了"公开播放控制"，则所有玩家都可控。</li>
-  </ul>
-
-  <div class="takeaway">
-    <div class="takeaway-label">管理员的常见判断场景</div>
+  <div class="exec-summary">
+    <h2>核心结论</h2>
     <ul>
-      <li>玩家能看到频道列表 → 不代表他能改频道名和介绍。</li>
-      <li>玩家能进入频道控制页 → 不代表他能修改播放内容。</li>
-      <li>只有公开播放控制开启时，所有玩家才拥有播放控制权。</li>
+      <li>玩家日常只需要记住一个入口：<code>/mtv</code>，其余操作几乎都在 GUI 内完成。</li>
+      <li>服务器侧以 <code>channel</code> 为权威状态源，播放器只是绑定到频道的可视化承载体。</li>
+      <li>公共频道与私有频道并存：私有频道服务单个播放器，公共频道可被多个播放器绑定并被搜索、管理。</li>
+      <li>客户端每 <span class="hl">5 秒</span>发送心跳，服务端在约 <span class="hl">30 秒</span>无心跳时清理 audience 会话。</li>
+      <li>播放进度不是持续推流同步，而是由服务端给出锚点，客户端按本地单调时间推算当前位置。</li>
     </ul>
   </div>
 
-  <h2>公共频道列表与搜索</h2>
-  <p>公共频道列表支持分页浏览，支持按频道名称、频道介绍、创建者名称搜索。管理员可以通过"我的频道"快速过滤出自己创建的频道。</p>
+  <h2>系统由哪几部分组成</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>层级</th>
+        <th>主要职责</th>
+        <th>对应实现</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>插件入口</td>
+        <td>注册命令、GUI、网络同步、心跳清理与周期广播</td>
+        <td><code>McediaMtvPlugin</code></td>
+      </tr>
+      <tr>
+        <td>播放器管理</td>
+        <td>创建、读取、删除播放器实体，维护实体配置与频道绑定</td>
+        <td><code>MtvPlayerManager</code></td>
+      </tr>
+      <tr>
+        <td>频道服务</td>
+        <td>维护播放状态、播放列表、公共频道信息、权限与持久化</td>
+        <td><code>MtvChannelService</code></td>
+      </tr>
+      <tr>
+        <td>GUI 交互</td>
+        <td>页面导航、点击分发、聊天输入、列表分页与页面状态保留</td>
+        <td><code>MtvGui</code> 与各类 <code>*Page</code></td>
+      </tr>
+      <tr>
+        <td>客户端会话</td>
+        <td>加载媒体、按快照同步播放位置、上报时长/完成态/挂起态</td>
+        <td><code>ClientChannelSession</code></td>
+      </tr>
+    </tbody>
+  </table>
 
-  <h2>公开播放控制开关</h2>
-  <p>这是公共频道最关键的设置：</p>
+  <h2>播放器、频道与观众的关系</h2>
+  <p>
+    领域模型的关键不是“某个屏幕正在播什么”，而是“某个频道现在处于什么状态”。服务端维护 <code>ChannelRuntimeState</code>，其中包含媒体 URL、播放状态、播放速度、播放列表、当前游标、频道元信息与 audience 摘要。播放器实体只保存“我绑定到哪个频道”；当播放器未绑定公共频道时，会自动回落到自己的私有频道。
+  </p>
+  <p>
+    这意味着：同一公共频道可以被多个播放器共用；频道删除后，所有绑定它的播放器都会失去该公共频道；而私有频道会跟随播放器生命周期创建与清理。对管理员和开发者来说，<span class="hl">先想频道，再想实体</span>，会更接近项目真实结构。
+  </p>
+
+  <div class="callout">
+    在当前实现里，服务端不会高频推送“当前播放到第几毫秒”。它只在状态变化或周期广播时下发快照；客户端依据锚点时间、自身单调时钟与播放速度自行推算播放位置。这样能降低同步噪声，也更适合多客户端同时接入。
+  </div>
+
+  <h2>默认操作入口</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>入口</th>
+        <th>用途</th>
+        <th>说明</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>/mtv</code></td>
+        <td>打开主菜单</td>
+        <td>默认入口，适合绝大多数操作</td>
+      </tr>
+      <tr>
+        <td><code>/mtv gui</code></td>
+        <td>打开主菜单</td>
+        <td>与 <code>/mtv</code> 等价</td>
+      </tr>
+      <tr>
+        <td><code>/mtv create &lt;name&gt;</code></td>
+        <td>直接创建播放器</td>
+        <td>在玩家当前位置创建 MTV 播放器并进入控制页</td>
+      </tr>
+      <tr>
+        <td>聊天输入</td>
+        <td>补充文本参数</td>
+        <td>重命名、搜索频道、输入媒体 URL 等操作通过聊天栏完成</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<section class="chapter">
+  <div class="chapter-num">02 · Player Guide</div>
+  <h1>玩家使用指南</h1>
+
+  <p class="lead">
+    对玩家而言，MTV 的使用逻辑很简单：先找到或创建播放器，再决定它是独立播放，还是绑定到某个公共频道。大部分常用功能已经集中在主菜单、播放器页、频道页与遥控器页中。
+  </p>
+
+  <h2>第一次使用：建议流程</h2>
+  <ol>
+    <li>输入 <code>/mtv</code> 打开主菜单。</li>
+    <li>如果附近已有播放器，优先点“控制最近的播放器”或“附近的播放器”。</li>
+    <li>如果没有可用播放器，点“创建播放器”，在聊天栏输入名称。</li>
+    <li>进入播放器页后，按需要配置外设、位置、激活范围与公开状态。</li>
+    <li>如果想独立播放，进入“频道设置”直接维护私有频道；如果想多人共用，去“频道列表”绑定公共频道。</li>
+  </ol>
+
+  <h2>主菜单能做什么</h2>
+  <p>
+    主菜单分成两块：左边偏播放器，右边偏频道。左侧包括“控制最近的播放器”“附近的播放器”“创建播放器”；右侧包括“频道控制”“频道列表”“我的频道”。这个设计刻意把“实体控制”和“频道管理”分开，避免用户把播放器和频道当成同一层概念。
+  </p>
+  <p>
+    如果你只是想让最近的一台屏幕播起来，最短路径通常是：<span class="hl">/mtv → 频道控制 → 设置 URL</span>。如果你想长期维护一套公共内容源，再去创建和管理公共频道。
+  </p>
+
+  <h2>播放器页面：管实体，不直接管媒体</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>功能</th>
+        <th>作用</th>
+        <th>适用场景</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>重命名</td>
+        <td>修改播放器显示名称</td>
+        <td>区分大厅屏、商店屏、活动屏</td>
+      </tr>
+      <tr>
+        <td>传送到位置</td>
+        <td>快速回到该播放器所在地点</td>
+        <td>地图大、设备分散时很有用</td>
+      </tr>
+      <tr>
+        <td>外设管理</td>
+        <td>管理屏幕与扬声器数量和配置</td>
+        <td>搭建显示墙、音响区时使用</td>
+      </tr>
+      <tr>
+        <td>位置与朝向</td>
+        <td>调整实体位置、偏航与俯仰</td>
+        <td>摆正屏幕、贴合建筑结构</td>
+      </tr>
+      <tr>
+        <td>激活范围</td>
+        <td>限制客户端在一定距离内才为该播放器工作</td>
+        <td>性能优化、避免远处无意义解码</td>
+      </tr>
+      <tr>
+        <td>公开 / 私有</td>
+        <td>决定谁可以编辑该播放器</td>
+        <td>多人服务器权限隔离</td>
+      </tr>
+      <tr>
+        <td>绑定新的频道</td>
+        <td>让该播放器改播某个公共频道</td>
+        <td>多屏同步、统一内容源</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>频道页面：管媒体、播放列表与时间轴</h2>
+  <p>
+    频道页面是实际“播什么、怎么播”的主战场。页面上半部是播放列表，中部是加项、清空和播放顺序，下半部是播放/暂停、前后跳时与切歌。当前实现支持把 URL 作为播放项插入到列表头、下一项或尾部，也支持直接“插入并立即播放”。
+  </p>
+  <p>
+    播放顺序有多种模式：顺序、随机、列表循环、当前媒体循环、播完当前停止。若你把频道当作连续节目流使用，推荐列表循环；若只是临时推送一条内容，推荐当前媒体循环或播完当前停止。
+  </p>
+
+  <div class="takeaway">
+    <div class="takeaway-label">实用建议</div>
+    单次播一条视频时，直接在频道页点“设置 URL”最快；做长期频道时，先把列表整理好，再切换播放顺序。把“临时插播”和“长期节目单”混在一起，后续维护会很乱。
+  </div>
+
+  <h2>公共频道与私有频道怎么选</h2>
+  <p>
+    私有频道适合“一台播放器只播自己的内容”；公共频道适合“多台播放器共享同一套节目流”。如果你只是装一块私人屏幕，继续使用私有频道即可；如果你想让大厅、分会场、商店橱窗统一播同一个频道，再创建公共频道并绑定多个播放器。
+  </p>
+  <p>
+    公共频道列表页支持搜索、只看自己的频道、创建新频道，以及把当前播放器绑定到目标公共频道。绑定后，播放器页中的“查看当前频道”会跳到公共频道详情页，统一管理频道名称、介绍、公开控制权限和删除操作。
+  </p>
+
+  <h2>遥控器页适合什么场景</h2>
+  <p>
+    遥控器页是轻量控制面板。它把电源、音量、频道跳转与播放控制压在一个页面里，适合站在现场做快速调试。你可以在这里调整音量、快进快退、切上一首下一首，也可以直接切到播放器设置页或频道设置页做更深入的修改。
+  </p>
+  <p>
+    需要注意的是，遥控器并不绕过频道权限。若当前频道未开启公开控制，只有频道创建者或拥有相应权限的玩家，才能通过遥控器更改播放内容。
+  </p>
+</section>
+
+<section class="chapter">
+  <div class="chapter-num">03 · Server Admin Guide</div>
+  <h1>服务器管理员指南</h1>
+
+  <p class="lead">
+    管理员需要关注的是三件事：谁能创建或编辑播放器，谁能创建或控制公共频道，以及系统在多人同时观看时如何维持同步与回收状态。
+  </p>
+
+  <h2>权限模型</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>权限节点</th>
+        <th>默认</th>
+        <th>作用</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>mtv.gui</code></td>
+        <td>true</td>
+        <td>打开 MTV GUI</td>
+      </tr>
+      <tr>
+        <td><code>mtv.player.create</code></td>
+        <td>true</td>
+        <td>创建播放器</td>
+      </tr>
+      <tr>
+        <td><code>mtv.player.edit</code></td>
+        <td>true</td>
+        <td>编辑自己可管理的播放器设置</td>
+      </tr>
+      <tr>
+        <td><code>mtv.player.edit.others</code></td>
+        <td>op</td>
+        <td>编辑或删除他人的私有播放器</td>
+      </tr>
+      <tr>
+        <td><code>mtv.player.teleport</code></td>
+        <td>op</td>
+        <td>传送到播放器位置</td>
+      </tr>
+      <tr>
+        <td><code>mtv.channel.create</code></td>
+        <td>true</td>
+        <td>创建公共频道</td>
+      </tr>
+      <tr>
+        <td><code>mtv.channel.manage.others</code></td>
+        <td>op</td>
+        <td>管理别人创建的公共频道</td>
+      </tr>
+      <tr>
+        <td><code>mtv.channel.control.others</code></td>
+        <td>op</td>
+        <td>控制别人创建且未公开控制的公共频道播放</td>
+      </tr>
+      <tr>
+        <td><code>mtv.admin</code></td>
+        <td>op</td>
+        <td>打包授予上述主要管理权限</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>建议的服内治理策略</h2>
   <ul>
-    <li><strong>公开</strong>：所有玩家都可以控制该频道播放——适合点歌屏、互动屏。</li>
-    <li><strong>私有</strong>：只有创建者或 <code>mtv.channel.control.others</code> 可控制——适合公告屏、广告屏、活动主舞台。</li>
+    <li>公共大厅、商业区、活动区建议由管理员统一创建公共频道，再把播放器绑定过去。</li>
+    <li>普通玩家可以保留 <code>mtv.player.create</code> 与 <code>mtv.gui</code>，但不一定要开放跨人编辑权限。</li>
+    <li>如果服务器强调秩序，建议只允许少数角色拥有 <code>mtv.channel.create</code>，避免公共频道列表被大量低质量频道污染。</li>
+    <li>对于活动运营位，通常只需要赋予频道控制权限，不需要授予频道管理或他人播放器编辑权限。</li>
   </ul>
 
-  <h2>删除公共频道</h2>
-  <p>删除频道是危险操作。删除后频道本身和其状态持久化数据都会被移除。如果删除失败，通常意味着当前状态不允许删除，或该频道仍有绑定关系未解除。建议删除前先确认频道是否仍被重要播放器使用。</p>
+  <h2>公开播放器与公开控制不是一回事</h2>
+  <p>
+    播放器“公开 / 私有”解决的是<span class="hl">实体谁能改</span>；公共频道的“播放权限公开 / 私有”解决的是<span class="hl">谁能改这个频道的播放状态</span>。两者分属不同层级，不要混用。
+  </p>
+  <p>
+    一个常见组合是：播放器实体由管理员维护，因此播放器仍偏私有；但它绑定的公共频道允许公开控制，于是活动主持人可以换片、暂停、跳转，而不会碰到实体位置、外设配置或删除操作。
+  </p>
 
-  <!-- ======== 维护建议 ======== -->
-  <h2>维护建议</h2>
+  <h2>运行与性能要点</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>机制</th>
+        <th>当前实现</th>
+        <th>管理员应关注什么</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>audience 超时</td>
+        <td>约 30 秒无心跳即清理</td>
+        <td>离线客户端不会长期占用会话</td>
+      </tr>
+      <tr>
+        <td>客户端心跳</td>
+        <td>约每 5 秒上报一次</td>
+        <td>用于修正状态、推进列表与统计观众数</td>
+      </tr>
+      <tr>
+        <td>周期广播</td>
+        <td>插件按固定 tick 周期发布同步更新</td>
+        <td>减少新加入观众或偏移客户端的停留误差</td>
+      </tr>
+      <tr>
+        <td>激活范围</td>
+        <td>超出距离后客户端可临时停止该播放器</td>
+        <td>用来压制远处无意义解码负载</td>
+      </tr>
+      <tr>
+        <td>decoder limit 挂起</td>
+        <td>客户端资源紧张时可进入挂起态</td>
+        <td>这属于运行态，不等于频道停止或播放器损坏</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="callout">
+    如果 GUI 中显示“多数观众端已挂起”，通常说明客户端端侧资源优先级或解码容量不足，而不是服务端频道丢了。此时优先检查观众位置、客户端负载与激活范围，不要第一时间删频道或重建播放器。
+  </div>
+
+  <h2>插件启停时会发生什么</h2>
+  <p>
+    插件启动时会加载已持久化的频道状态、恢复 audience 超时设置、建立网络服务、注册 GUI 与命令，并定期执行 audience 清理与频道同步任务。关闭时则会撤掉回调、停止定时任务、关闭网络服务、关闭仍打开的 MTV GUI，并让频道服务安全收尾。
+  </p>
+  <p>
+    这套流程意味着：公共频道状态是可持久化的；私有频道也会在播放器创建时初始化，并在播放器删除或注销时被清理。管理员做运维排障时，应优先区分“频道状态还在不在”和“播放器实体还在不在”，这两个问题往往来自不同层面。
+  </p>
+</section>
+
+<section class="chapter">
+  <div class="chapter-num">04 · Developer Guide</div>
+  <h1>开发人员指南</h1>
+
+  <p class="lead">
+    如果你要继续开发 MTV，最重要的不是先改某个 GUI 页，而是先理解当前架构把“播放控制”“实体配置”“客户端同步”拆在了哪三层。掌握这三层边界，改动才不容易串味。
+  </p>
+
+  <h2>入口与初始化顺序</h2>
+  <p>
+    服务端入口是 <code>McediaMtvPlugin</code>。它在启动时构造 <code>MtvPlayerManager</code>，随后取出 <code>MtvChannelService</code> 加载持久化状态，再挂上 <code>MtvChannelNetworkService</code> 的变更/删除回调，最后组装 <code>MtvGui</code>、命令执行器与多个事件监听器。也就是说，<span class="hl">频道服务比 GUI 更基础</span>，GUI 只是它的一个操作面。
+  </p>
+
+  <h2>服务端侧的职责切分</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>组件</th>
+        <th>边界</th>
+        <th>不要让它做什么</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>MtvPlayerManager</code></td>
+        <td>实体生命周期、配置读写、绑定切换</td>
+        <td>不要把播放策略硬塞进实体层</td>
+      </tr>
+      <tr>
+        <td><code>MtvChannelService</code></td>
+        <td>频道状态、播放列表、权限判定、持久化</td>
+        <td>不要直接渲染 GUI 或处理玩家输入</td>
+      </tr>
+      <tr>
+        <td><code>MtvPlaybackController</code></td>
+        <td>围绕播放器做播放操作包装</td>
+        <td>不要绕过频道层直接制造双写状态</td>
+      </tr>
+      <tr>
+        <td><code>MtvGui</code> / <code>*Page</code></td>
+        <td>导航、页面状态、交互分流</td>
+        <td>不要在页面里长期缓存业务状态</td>
+      </tr>
+      <tr>
+        <td><code>MtvChannelNetworkService</code></td>
+        <td>快照发布、移除广播、网络订阅</td>
+        <td>不要把领域判断逻辑塞到网络层</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>为什么说 channel 是核心模型</h2>
+  <p>
+    <code>MtvChannelService</code> 维护一个以 <code>channelId</code> 为键的运行态映射，并提供播放相关的全部高层操作：更新 URL、切换暂停、相对跳时、切歌、插入播放项、切换顺序、创建公共频道、删除公共频道、切换公开控制等。所有这些操作最终都汇聚到 <code>mutatePlayback</code> 或公共频道变更逻辑，再触发持久化与同步广播。
+  </p>
+  <p>
+    对后续开发来说，这个设计很关键：无论入口来自 GUI、命令、遥控器还是未来的 API，只要目标是“改变播放状态”，都应该优先复用频道服务，而不是各写一套状态推进逻辑。否则 revision、时间锚点、播放列表游标和持久化行为很容易不一致。
+  </p>
+
+  <h2>客户端同步机制如何工作</h2>
+  <p>
+    客户端侧以 <code>ClientChannelPlaybackManager</code> 按频道持有多个 <code>ClientChannelSession</code>。当某个界面或设备 attach 到频道时，会发送订阅请求；当快照到达时，session 会比较 revision、媒体 URL、暂停态、速度与挂起态，必要时要求强制重同步。
+  </p>
+  <p>
+    真正的播放过程发生在 <code>ClientChannelSession</code> 内部：若媒体变更就重新加载；若只是时间轴偏移，就通过估算目标位置后 seek；若暂停态或速度不一致，就同步调整播放器。客户端同时每 5 秒上报心跳，告知服务端当前媒体是否已加载、是否播放完成、时长是否可解析，以及 decoder 是否处于挂起态。
+  </p>
+
+  <pre><code>服务端快照 → ClientChannelSession.updateSnapshot()
+           → tick() 中计算目标时间轴
+           → 需要时 load / seek / pause / speed 同步
+           → sendHeartbeat() 回传 loaded、completed、duration、suspended</code></pre>
+
+  <h2>做扩展时的几个落点</h2>
   <ul>
-    <li>为公共频道建立统一命名规范，按场景、区域或功能分类。</li>
-    <li>不要把所有大屏都设成无限激活范围。</li>
-    <li>对重要公共屏关闭公开播放控制，把管理权只交给可信管理员。</li>
-    <li>多用公共频道实现多屏同播，少用复制式维护多个独立频道。</li>
-    <li>在大型建筑内，优先通过"设到玩家位置"完成摆放，再做精调。</li>
-    <li>只把 <code>mtv.channel.manage.others</code> 和 <code>mtv.channel.control.others</code> 发给可信管理员。</li>
+    <li>加新的播放策略，优先扩展 <code>MtvChannelService</code> 与 <code>ChannelTimelineCalculator</code> 一侧。</li>
+    <li>加新的 GUI 操作，先决定它属于实体层还是频道层，再选择挂在 <code>PlayerMenuPage</code>、<code>ChannelMenuPage</code> 或 <code>PublicChannelManagePage</code>。</li>
+    <li>加新的同步字段，先定义它在快照和心跳中的语义，再考虑 GUI 是否展示。</li>
+    <li>若要新增持久化后端，优先围绕 <code>ChannelRepository</code> 抽象落地，而不是直接侵入页面或控制器。</li>
+    <li>若要做脚本化控制或 Web 管理台，频道服务会是最自然的后端边界。</li>
   </ul>
 
   <div class="takeaway">
-    <div class="takeaway-label">管理员总结</div>
-    MTV 的权限体系围绕三个维度展开：播放器编辑权限（公开/私有）、频道资料管理权限（名称/介绍）、频道播放控制权限（谁能改播）。理解这三层的分离后，配置权限组时就清晰了。深入的实现原理和架构参考请见下一部分。
+    <div class="takeaway-label">开发建议</div>
+    在 MTV 里，最稳妥的改法通常是“先补 channel 语义，再补 GUI 操作”。如果先从界面按钮出发补逻辑，很容易让功能能点、但状态模型不完整。
   </div>
+</section>
+
+<section class="chapter">
+  <div class="chapter-num">05 · Appendix</div>
+  <h1>附录</h1>
+
+  <h2>A. 常见问题</h2>
+  <p><strong>为什么我改了频道，另一台屏没有立刻跟上？</strong> 先看该客户端是否仍在频道 audience 内、是否超出激活范围、是否处于 decoder 挂起态；随后再检查频道是否真的发生了 revision 变化。</p>
+  <p><strong>为什么搜索得到公共频道，却无法控制它？</strong> 因为搜索权限与播放控制权限是两回事。未公开控制的频道，只允许创建者或拥有 <code>mtv.channel.control.others</code> 的玩家控制。</p>
+  <p><strong>为什么切回私有频道后内容变了？</strong> 因为播放器重新回到了自身私有频道；私有频道与公共频道是两套独立状态，不共享播放列表。</p>
+
+  <h2>B. 关键术语</h2>
+  <p><strong>player entity</strong>：世界中的 MTV 播放器实体，负责承载位置、外设与绑定信息。</p>
+  <p><strong>channel</strong>：媒体状态的核心单元，包含播放 URL、暂停态、速度、播放列表与 audience 信息。</p>
+  <p><strong>audience</strong>：当前订阅并参与该频道播放的客户端会话集合。</p>
+  <p><strong>decoder suspended</strong>：客户端因资源限制而暂时挂起解码的运行态，不代表频道丢失。</p>
+
+  <h2>C. 当前文档依据</h2>
+  <ul>
+    <li>命令与权限：<code>plugin.yml</code>、<code>MtvCommand</code></li>
+    <li>GUI 交互：<code>MtvGui</code>、<code>MainMenuPage</code>、<code>PlayerMenuPage</code>、<code>ChannelMenuPage</code>、<code>PublicChannelListPage</code>、<code>PublicChannelManagePage</code>、<code>RemoteMenuPage</code></li>
+    <li>服务端频道模型：<code>MtvChannelService</code>、相关 channel 实现</li>
+    <li>客户端同步：<code>ClientChannelSession</code>、<code>ClientChannelPlaybackManager</code></li>
+  </ul>
 </section>
 
 </body>

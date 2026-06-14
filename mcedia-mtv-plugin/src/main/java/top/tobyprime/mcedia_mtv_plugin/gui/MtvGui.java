@@ -6,6 +6,7 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.plugin.java.JavaPlugin;
 import top.tobyprime.mcedia_mtv_plugin.channel.ChannelRuntimeState;
+import top.tobyprime.mcedia_mtv_plugin.channel.PublicChannelSort;
 import top.tobyprime.mcedia_mtv_plugin.controller.MtvPeripheralController;
 import top.tobyprime.mcedia_mtv_plugin.controller.MtvPlaybackController;
 import top.tobyprime.mcedia_mtv_plugin.manager.MtvPlayerManager;
@@ -81,6 +82,7 @@ public class MtvGui {
     public static final String PUBLIC_QUERY_KEY             = "public_query";
     public static final String PUBLIC_PAGE_KEY              = "public_page";
     public static final String PUBLIC_OWN_ONLY_KEY          = "public_own_only";
+    public static final String PUBLIC_SORT_KEY              = "public_sort";
 
     // Slot arrays
     public static final int[] CHANNEL_PLAYLIST_SLOTS = {
@@ -234,6 +236,24 @@ public class MtvGui {
                 && nav.getCurrent().getState().containsKey(AWAITING_KEY);
     }
 
+    public void clearPlayerState(Player player) {
+        if (player == null) {
+            return;
+        }
+        clearPlayerState(player.getUniqueId());
+    }
+
+    public void clearPlayerState(UUID playerId) {
+        if (playerId == null) {
+            return;
+        }
+        playerNavs.remove(playerId);
+    }
+
+    public boolean isMtvInventory(Inventory inventory) {
+        return inventory != null && inventory.getHolder() instanceof MtvHolder;
+    }
+
     /** Mark the player as awaiting chat input (stored in the current entry state). */
     public void setAwaitingInput(Player player, String kind) {
         NavigationState nav = getNavigation(player);
@@ -249,16 +269,24 @@ public class MtvGui {
     public void shutdown() {
         if (closed) return;
         closed = true;
-        playerNavs.clear();
-        if (!plugin.isEnabled()) return;
+        var playersToClose = new ArrayList<Player>();
         for (var player : Bukkit.getOnlinePlayers()) {
-            player.getScheduler().run(plugin, task -> {
-                var holder = player.getOpenInventory().getTopInventory().getHolder();
-                if (holder instanceof MtvHolder) {
-                    player.closeInventory();
-                }
-            }, null);
+            if (isMtvInventory(player.getOpenInventory().getTopInventory())) {
+                playersToClose.add(player);
+            }
         }
+        for (var player : playersToClose) {
+            if (plugin.isEnabled()) {
+                player.getScheduler().run(plugin, task -> {
+                    if (isMtvInventory(player.getOpenInventory().getTopInventory())) {
+                        player.closeInventory();
+                    }
+                }, null);
+            } else if (isMtvInventory(player.getOpenInventory().getTopInventory())) {
+                player.closeInventory();
+            }
+        }
+        playerNavs.clear();
     }
 
     // ─────────────────────────────────────────────────────────
@@ -278,11 +306,12 @@ public class MtvGui {
     // ─────────────────────────────────────────────────────────
 
     /** Create a state map for public-channel list navigation. */
-    public static Map<String, String> publicChannelState(String query, int page, boolean ownOnly) {
+    public static Map<String, String> publicChannelState(String query, int page, boolean ownOnly, PublicChannelSort sort) {
         var st = new java.util.HashMap<String, String>();
         st.put(PUBLIC_QUERY_KEY, query);
         st.put(PUBLIC_PAGE_KEY, Integer.toString(page));
         st.put(PUBLIC_OWN_ONLY_KEY, Boolean.toString(ownOnly));
+        st.put(PUBLIC_SORT_KEY, sort.name());
         return st;
     }
 
@@ -297,6 +326,15 @@ public class MtvGui {
     public static boolean isPublicOwnOnly(PageEntry entry) {
         return entry != null && Boolean.parseBoolean(
                 entry.getState().getOrDefault(PUBLIC_OWN_ONLY_KEY, "false"));
+    }
+
+    public static PublicChannelSort parsePublicSort(PageEntry entry) {
+        if (entry == null) return PublicChannelSort.RELEVANCE;
+        try {
+            return PublicChannelSort.valueOf(entry.getState().getOrDefault(PUBLIC_SORT_KEY, PublicChannelSort.RELEVANCE.name()));
+        } catch (Exception e) {
+            return PublicChannelSort.RELEVANCE;
+        }
     }
 
     public static int getNearbyPage(PageEntry entry) {

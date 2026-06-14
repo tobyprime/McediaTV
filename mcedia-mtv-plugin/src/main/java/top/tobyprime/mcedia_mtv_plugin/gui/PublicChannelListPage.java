@@ -5,6 +5,7 @@ import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import java.util.UUID;
 import top.tobyprime.mcedia_mtv_plugin.channel.MtvChannelBinding;
+import top.tobyprime.mcedia_mtv_plugin.channel.PublicChannelSort;
 
 public class PublicChannelListPage extends GuiPage {
     @Override
@@ -21,8 +22,9 @@ public class PublicChannelListPage extends GuiPage {
                               NavigationState nav, PageEntry entry) {
         String query = entry.getState(MtvGui.PUBLIC_QUERY_KEY, "");
         boolean ownOnly = MtvGui.isPublicOwnOnly(entry);
+        var sort = MtvGui.parsePublicSort(entry);
         var results = context.manager().getChannelService()
-                .searchPublicChannels(query, player.getUniqueId(), ownOnly);
+                .searchPublicChannels(query, player.getUniqueId(), ownOnly, sort);
         int requestedPage = MtvGui.parsePage(entry);
         int totalPages = Math.max(1, (results.size() + MtvGui.PUBLIC_CHANNEL_SLOTS.length - 1)
                 / MtvGui.PUBLIC_CHANNEL_SLOTS.length);
@@ -35,6 +37,9 @@ public class PublicChannelListPage extends GuiPage {
         inv.setItem(47, item(Material.OAK_SIGN, "输入搜索词"));
         inv.setItem(48, item(Material.BARRIER, "清空搜索"));
         inv.setItem(49, item(Material.ANVIL, "创建公共频道"));
+        inv.setItem(50, item(Material.COMPARATOR,
+                "§e排序: " + sort.displayName(),
+                "§7点击切换排序方式"));
         inv.setItem(53, item(Material.ARROW, "下一页"));
 
         int start = page * MtvGui.PUBLIC_CHANNEL_SLOTS.length;
@@ -51,6 +56,7 @@ public class PublicChannelListPage extends GuiPage {
         entry.putState(MtvGui.PUBLIC_QUERY_KEY, query);
         entry.putState(MtvGui.PUBLIC_PAGE_KEY, Integer.toString(page));
         entry.putState(MtvGui.PUBLIC_OWN_ONLY_KEY, Boolean.toString(ownOnly));
+        entry.putState(MtvGui.PUBLIC_SORT_KEY, sort.name());
         setupTitleBar(inv, nav, entry);
         openInventory(player, inv);
     }
@@ -63,21 +69,22 @@ public class PublicChannelListPage extends GuiPage {
         String query = entry.getState(MtvGui.PUBLIC_QUERY_KEY, "");
         int page = MtvGui.parsePage(entry);
         boolean ownOnly = MtvGui.isPublicOwnOnly(entry);
+        var sort = MtvGui.parsePublicSort(entry);
 
         switch (slot) {
             case 45 -> {
-                var st = MtvGui.publicChannelState(query, Math.max(0, page - 1), ownOnly);
+                var st = MtvGui.publicChannelState(query, Math.max(0, page - 1), ownOnly, sort);
                 context.navigateTo(player, MtvGui.GuiType.PUBLIC_CHANNEL_LIST, entityUuid, null, st);
             }
             case 46 -> {
-                var st = MtvGui.publicChannelState(query, 0, !ownOnly);
+                var st = MtvGui.publicChannelState(query, 0, !ownOnly, sort);
                 context.navigateTo(player, MtvGui.GuiType.PUBLIC_CHANNEL_LIST, entityUuid, null, st);
             }
             case 47 -> {
                 context.requestInput(player, "请输入搜索关键词。可按频道名、介绍、创建者搜索。", MtvGui.AWAITING_PUBLIC_CHANNEL_SEARCH);
             }
             case 48 -> {
-                var st = MtvGui.publicChannelState("", 0, ownOnly);
+                var st = MtvGui.publicChannelState("", 0, ownOnly, sort);
                 context.navigateTo(player, MtvGui.GuiType.PUBLIC_CHANNEL_LIST, entityUuid, null, st);
             }
             case 49 -> {
@@ -85,18 +92,22 @@ public class PublicChannelListPage extends GuiPage {
                     player.sendMessage("你没有权限创建公共频道。需要权限: mtv.channel.create");
                     return true;
                 }
-                var st = MtvGui.publicChannelState(query, page, ownOnly);
+                var st = MtvGui.publicChannelState(query, page, ownOnly, sort);
                 context.navigateTo(player, MtvGui.GuiType.PUBLIC_CHANNEL_CREATE, entityUuid, null, st);
             }
+            case 50 -> {
+                var st = MtvGui.publicChannelState(query, 0, ownOnly, sort.next());
+                context.navigateTo(player, MtvGui.GuiType.PUBLIC_CHANNEL_LIST, entityUuid, null, st);
+            }
             case 53 -> {
-                var st = MtvGui.publicChannelState(query, page + 1, ownOnly);
+                var st = MtvGui.publicChannelState(query, page + 1, ownOnly, sort);
                 context.navigateTo(player, MtvGui.GuiType.PUBLIC_CHANNEL_LIST, entityUuid, null, st);
             }
             default -> {
                 int localIndex = GuiPage.indexOf(MtvGui.PUBLIC_CHANNEL_SLOTS, slot);
                 if (localIndex < 0) return false;
                 var results = context.manager().getChannelService()
-                        .searchPublicChannels(query, player.getUniqueId(), ownOnly);
+                        .searchPublicChannels(query, player.getUniqueId(), ownOnly, sort);
                 int globalIndex = page * MtvGui.PUBLIC_CHANNEL_SLOTS.length + localIndex;
                 if (globalIndex < 0 || globalIndex >= results.size()) return false;
                 var channel = results.get(globalIndex);
@@ -111,7 +122,7 @@ public class PublicChannelListPage extends GuiPage {
                                 context.navigateTo(player, MtvGui.GuiType.CHANNEL_MENU, entityUuid);
                             }));
                 } else {
-                    var st = MtvGui.publicChannelState(query, page, ownOnly);
+                    var st = MtvGui.publicChannelState(query, page, ownOnly, sort);
                     st.put("channel_id", channel.getChannelId());
                     context.navigateTo(player, MtvGui.GuiType.PUBLIC_CHANNEL_MANAGE,
                             entityUuid, null, st);
@@ -131,8 +142,9 @@ public class PublicChannelListPage extends GuiPage {
         // awaiting key already consumed, but we still check it for routing
         String query = message.trim();
         boolean ownOnly = MtvGui.isPublicOwnOnly(entry);
+        var sort = MtvGui.parsePublicSort(entry);
         context.runOnPlayer(player, () -> {
-            var st = MtvGui.publicChannelState(query, 0, ownOnly);
+            var st = MtvGui.publicChannelState(query, 0, ownOnly, sort);
             context.navigateTo(player, MtvGui.GuiType.PUBLIC_CHANNEL_LIST,
                     entry.getEntityUuid(), null, st);
         });

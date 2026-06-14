@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">MCedia Core icon</title>
+  <desc id="desc">MCedia logo with a Core background wordmark in a dark Minecraft Ten style.</desc>
+
+  <defs>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="160%">
+      <feDropShadow dx="0" dy="12" stdDeviation="12" flood-color="#000000" flood-opacity="0.16" />
+    </filter>
+    <style>
+      @font-face {
+        font-family: "Minecraft Ten";
+        src: url("https://www.minecraft.net/etc.clientlibs/minecraftnet/clientlibs/clientlib-site/resources/fonts/Minecraft-Tenv2.woff2") format("woff2");
+      }
+      .brand-main {
+        font-family: "Minecraft Ten", sans-serif;
+        font-size: 110px;
+        letter-spacing: 0;
+      }
+      .brand-sub {
+        font-family: "Minecraft Ten", sans-serif;
+        font-size: 72px;
+        letter-spacing: 0;
+      }
+      .core-bg {
+        font-family: "Minecraft Ten", sans-serif;
+        font-size: 82px;
+        letter-spacing: 1px;
+      }
+    </style>
+  </defs>
+
+  <g filter="url(#shadow)">
+    <rect x="48" y="112" width="416" height="288" fill="#111417" />
+
+    <text x="92" y="212" class="core-bg" fill="#31383d" opacity="0.98">Core</text>
+
+    <g>
+      <text x="74" y="278" class="brand-main" fill="#ffffff">M</text>
+      <text x="140" y="306" class="brand-sub" fill="#63e61d">c</text>
+      <text x="184" y="278" class="brand-main" fill="#ffffff">edia</text>
+    </g>
+  </g>
+</svg>

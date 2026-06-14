@@ -30,7 +30,14 @@ public final class MtvChannelService {
 
     public MtvChannelService(MtvPlayerManager manager) {
         this.manager = manager;
-        this.repository = new FileSystemChannelRepository(manager.getPlugin());
+        ChannelRepository repo;
+        try {
+            repo = new SqLiteChannelRepository(manager.getPlugin());
+        } catch (Exception e) {
+            LOGGER.error("Failed to initialize SQLite repository, falling back to filesystem", e);
+            repo = new FileSystemChannelRepository(manager.getPlugin());
+        }
+        this.repository = repo;
     }
 
     public void loadPersistedStates() {
@@ -298,20 +305,43 @@ public final class MtvChannelService {
         return state;
     }
 
-    public List<ChannelRuntimeState> searchPublicChannels(String query, UUID creatorUuid, boolean ownOnly) {
+    public List<ChannelRuntimeState> searchPublicChannels(String query, UUID creatorUuid, boolean ownOnly, PublicChannelSort sort) {
         String normalized = query == null ? "" : query.trim().toLowerCase();
-        return channelStates.values().stream()
+        var candidates = channelStates.values().stream()
                 .filter(ChannelRuntimeState::isPublicChannel)
                 .filter(state -> !ownOnly || (creatorUuid != null && creatorUuid.toString().equals(state.getCreatorUuid())))
                 .filter(state -> normalized.isBlank()
                         || state.getChannelName().toLowerCase().contains(normalized)
                         || state.getDescription().toLowerCase().contains(normalized)
                         || state.getCreatorName().toLowerCase().contains(normalized))
-                .sorted(Comparator
-                        .comparing((ChannelRuntimeState state) -> matchRank(state, normalized))
-                        .thenComparing(ChannelRuntimeState::getUpdatedAtMs, Comparator.reverseOrder())
-                        .thenComparing(ChannelRuntimeState::getChannelName, String.CASE_INSENSITIVE_ORDER))
                 .toList();
+
+        Comparator<ChannelRuntimeState> comparator;
+        switch (sort) {
+            case CREATED_NEWEST:
+                comparator = Comparator.comparingLong(ChannelRuntimeState::getCreatedAtMs).reversed();
+                break;
+            case CREATED_OLDEST:
+                comparator = Comparator.comparingLong(ChannelRuntimeState::getCreatedAtMs);
+                break;
+            case MOST_VIEWERS:
+                comparator = Comparator
+                        .<ChannelRuntimeState, Integer>comparing(
+                                state -> audienceSessionManager.countAudience(state.getChannelId()))
+                        .reversed()
+                        .thenComparing(ChannelRuntimeState::getChannelName, String.CASE_INSENSITIVE_ORDER);
+                break;
+            case NAME_A_Z:
+                comparator = Comparator.comparing(ChannelRuntimeState::getChannelName, String.CASE_INSENSITIVE_ORDER);
+                break;
+            default: // RELEVANCE
+                comparator = Comparator
+                        .<ChannelRuntimeState, Integer>comparing(state -> matchRank(state, normalized))
+                        .thenComparing(ChannelRuntimeState::getUpdatedAtMs, Comparator.reverseOrder())
+                        .thenComparing(ChannelRuntimeState::getChannelName, String.CASE_INSENSITIVE_ORDER);
+                break;
+        }
+        return candidates.stream().sorted(comparator).toList();
     }
 
     public ChannelRuntimeState getPublicChannel(String channelId) {
