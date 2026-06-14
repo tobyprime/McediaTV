@@ -3,6 +3,7 @@ package top.tobyprime.mcedia_mtv_plugin.gui;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
+import top.tobyprime.mcedia_mtv_plugin.channel.PublicChannelSort;
 
 public class MainMenuPage extends GuiPage {
     @Override
@@ -90,6 +91,7 @@ public class MainMenuPage extends GuiPage {
                 st.put(MtvGui.PUBLIC_OWN_ONLY_KEY, "true");
                 st.put(MtvGui.PUBLIC_QUERY_KEY, "");
                 st.put(MtvGui.PUBLIC_PAGE_KEY, "0");
+                st.put(MtvGui.PUBLIC_SORT_KEY, PublicChannelSort.RELEVANCE.name());
                 context.navigateTo(player, MtvGui.GuiType.PUBLIC_CHANNEL_LIST, null, null, st);
             }
 

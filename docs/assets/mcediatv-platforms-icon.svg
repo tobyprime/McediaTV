@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">MCedia Platforms icon</title>
+  <desc id="desc">MCedia logo with a brighter Platforms background wordmark and platform icons for Bilibili and Douyin.</desc>
+
+  <defs>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="160%">
+      <feDropShadow dx="0" dy="12" stdDeviation="12" flood-color="#000000" flood-opacity="0.16" />
+    </filter>
+    <style>
+      @font-face {
+        font-family: "Minecraft Ten";
+        src: url("https://www.minecraft.net/etc.clientlibs/minecraftnet/clientlibs/clientlib-site/resources/fonts/Minecraft-Tenv2.woff2") format("woff2");
+      }
+      .brand-main {
+        font-family: "Minecraft Ten", sans-serif;
+        font-size: 110px;
+        letter-spacing: 0;
+      }
+      .brand-sub {
+        font-family: "Minecraft Ten", sans-serif;
+        font-size: 72px;
+        letter-spacing: 0;
+      }
+      .platforms-bg {
+        font-family: "Minecraft Ten", sans-serif;
+        font-size: 66px;
+        letter-spacing: 1.5px;
+      }
+    </style>
+  </defs>
+
+  <g filter="url(#shadow)">
+    <rect x="48" y="112" width="416" height="288" fill="#111417" />
+
+    <text x="58" y="208" class="platforms-bg" fill="#31383d" opacity="0.98">Platforms</text>
+
+    <g>
+      <text x="74" y="278" class="brand-main" fill="#ffffff">M</text>
+      <text x="140" y="306" class="brand-sub" fill="#63e61d">c</text>
+      <text x="184" y="278" class="brand-main" fill="#ffffff">edia</text>
+    </g>
+
+    <g transform="translate(76 334)">
+      <rect x="0" y="0" width="88" height="34" rx="8" fill="#1b2024" opacity="0.96" />
+      <image href="https://www.bilibili.com/favicon.ico" x="8" y="5" width="24" height="24" preserveAspectRatio="xMidYMid meet" />
+      <image href="https://www.douyin.com/favicon.ico" x="38" y="5" width="24" height="24" preserveAspectRatio="xMidYMid meet" />
+      <circle cx="74" cy="17" r="4" fill="#63e61d" opacity="0.95" />
+    </g>
+  </g>
+</svg>

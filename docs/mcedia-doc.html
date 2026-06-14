@@ -1,0 +1,921 @@
+<!DOCTYPE html>
+<!-- ==================================================================
+     LONG DOCUMENT TEMPLATE · parchment design system
+     多页 A4 白皮书/技术报告/年度总结
+     结构：封面 -> 目录 -> 执行摘要 -> 正文章节 -> 附录
+     ================================================================== -->
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>McediaTV 使用文档</title>
+<meta name="author" content="Mcedia 团队">
+<meta name="description" content="McediaTV — Minecraft 电视播放系统。玩家指南、管理员指南、开发人员指南。">
+<meta name="keywords" content="Mcedia, MTV, Minecraft, 电视, 播放器, 媒体, 弹幕, Bukkit, Paper, Folia">
+<meta name="generator" content="Kami">
+<style>
+  /* Regular weight */
+  @font-face {
+    font-family: "TsangerJinKai02";
+    src: url("/home/toby/.claude/skills/kami/assets/fonts/TsangerJinKai02-W04.ttf") format("truetype"),
+       url("https://cdn.jsdelivr.net/gh/tw93/Kami@main/assets/fonts/TsangerJinKai02-W04.ttf") format("truetype");
+    font-weight: 400;
+    font-style: normal;
+  }
+
+  /* Bold weight - W05 for all bold variants */
+  @font-face {
+    font-family: "TsangerJinKai02";
+    src: url("/home/toby/.claude/skills/kami/assets/fonts/TsangerJinKai02-W05.ttf") format("truetype"),
+       url("https://cdn.jsdelivr.net/gh/tw93/Kami@main/assets/fonts/TsangerJinKai02-W05.ttf") format("truetype");
+    font-weight: 500;
+    font-style: normal;
+  }
+
+  @page {
+    size: A4;
+    margin: 20mm 22mm 22mm 22mm;
+    background: #f5f4ed;
+
+    @top-right {
+      content: string(section-title);
+      font-family: "TsangerJinKai02", "Source Han Serif SC",
+                   "Noto Serif CJK SC", "Songti SC", Georgia, serif;
+      font-size: 8pt;
+      color: #6b6a64;
+    }
+
+    @bottom-center {
+      content: counter(page) "  ·  McediaTV 使用文档";
+      font-family: "TsangerJinKai02", "Source Han Serif SC",
+                   "Noto Serif CJK SC", "Songti SC", Georgia, serif;
+      font-size: 9pt;
+      color: #6b6a64;
+    }
+  }
+
+  @page:first {
+    @top-right { content: ""; }
+    @bottom-center { content: ""; }
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --parchment: #f5f4ed;
+    --ivory:     #faf9f5;
+    --near-black:#141413;
+    --dark-warm: #3d3d3a;
+    --olive:     #504e49;
+    --stone:     #6b6a64;
+    --brand:     #1B365D;
+    --border:    #e8e6dc;
+    --border-soft:#e5e3d8;
+    --tag-bg:    #E4ECF5;
+    --serif: "TsangerJinKai02", "Source Han Serif SC", "Noto Serif CJK SC", "Songti SC", "STSong", Georgia, serif;
+    --sans: var(--serif);
+
+    --rhythm-module:  14pt;
+    --rhythm-section: 18pt;
+  }
+
+  html, body { background: var(--parchment); }
+
+  @media screen {
+    body { max-width: 210mm; margin: 0 auto; padding: 20mm 22mm 22mm 22mm; }
+  }
+
+  body {
+    color: var(--near-black);
+    font-family: var(--serif);
+    font-size: 10.5pt;
+    line-height: 1.55;
+    letter-spacing: 0.3pt;
+    widows: 3;
+    orphans: 3;
+  }
+
+  .sans {
+    font-family: var(--sans);
+  }
+
+  /* ========== COVER ========== */
+  .cover {
+    min-height: 240mm;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 40mm 0 0 0;
+    break-after: page;
+  }
+  .cover-eyebrow {
+    font-family: var(--sans);
+    font-size: 10pt;
+    color: var(--brand);
+    letter-spacing: 1pt;
+    text-transform: uppercase;
+    margin-bottom: 18pt;
+  }
+  .cover-title {
+    font-size: 36pt;
+    font-weight: 500;
+    color: var(--near-black);
+    line-height: 1.15;
+    letter-spacing: 0.3pt;
+    margin-bottom: 16pt;
+  }
+  .cover-sub {
+    font-family: var(--sans);
+    font-size: 14pt;
+    color: var(--olive);
+    line-height: 1.5;
+    max-width: 85%;
+    margin-bottom: 30pt;
+  }
+  .cover-meta {
+    font-family: var(--sans);
+    font-size: 10pt;
+    color: var(--stone);
+    line-height: 1.5;
+  }
+  .cover-meta strong {
+    color: var(--dark-warm);
+    font-weight: 500;
+  }
+
+  /* ========== TOC（目录）========== */
+  .toc { break-after: page; }
+  .toc h2 {
+    font-size: 22pt;
+    font-weight: 500;
+    margin-bottom: var(--rhythm-module);
+    border-left: 2.5pt solid var(--brand);
+    border-radius: 1.5pt;
+    padding-left: 8pt;
+  }
+  .toc-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 6pt 0;
+    border-bottom: 0.3pt dotted var(--border);
+    font-size: 11pt;
+  }
+  .toc-item:last-of-type { border-bottom: none; }
+  .toc-num {
+    color: var(--brand);
+    font-weight: 500;
+    min-width: 30pt;
+  }
+  .toc-title {
+    flex: 1;
+    color: var(--near-black);
+    padding-left: 6pt;
+  }
+  .toc-page {
+    color: var(--stone);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ========== HEADINGS ========== */
+  h1 {
+    font-size: 22pt;
+    font-weight: 500;
+    line-height: 1.2;
+    margin: 0 0 10pt 0;
+    border-left: 2.5pt solid var(--brand);
+    border-radius: 1.5pt;
+    padding-left: 8pt;
+    color: var(--near-black);
+    break-after: avoid;
+  }
+
+  h2 {
+    font-size: 16pt;
+    font-weight: 500;
+    line-height: 1.25;
+    margin: 24pt 0 8pt 0;
+    color: var(--near-black);
+    break-after: avoid;
+    string-set: section-title content();
+  }
+
+  h3 {
+    font-size: 13pt;
+    font-weight: 500;
+    line-height: 1.3;
+    margin: 18pt 0 6pt 0;
+    color: var(--dark-warm);
+    break-after: avoid;
+  }
+
+  .chapter-num {
+    font-family: var(--sans);
+    font-size: 10pt;
+    color: var(--brand);
+    letter-spacing: 1pt;
+    text-transform: uppercase;
+    margin-bottom: 6pt;
+  }
+
+  /* ========== PARAGRAPHS ========== */
+  p {
+    margin: 0 0 10pt 0;
+    line-height: 1.55;
+    color: var(--near-black);
+    widows: 2;
+    orphans: 2;
+  }
+
+  .lead {
+    font-size: 12pt;
+    line-height: 1.55;
+    color: var(--dark-warm);
+    margin-bottom: var(--rhythm-module);
+  }
+
+  .hl { color: var(--brand); font-weight: 500; }
+  strong { font-weight: 500; }
+
+  /* ========== LISTS ========== */
+  ul, ol {
+    margin: 6pt 0 10pt 0;
+    padding-left: 20pt;
+    line-height: 1.55;
+  }
+  ul li::marker { color: var(--brand); }
+  ol li::marker { color: var(--brand); font-weight: 500; }
+
+  /* ========== QUOTE ========== */
+  blockquote, .quote {
+    border-left: 2pt solid var(--brand);
+    margin: 12pt 0;
+    padding: 4pt 0 4pt 16pt;
+    color: var(--olive);
+    line-height: 1.55;
+    break-inside: avoid;
+  }
+  blockquote .cite, .quote .cite {
+    display: block;
+    font-size: 9pt;
+    color: var(--stone);
+    margin-top: 4pt;
+  }
+
+  /* ========== CODE ========== */
+  /* Mono first for English glyphs, then CJK fallback so Chinese comments
+     inside code/pre render correctly. A mono-only chain causes missing
+     glyphs rendered as "?" or missing-glyph boxes in WeasyPrint when the system lacks
+     a mono font with CJK coverage. */
+  code {
+    font-family: "JetBrains Mono", "SF Mono", Consolas,
+                 "TsangerJinKai02", "Source Han Serif SC",
+                 "Noto Serif CJK SC", "Songti SC", monospace;
+    font-size: 9pt;
+    background: var(--ivory);
+    padding: 1pt 4pt;
+    border-radius: 2pt;
+    color: var(--dark-warm);
+  }
+  pre {
+    font-family: "JetBrains Mono", "SF Mono", Consolas,
+                 "TsangerJinKai02", "Source Han Serif SC",
+                 "Noto Serif CJK SC", "Songti SC", monospace;
+    font-size: 9pt;
+    line-height: 1.5;
+    background: var(--ivory);
+    border-radius: 4pt;
+    padding: 10pt 14pt;
+    margin: 10pt 0;
+    white-space: pre-wrap;
+    color: var(--near-black);
+    break-inside: avoid;
+  }
+  pre code { background: transparent; padding: 0; font-size: inherit; }
+
+  /* ========== TABLE (kami-table) ========== */
+  table, .kami-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 9.5pt;
+    margin: 12pt 0;
+    break-inside: avoid;
+  }
+  table th, .kami-table th {
+    text-align: left;
+    font-weight: 500;
+    color: var(--dark-warm);
+    padding: 6pt 8pt;
+    border-bottom: 1pt solid var(--border);
+    background: transparent;
+  }
+  table td, .kami-table td {
+    padding: 5pt 8pt;
+    border-bottom: 0.3pt solid var(--border-soft);
+    vertical-align: top;
+  }
+  table.compact th, .kami-table.compact th { padding: 3pt 6pt; font-size: 8pt; }
+  table.compact td, .kami-table.compact td { padding: 2pt 6pt; font-size: 8pt; line-height: 1.4; }
+  table.financial td:not(:first-child), .kami-table.financial td:not(:first-child) {
+    text-align: right; font-variant-numeric: tabular-nums;
+  }
+  table.financial th:not(:first-child), .kami-table.financial th:not(:first-child) { text-align: right; }
+  table.striped tbody tr:nth-child(even) td, .kami-table.striped tbody tr:nth-child(even) td {
+    background: var(--ivory);
+  }
+  table .total td, .kami-table .total td {
+    font-weight: 500; border-top: 1pt solid var(--brand); border-bottom: none; color: var(--near-black);
+  }
+
+  /* ========== CALLOUT ========== */
+  .callout {
+    background: var(--ivory);
+    border-left: 2pt solid var(--brand);
+    padding: 10pt 14pt;
+    border-radius: 3pt;
+    margin: 12pt 0;
+    line-height: 1.55;
+    break-inside: avoid;
+  }
+  .callout blockquote,
+  .callout .quote {
+    border-left: none;
+    padding-left: 0;
+    margin: 6pt 0;
+    color: var(--olive);
+  }
+  .callout blockquote:first-child,
+  .callout .quote:first-child { margin-top: 0; }
+  .callout blockquote:last-child,
+  .callout .quote:last-child  { margin-bottom: 0; }
+
+  .takeaway {
+    background: var(--ivory);
+    border-radius: 4pt;
+    padding: 10pt 14pt;
+    margin: 14pt 0;
+    break-inside: avoid;
+  }
+  .takeaway-label {
+    font-family: var(--sans);
+    font-size: 9pt;
+    color: var(--brand);
+    letter-spacing: 0.5pt;
+    text-transform: uppercase;
+    margin-bottom: 4pt;
+  }
+
+  /* ========== TAG ========== */
+  .tag {
+    display: inline-block;
+    background: var(--tag-bg);
+    color: var(--brand);
+    font-family: var(--sans);
+    font-size: 9pt;
+    font-weight: 500;
+    padding: 1pt 6pt;
+    border-radius: 3pt;
+    margin-right: 4pt;
+  }
+
+  /* ========== FIGURE ========== */
+  figure {
+    margin: 14pt 0;
+    break-inside: avoid;
+  }
+  figure img {
+    max-width: 100%;
+    border-radius: 4pt;
+  }
+  figcaption {
+    font-family: var(--sans);
+    font-size: 9pt;
+    color: var(--stone);
+    margin-top: 6pt;
+    text-align: center;
+  }
+
+  /* ========== EXECUTIVE SUMMARY ========== */
+  .exec-summary {
+    background: var(--ivory);
+    border-left: 1.4pt solid var(--brand);
+    border-radius: 6pt;
+    padding: 16pt 20pt;
+    margin: 14pt 0;
+    break-inside: avoid;
+  }
+  .exec-summary h2 {
+    margin-top: 0;
+    font-size: 13pt;
+  }
+
+  /* ========== CHAPTER BREAK ========== */
+  .chapter { break-before: page; }
+</style>
+</head>
+<body>
+
+<!-- ═════════════ COVER ═════════════ -->
+<section class="cover">
+  <div>
+    <div class="cover-eyebrow">使用文档 · Technical Guide</div>
+    <div class="cover-title">McediaTV<br>Minecraft 电视播放系统</div>
+    <div class="cover-sub">面向玩家、管理员与开发者的完整文档。涵盖播放器创建与管理、频道播放控制、外设配置、权限体系及开发者扩展指南。</div>
+  </div>
+  <div class="cover-meta">
+    <strong>Mcedia 团队</strong><br>
+    版本 V2.0  ·  2026.06<br>
+    Mcedia Project
+  </div>
+</section>
+
+<!-- ═════════════ 目录 ═════════════ -->
+<section class="toc">
+  <h2>目录</h2>
+  <div class="toc-item">
+    <span class="toc-num">01</span>
+    <span class="toc-title">综合简述</span>
+    <span class="toc-page">03</span>
+  </div>
+  <div class="toc-item">
+    <span class="toc-num">02</span>
+    <span class="toc-title">玩家使用指南</span>
+    <span class="toc-page">04</span>
+  </div>
+  <div class="toc-item">
+    <span class="toc-num">03</span>
+    <span class="toc-title">服务器管理员指南</span>
+    <span class="toc-page">06</span>
+  </div>
+  <div class="toc-item">
+    <span class="toc-num">04</span>
+    <span class="toc-title">开发人员指南</span>
+    <span class="toc-page">08</span>
+  </div>
+</section>
+
+<!-- ═════════════ Chapter 01：综合简述 ═════════════ -->
+<section class="chapter">
+  <div class="chapter-num">01 · Overview</div>
+  <h1>综合简述</h1>
+
+  <p class="lead">
+    McediaTV（简称 MTV）是 Mcedia 生态下的多媒体播放系统。它允许玩家在 Minecraft 世界中创建实体电视播放器，播放网络媒体内容，并通过弹幕、多屏多扬声器等特性提供沉浸式观影体验。
+  </p>
+
+  <div class="callout">
+    <strong>适用环境</strong>：Paper 1.21+ / Folia，需安装 Mcedia Core 与 McediaTV 客户端模组。服务端为 Bukkit 插件，客户端为 Fabric / NeoForge 模组。
+  </div>
+
+  <h2>系统架构</h2>
+  <p>MTV 采用 C/S 分离架构：服务端插件管理播放器实体、频道状态与权限；客户端模组负责媒体解码、画面渲染与音频输出。两端通过自定义网络数据包同步状态。</p>
+
+  <table class="kami-table">
+    <thead>
+      <tr>
+        <th>模块</th>
+        <th>位置</th>
+        <th>职责</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>MTV Plugin</td>
+        <td>服务端</td>
+        <td>播放器创建/持久化、频道管理、观众心跳、权限校验、GUI</td>
+      </tr>
+      <tr>
+        <td>MTV Client</td>
+        <td>客户端</td>
+        <td>媒体解码播放、画面渲染（ItemDisplay 实体映射）、音频路由</td>
+      </tr>
+      <tr>
+        <td>Mcedia Core</td>
+        <td>两端</td>
+        <td>媒体解析器、解码器配置、Screen/Speaker 外设抽象</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>核心概念</h2>
+
+  <h3>MTV 播放器</h3>
+  <p>Minecraft 世界中的 <code>ItemDisplay</code> 实体。每个播放器可挂载多块屏幕和多个扬声器，绑定一个频道，以此决定播放内容。</p>
+
+  <h3>频道（Channel）</h3>
+  <p>播放状态与媒体列表的容器。分为两种类型：</p>
+  <ul>
+    <li><strong>SELF 频道</strong>（私有）— 每个播放器创建时自动生成，仅归属者可操作。</li>
+    <li><strong>BROADCAST 频道</strong>（公共）— 可被发现与订阅，支持完整播放列表与多种播放模式。</li>
+  </ul>
+
+  <h3>观众（Audience）</h3>
+  <p>靠近播放器范围的玩家自动成为观众，通过心跳包（每 <span class="hl">5 秒</span>）保活。服务端 <span class="hl">30 秒</span> 无心跳视为超时。观众状态影响播放器是否保持激活。</p>
+
+  <h3>外设（Peripheral）</h3>
+  <ul>
+    <li><strong>屏幕</strong> — 渲染视频画面，可配置尺寸、位置、旋转、填充模式、亮度与弹幕显示。</li>
+    <li><strong>扬声器</strong> — 输出音频，可配置音量、范围与声道模式（mix / left / right）。</li>
+  </ul>
+</section>
+
+<!-- ═════════════ Chapter 02：玩家使用指南 ═════════════ -->
+<section class="chapter">
+  <div class="chapter-num">02 · Player Guide</div>
+  <h1>玩家使用指南</h1>
+
+  <p class="lead">
+    本章面向服内玩家，涵盖从创建播放器到日常使用的完整操作流程。所有管理操作均可通过 GUI 完成。
+  </p>
+
+  <h2>创建 MTV 播放器</h2>
+  <p>手持物品，站在目标位置，输入：</p>
+  <pre><code>/mtv create &lt;名称&gt;</code></pre>
+  <p>系统将在你当前位置创建一个 <code>ItemDisplay</code> 实体播放器，并自动进入播放器管理界面。创建者默认被标记为所有者。权限：<code>mtv.player.create</code>（默认所有玩家拥有）。</p>
+
+  <h2>主菜单</h2>
+  <p>输入 <code>/mtv</code> 或 <code>/mtv gui</code> 打开主菜单。包含以下入口：</p>
+  <ul>
+    <li><strong>附近的播放器</strong> — 列出周围 50 格内的 MTV 播放器，快速进入管理。</li>
+    <li><strong>公共频道</strong> — 浏览和搜索可发现的公共频道，订阅后自动播放。</li>
+    <li><strong>创建公共频道</strong> — 将自己的播放器频道设为公开。</li>
+  </ul>
+
+  <h2>播放器管理</h2>
+  <p>从附近的播放器列表选择一个播放器，进入管理界面：</p>
+
+  <h3>播放控制</h3>
+  <ul>
+    <li><strong>输入媒体链接</strong> — 点击"设置播放"，在聊天框粘贴支持的媒体 URL，按回车确认。</li>
+    <li><strong>暂停/继续</strong> — 一键切换播放状态。</li>
+    <li><strong>播放列表管理</strong> — 添加、移除、排序媒体项。支持列表播放、列表循环、单曲循环、随机播放、播完即停五种模式。</li>
+    <li><strong>速度调节</strong> — 调整播放倍速。</li>
+    <li><strong>跳转</strong> — 快进/快退（相对跳转），或指定起始时间。</li>
+  </ul>
+
+  <h3>屏幕设置</h3>
+  <ul>
+    <li><strong>尺寸</strong> — 设置屏幕宽度与高度。</li>
+    <li><strong>位置偏移</strong> — 微调屏幕相对播放器的位置。</li>
+    <li><strong>旋转</strong> — 设置屏幕朝向（四元数）。</li>
+    <li><strong>填充模式</strong> — <code>keep_aspect_cover</code>（等比填充）/ <code>keep_aspect_fit</code>（等比适配）/ <code>stretch</code>（拉伸）。</li>
+    <li><strong>亮度</strong> — 最低 8，最高 15（默认 8）。</li>
+    <li><strong>弹幕开关</strong> — 是否在屏幕上显示弹幕。</li>
+    <li><strong>背景纹理</strong> — 空闲时显示的背景图片。</li>
+  </ul>
+
+  <h3>扬声器设置</h3>
+  <ul>
+    <li><strong>音量</strong> — 0–1.0 浮点数。</li>
+    <li><strong>听觉范围</strong> — 声音能传播的最远距离（格）。</li>
+    <li><strong>声道模式</strong> — <code>mix</code>（混合立体声）/ <code>left</code>（左声道）/ <code>right</code>（右声道）。</li>
+    <li><strong>位置偏移</strong> — 微调扬声器相对播放器的位置。</li>
+  </ul>
+
+  <h3>其他操作</h3>
+  <ul>
+    <li><strong>总音量</strong> — 播放器全局音量，0–1.0。</li>
+    <li><strong>电源开关</strong> — 关闭后画面停止、声音静音，但配置保留。</li>
+    <li><strong>移动到此处</strong> — 将播放器传送到玩家位置。</li>
+    <li><strong>删除</strong> — 移除播放器（含所有外设）。</li>
+  </ul>
+
+  <h2>遥控器快捷操作</h2>
+  <p>手持名为"遥控器"的铁门物品（<code>IRON_DOOR</code>），右键空气或方块，即可打开遥控菜单，无需输入命令。</p>
+
+  <h2>公共频道</h2>
+  <p>创建公共频道后，其他玩家可搜索发现并订阅。公共频道支持：</p>
+  <ul>
+    <li>完整的播放列表管理（添加、删除、排序）。</li>
+    <li>五种播放顺序模式任意切换。</li>
+    <li>公开控制：开启后任何玩家均可控制播放（暂停/切歌等）；关闭后仅创建者可操作。</li>
+  </ul>
+</section>
+
+<!-- ═════════════ Chapter 03：服务器管理员指南 ═════════════ -->
+<section class="chapter">
+  <div class="chapter-num">03 · Admin Guide</div>
+  <h1>服务器管理员指南</h1>
+
+  <p class="lead">
+    本章面向服务器管理员，涵盖安装配置、权限管理、数据持久化与性能优化建议。
+  </p>
+
+  <h2>安装要求</h2>
+  <table class="kami-table">
+    <thead>
+      <tr>
+        <th>组件</th>
+        <th>要求</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>服务端</td>
+        <td>Paper 1.21+ 或 Folia（已标记 <code>folia-supported: true</code>）</td>
+      </tr>
+      <tr>
+        <td>客户端</td>
+        <td>Fabric / NeoForge，安装 Mcedia Core + McediaTV Client 模组</td>
+      </tr>
+      <tr>
+        <td>依赖</td>
+        <td>Mcedia Core（提供媒体解码与渲染能力）</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="callout">
+    插件需安装于 <code>plugins/</code> 目录。频道数据持久化于 <code>plugins/mtv/channels/</code> 目录（JSON 格式）。
+  </div>
+
+  <h2>权限体系</h2>
+  <p>完整权限列表如下。建议使用权限管理插件（如 LuckPerms）进行分配。</p>
+
+  <table class="kami-table compact">
+    <thead>
+      <tr>
+        <th>权限节点</th>
+        <th>默认</th>
+        <th>说明</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>mtv.admin</code></td>
+        <td>op</td>
+        <td>父权限，包含以下所有子权限</td>
+      </tr>
+      <tr>
+        <td><code>mtv.player.create</code></td>
+        <td>true</td>
+        <td>创建 MTV 播放器</td>
+      </tr>
+      <tr>
+        <td><code>mtv.player.edit</code></td>
+        <td>true</td>
+        <td>编辑播放器（屏幕/扬声器/播放/移动/删除）</td>
+      </tr>
+      <tr>
+        <td><code>mtv.player.edit.others</code></td>
+        <td>op</td>
+        <td>编辑他人创建的私有播放器</td>
+      </tr>
+      <tr>
+        <td><code>mtv.player.teleport</code></td>
+        <td>op</td>
+        <td>传送到 MTV 播放器</td>
+      </tr>
+      <tr>
+        <td><code>mtv.gui</code></td>
+        <td>true</td>
+        <td>打开 MTV 管理 GUI</td>
+      </tr>
+      <tr>
+        <td><code>mtv.channel.create</code></td>
+        <td>true</td>
+        <td>创建公共频道</td>
+      </tr>
+      <tr>
+        <td><code>mtv.channel.manage.others</code></td>
+        <td>op</td>
+        <td>管理他人创建的公共频道</td>
+      </tr>
+      <tr>
+        <td><code>mtv.channel.control.others</code></td>
+        <td>op</td>
+        <td>控制他人频道（非公开控制时）</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>数据存储</h2>
+  <p>播放器配置存储在 <code>ItemDisplay</code> 实体的 NBT 数据中，随区块保存。频道播放状态存储在文件系统：</p>
+  <pre><code>plugins/mtv/channels/
+  ├── channel_&lt;id1&gt;.json
+  └── channel_&lt;id2&gt;.json</code></pre>
+  <p>服务启动时自动从文件系统加载频道状态，每次状态变更后自动落盘。移除频道时同步清理对应文件。</p>
+
+  <h2>系统参数</h2>
+  <table class="kami-table compact">
+    <thead>
+      <tr>
+        <th>参数</th>
+        <th>默认值</th>
+        <th>说明</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>观众超时</td>
+        <td>30000ms</td>
+        <td>客户端无心跳超过此时间，视为观众离线</td>
+      </tr>
+      <tr>
+        <td>频道同步间隔</td>
+        <td>100 ticks（5s）</td>
+        <td>周期向所有观众广播频道状态快照</td>
+      </tr>
+      <tr>
+        <td>观众清理间隔</td>
+        <td>20 ticks（1s）</td>
+        <td>定期清理过期观众会话</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>性能考量</h2>
+  <ul>
+    <li>每个 MTV 播放器对应一个 <code>ItemDisplay</code> 实体，实体量大的服务器注意实体数量上限。</li>
+    <li>频道状态变更会向所有已订阅客户端的广播快照。公共频道观众过多时，网络带宽是主要瓶颈。</li>
+    <li>插件已原生支持 Folia 线程调度，所有实体操作均使用 <code>Player#getScheduler</code> 而非 Bukkit 同步任务。</li>
+    <li>频道数据采用文件系统存储而非数据库，适合中小规模部署。大批量频道场景建议评估 I/O 压力。</li>
+  </ul>
+</section>
+
+<!-- ═════════════ Chapter 04：开发人员指南 ═════════════ -->
+<section class="chapter">
+  <div class="chapter-num">04 · Developer Guide</div>
+  <h1>开发人员指南</h1>
+
+  <p class="lead">
+    本章面向希望对 MTV 进行二次开发或集成其他系统的开发者，介绍模块结构、关键 API 与扩展点。
+  </p>
+
+  <h2>项目结构</h2>
+  <pre><code>mcedia-mtv-plugin/          # 服务端 Bukkit/Paper 插件
+  src/main/java/.../
+    channel/                 # 频道核心逻辑
+    command/                 # /mtv 命令
+    controller/              # 外设与播放控制入口
+    gui/                     # 库存 GUI 页面系统
+    listener/                # 事件监听
+    manager/                 # 播放器管理
+    model/                   # 领域模型
+    selector/                # 播放器选择逻辑
+    util/                    # 工具类
+
+mcedia-mtv/                  # 客户端 Fabric/NeoForge 模组
+  src/client/java/.../
+    channel/                 # 客户端频道会话与同步
+    entityplayer/            # ItemDisplay 实体渲染映射
+    mixin/                   # 渲染 Mixin</code></pre>
+
+  <h2>服务端 API 概览</h2>
+
+  <h3>MtvPlayerManager</h3>
+  <p>播放器管理的核心入口。提供异步操作接口：</p>
+  <ul>
+    <li><code>readSnapshot(UUID, Consumer&lt;ManagedMtvPlayer&gt;)</code> — 读取播放器配置快照</li>
+    <li><code>withManagedPlayer(UUID, Function, Consumer)</code> — 安全地获取并操作播放器</li>
+    <li><code>createPlayerAsync(Location, String, Player, Consumer)</code> — 异步创建播放器</li>
+    <li><code>setScreenSize / setSpeakerVolume / ...</code> — 外设配置修改（异步持久化）</li>
+  </ul>
+
+  <h3>MtvChannelService</h3>
+  <p>频道状态的管理与播放控制：</p>
+  <ul>
+    <li><code>resolveBinding(ManagedMtvPlayer)</code> — 解析播放器的频道绑定（SELF 或 BROADCAST）</li>
+    <li><code>togglePause(String channelId)</code> — 切换暂停</li>
+    <li><code>updateMediaUrl / updateSpeed / updateStartAt</code> — 更新播放参数</li>
+    <li><code>appendPlaylistItem / insertNextPlaylistItem / removePlaylistItem</code> — 播放列表操作</li>
+    <li><code>cyclePlayOrderMode</code> — 切换播放顺序模式</li>
+    <li><code>ensureChannelState(String channelId)</code> — 获取或创建频道运行时状态</li>
+  </ul>
+
+  <h3>AudienceSessionManager</h3>
+  <p>观众与会话生命周期管理：</p>
+  <ul>
+    <li><code>subscribe / unsubscribe</code> — 订阅/退订频道</li>
+    <li><code>touch(UUID, String, ...)</code> — 心跳上报，返回状态变更与时长变更标记</li>
+    <li><code>pruneExpired(long nowMs)</code> — 清理过期会话</li>
+    <li><code>summarize(String channelId)</code> — 汇总观众状态（时长、完成度、加载状态、挂起数量）</li>
+  </ul>
+
+  <h2>网络协议</h2>
+  <p>服务端与客户端通过 Minecraft 自定义负载数据包通信。所有数据包使用 <code>FriendlyByteBuf</code> 序列化。</p>
+
+  <table class="kami-table compact">
+    <thead>
+      <tr>
+        <th>通道标识</th>
+        <th>方向</th>
+        <th>用途</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>mcedia_mtv:channel_subscribe</code></td>
+        <td>C → S</td>
+        <td>客户端请求订阅频道</td>
+      </tr>
+      <tr>
+        <td><code>mcedia_mtv:channel_unsubscribe</code></td>
+        <td>C → S</td>
+        <td>客户端退订频道</td>
+      </tr>
+      <tr>
+        <td><code>mcedia_mtv:channel_snapshot</code></td>
+        <td>S → C</td>
+        <td>频道状态快照（媒体 URL、时间轴、播放状态）</td>
+      </tr>
+      <tr>
+        <td><code>mcedia_mtv:channel_sync</code></td>
+        <td>S → C</td>
+        <td>周期同步更新</td>
+      </tr>
+      <tr>
+        <td><code>mcedia_mtv:channel_remove</code></td>
+        <td>S → C</td>
+        <td>频道被移除通知</td>
+      </tr>
+      <tr>
+        <td><code>mcedia_mtv:channel_heartbeat</code></td>
+        <td>C → S</td>
+        <td>观众心跳（含加载状态、播放进度、解码器状态）</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>时间轴模型</h2>
+  <p>MTV 采用服务端权威时间模型，关键属性：</p>
+  <ul>
+    <li><code>mediaTimeMs</code> — 媒体层已处理的时间偏移（设置后不随播放递增）</li>
+    <li><code>playTimeMs</code> — 播放器进入 PLAYING 状态的系统时间戳</li>
+    <li><code>computeCurrentMediaTimeMs(nowMs) = mediaTimeMs + (playing ? nowMs - playTimeMs : 0)</code></li>
+  </ul>
+  <p>客户端根据快照中的锚点时间 <code>anchorMediaTimeUs</code>、已消逝时间 <code>elapsedTimeMs</code> 和本地单调时钟，计算目标播放位置并同步。</p>
+
+  <h2>播放顺序模式</h2>
+  <table class="kami-table compact">
+    <thead>
+      <tr>
+        <th>模式</th>
+        <th>行为</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>SEQUENTIAL</code></td>
+        <td>顺序播放到列表末尾后暂停</td>
+      </tr>
+      <tr>
+        <td><code>SHUFFLE</code></td>
+        <td>随机选取下一首</td>
+      </tr>
+      <tr>
+        <td><code>LOOP_ALL</code></td>
+        <td>从头到尾循环</td>
+      </tr>
+      <tr>
+        <td><code>LOOP_ONE</code></td>
+        <td>单曲循环</td>
+      </tr>
+      <tr>
+        <td><code>CURRENT_ONLY</code></td>
+        <td>播完当前即停</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>GUI 扩展</h2>
+  <p>GUI 系统使用页面注册模式。新增页面需：</p>
+  <ol>
+    <li>在 <code>MtvGui.GuiType</code> 枚举中添加新类型。</li>
+    <li>实现 <code>GuiPage</code> 接口（<code>type()</code>、<code>open()</code>、<code>renderFromEntry()</code>、<code>handleClick()</code>）。</li>
+    <li>在 <code>MtvGui</code> 构造器中通过 <code>registerPage()</code> 注册。</li>
+  </ol>
+
+  <h2>播放器选择策略</h2>
+  <p>当玩家附近有多个播放器时，<code>MtvPlayerSelector</code> 根据距离、激活范围及电源状态提供智能选择推荐。可扩展 <code>SelectorStrategy</code> 自定义选择逻辑。</p>
+
+  <div class="takeaway">
+    <div class="takeaway-label">扩展建议</div>
+    如需集成其他插件（如 PlaceholderAPI、自定义计分板等），建议通过 <code>MtvChannelService</code> 获取频道状态，避免直接操作 <code>ItemDisplay</code> 实体的 NBT。
+  </div>
+</section>
+
+<!-- ═════════════ 附录 ═════════════ -->
+<section class="chapter">
+  <div class="chapter-num">Appendix</div>
+  <h1>附录</h1>
+
+  <h2>A. 术语表</h2>
+  <p><strong>MTV</strong>：Mcedia Television，本系统的简称。</p>
+  <p><strong>频道（Channel）</strong>：封装媒体播放状态的逻辑容器。SELF 为私有，BROADCAST 为公共。</p>
+  <p><strong>外设（Peripheral）</strong>：屏幕（Screen）或扬声器（Speaker）的统称。</p>
+  <p><strong>弹幕（Danmaku）</strong>：屏幕上飘过的用户评论。</p>
+  <p><strong>观众（Audience）</strong>：正在观看/收听某个频道的玩家。</p>
+  <p><strong>ItemDisplay</strong>：Minecraft 中用于展示物品的实体类型，MTV 播放器的载体。</p>
+  <p><strong>遥控器</strong>：名为"遥控器"的 <code>IRON_DOOR</code> 物品，右键打开远程菜单。</p>
+  <p><strong>Folia</strong>：Paper 团队开发的区域化线程调度服务端实现。</p>
+
+  <h2>B. 相关项目</h2>
+  <ul>
+    <li>Mcedia Core — 媒体解析、解码与播放核心库</li>
+    <li>McediaTV Plugin — 本系统的服务端插件</li>
+    <li>McediaTV Client — 本系统的客户端模组</li>
+  </ul>
+</section>
+
+</body>
+</html>

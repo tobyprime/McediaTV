@@ -73,12 +73,15 @@ public final class ClientChannelSession {
             stopMediaIfIdle();
             return;
         }
+        long now = System.currentTimeMillis();
         if (!snapshot.hasMedia()) {
             stopMediaIfIdle();
+            if (now - lastHeartbeatAtMs >= HEARTBEAT_INTERVAL_MS) {
+                sendHeartbeat(snapshot, now);
+            }
             return;
         }
         applySnapshot(snapshot);
-        long now = System.currentTimeMillis();
         if (now - lastHeartbeatAtMs >= HEARTBEAT_INTERVAL_MS) {
             sendHeartbeat(snapshot, now);
         }
@@ -233,14 +236,22 @@ public final class ClientChannelSession {
             completed = loaded && resolvedDurationUs > 0L && localPositionUs >= resolvedDurationUs;
         }
         MtvChannelHeartbeatSender.send(new MtvAudienceHeartbeat(
-                snapshot.channelId(),
-                snapshot.revision(),
+                resolveHeartbeatChannelId(snapshot),
+                resolveHeartbeatRevision(snapshot),
                 loaded,
                 completed,
                 resolvedDurationUs,
                 errorMedia,
                 suspended
         ));
+    }
+
+    private String resolveHeartbeatChannelId(ClientChannelPlaybackSnapshot snapshot) {
+        return snapshot.channelId() == null || snapshot.channelId().isBlank() ? channelId : snapshot.channelId();
+    }
+
+    private long resolveHeartbeatRevision(ClientChannelPlaybackSnapshot snapshot) {
+        return resolveHeartbeatChannelId(snapshot).equals(snapshot.channelId()) ? snapshot.revision() : 0L;
     }
 
     private void stopMedia() {

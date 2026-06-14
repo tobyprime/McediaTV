@@ -1,8 +1,12 @@
-name: mcedia_mtv_plugin
+name: McediaMtvPlugin
 version: '1.0-SNAPSHOT'
-main: top.tobyprime.mcedia_mtv_plugin.Mcedia_mtv_plugin
-api-version: '1.21'
+main: top.tobyprime.mcedia_mtv_plugin.McediaMtvPlugin
+api-version: '${apiLevel}'
 folia-supported: true
+commands:
+  mtv:
+    description: 打开 MTV 管理 GUI
+    usage: /mtv [gui]
 permissions:
   mtv.admin:
     description: 所有 MTV 管理权限
