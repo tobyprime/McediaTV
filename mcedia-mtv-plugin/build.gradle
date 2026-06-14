@@ -74,6 +74,9 @@ dependencies {
     compileOnly("io.papermc.paper:paper-api:${cfg.paperApi}")
     compileOnly("com.google.code.gson:gson:2.11.0")
     implementation("org.xerial:sqlite-jdbc:3.45.3.0")
+
+    testImplementation("org.junit.jupiter:junit-jupiter:5.11.4")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher:1.11.4")
 }
 
 // 如果有版本特定源码，添加到主源码集
@@ -105,6 +108,15 @@ tasks.withType(JavaCompile).configureEach {
 
     if (targetJavaVersion >= 10 || JavaVersion.current().isJava10Compatible()) {
         options.release.set(targetJavaVersion)
+    }
+}
+
+// ========== 测试 ==========
+tasks.named('test', Test) {
+    useJUnitPlatform()
+    testLogging {
+        events("passed", "skipped", "failed")
+        exceptionFormat = 'full'
     }
 }
 

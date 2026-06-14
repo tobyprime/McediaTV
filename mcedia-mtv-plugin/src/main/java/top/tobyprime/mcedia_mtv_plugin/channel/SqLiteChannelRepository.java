@@ -27,6 +27,12 @@ public final class SqLiteChannelRepository implements ChannelRepository, AutoClo
 
     private final Connection connection;
 
+    /** Constructor for tests — accepts a pre-configured (e.g. in-memory) connection. */
+    SqLiteChannelRepository(Connection connection) throws SQLException {
+        this.connection = connection;
+        createTable();
+    }
+
     SqLiteChannelRepository(JavaPlugin plugin) throws SQLException {
         Path dbPath = plugin.getServer().getWorldContainer().toPath()
                 .resolve("plugins")
