@@ -221,6 +221,7 @@ public class EntityPlayerHandle {
         screen.setFillMode(config.fillMode());
         screen.setBackgroundTextureId(config.backgroundTextureId());
         screen.setDanmakuVisible(config.danmakuVisible());
+        screen.setProgressBarVisible(config.progressBarVisible());
 
         float width = config.width() > 0.0F ? config.width() : DEFAULT_SCREEN_WIDTH;
         float height = config.height() > 0.0F ? config.height() : DEFAULT_SCREEN_HEIGHT;
@@ -393,7 +394,8 @@ public class EntityPlayerHandle {
                     peripheralTag.getFloatOr("height", 0.0F),
                     parseFillMode(peripheralTag.getStringOr("fill_mode", "keep_aspect_cover")),
                     parseBackgroundTexture(peripheralTag.getStringOr("background_texture", "")),
-                    peripheralTag.getBooleanOr("danmaku_visible", true)
+                    peripheralTag.getBooleanOr("danmaku_visible", true),
+                    peripheralTag.getBooleanOr("progress_bar_visible", true)
             );
             case SPEAKER -> new SpeakerPeripheralConfig(
                     id,
@@ -414,6 +416,7 @@ public class EntityPlayerHandle {
     private static ScreenFillMode parseFillMode(String value) {
         return switch (value) {
             case "fill", "FILL" -> ScreenFillMode.FILL;
+            case "keep_aspect_fit" -> ScreenFillMode.KEEP_ASPECT_FIT;
             default -> ScreenFillMode.KEEP_ASPECT_COVER;
         };
     }
@@ -536,7 +539,8 @@ public class EntityPlayerHandle {
             float height,
             ScreenFillMode fillMode,
             @Nullable Identifier backgroundTextureId,
-            boolean danmakuVisible
+            boolean danmakuVisible,
+            boolean progressBarVisible
     ) implements PeripheralConfig {
         @Override
         public PeripheralKind kind() {

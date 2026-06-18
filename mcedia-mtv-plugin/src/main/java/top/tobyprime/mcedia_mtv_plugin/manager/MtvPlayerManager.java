@@ -114,6 +114,7 @@ public class MtvPlayerManager {
                     s.setFillMode(pt.getStringOr("fill_mode", "keep_aspect_cover"));
                     s.setBackgroundTexture(pt.getStringOr("background_texture", "mcedia:textures/gui/idle_screen.png"));
                     s.setDanmakuVisible(pt.getBooleanOr("danmaku_visible", true));
+                    s.setProgressBarVisible(pt.getBooleanOr("progress_bar_visible", true));
                     player.getScreens().add(s);
                 } else if ("speaker".equals(type)) {
                     var s = new SpeakerPeripheralConfigModel(pt.getStringOr("id", "speaker_" + countSpeakerType(peripherals, i)));
@@ -222,6 +223,15 @@ public class MtvPlayerManager {
         }, result -> done.accept(Boolean.TRUE.equals(result)));
     }
 
+    private void mutateScreen(UUID uuid, String periphId, Consumer<ScreenPeripheralConfigModel> action, Consumer<Boolean> done) {
+        mutate(uuid, p -> {
+            var s = p.findScreen(periphId);
+            if (s == null) return false;
+            action.accept(s);
+            return true;
+        }, done);
+    }
+
     public void updateScreenSize(UUID uuid, String periphId, float dw, float dh, Consumer<Boolean> done) {
         mutate(uuid, p -> {
             var s = p.findScreen(periphId);
@@ -288,28 +298,27 @@ public class MtvPlayerManager {
     }
 
     public void setScreenFillMode(UUID uuid, String periphId, String mode, Consumer<Boolean> done) {
-        mutate(uuid, p -> {
-            var s = p.findScreen(periphId);
-            if (s == null) return false;
-            s.setFillMode(mode);
-            return true;
-        }, done);
+        mutateScreen(uuid, periphId, s -> s.setFillMode(mode), done);
     }
 
     public void setScreenDanmakuVisible(UUID uuid, String periphId, boolean visible, Consumer<Boolean> done) {
-        mutate(uuid, p -> {
-            var s = p.findScreen(periphId);
-            if (s == null) return false;
-            s.setDanmakuVisible(visible);
-            return true;
-        }, done);
+        mutateScreen(uuid, periphId, s -> s.setDanmakuVisible(visible), done);
+    }
+
+    public void setScreenProgressBarVisible(UUID uuid, String periphId, boolean visible, Consumer<Boolean> done) {
+        mutateScreen(uuid, periphId, s -> s.setProgressBarVisible(visible), done);
     }
 
     public void toggleScreenFill(UUID uuid, String periphId, Consumer<Boolean> done) {
         mutate(uuid, p -> {
             var s = p.findScreen(periphId);
             if (s == null) return false;
-            s.setFillMode("fill".equalsIgnoreCase(s.getFillMode()) ? "keep_aspect_cover" : "fill");
+            s.setFillMode(switch (s.getFillMode()) {
+                case "fill" -> "keep_aspect_cover";
+                case "keep_aspect_cover" -> "keep_aspect_fit";
+                case "keep_aspect_fit" -> "fill";
+                default -> "fill";
+            });
             return true;
         }, done);
     }

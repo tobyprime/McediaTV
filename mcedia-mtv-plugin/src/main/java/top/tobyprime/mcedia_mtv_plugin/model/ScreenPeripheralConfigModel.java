@@ -15,6 +15,7 @@ public class ScreenPeripheralConfigModel {
     private String fillMode = "keep_aspect_cover";
     private String backgroundTexture = "mcedia:textures/gui/idle_screen.png";
     private boolean danmakuVisible = true;
+    private boolean progressBarVisible = true;
 
     public ScreenPeripheralConfigModel() {
     }
@@ -52,10 +53,12 @@ public class ScreenPeripheralConfigModel {
     public void setBackgroundTexture(String backgroundTexture) { this.backgroundTexture = backgroundTexture; }
     public boolean isDanmakuVisible() { return danmakuVisible; }
     public void setDanmakuVisible(boolean danmakuVisible) { this.danmakuVisible = danmakuVisible; }
+    public boolean isProgressBarVisible() { return progressBarVisible; }
+    public void setProgressBarVisible(boolean progressBarVisible) { this.progressBarVisible = progressBarVisible; }
 
     // Group resets
     public void resetSize() { width = 2.0F; height = 1.125F; }
-    public void resetBasic() { minBrightness = 8; fillMode = "keep_aspect_cover"; backgroundTexture = "mcedia:textures/gui/idle_screen.png"; }
+    public void resetBasic() { minBrightness = 8; fillMode = "keep_aspect_cover"; backgroundTexture = "mcedia:textures/gui/idle_screen.png"; danmakuVisible = true; progressBarVisible = true; }
     public void resetOffset() { offsetX = 0; offsetY = 0.5F; offsetZ = 0; }
     public void resetRotation() { offsetRx = 0; offsetRy = 0; offsetRz = 0; offsetRw = 1; }
 }

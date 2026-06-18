@@ -66,7 +66,7 @@ public class ScreenSettingsPage extends GuiPage {
             inv.setItem(31, item(Material.RED_CONCRETE,
                     "§c− §7调暗", "§7当前: §f" + bright, "§7点击 −1"));
 
-            // ── 右栏 (17,26,35): 开关 / 操作 ──
+            // ── 右栏 (17,26,35,34): 开关 / 操作 ──
 
             inv.setItem(17, item(Material.PAINTING,
                     "§d🎨 填充: " + sc.getFillMode(), "§7点击切换填充模式"));
@@ -74,6 +74,10 @@ public class ScreenSettingsPage extends GuiPage {
             var danmakuIcon = sc.isDanmakuVisible() ? Material.LIME_DYE : Material.GRAY_DYE;
             inv.setItem(26, item(danmakuIcon,
                     "§a💬 弹幕: " + (sc.isDanmakuVisible() ? "开" : "关"), "§7点击切换弹幕显示"));
+
+            var progressIcon = sc.isProgressBarVisible() ? Material.LIME_DYE : Material.GRAY_DYE;
+            inv.setItem(34, item(progressIcon,
+                    "§6📊 进度条: " + (sc.isProgressBarVisible() ? "开" : "关"), "§7点击切换进度条显示"));
 
             inv.setItem(35, item(Material.STRUCTURE_VOID,
                     "§e↺ 重置显示", "§7亮度/填充/纹理恢复默认"));
@@ -197,6 +201,9 @@ public class ScreenSettingsPage extends GuiPage {
                 case 26 -> context.updateAndRefresh(player, uuid,
                         done -> context.manager().setScreenDanmakuVisible(uuid, periphId,
                                 !sc.isDanmakuVisible(), done));
+                case 34 -> context.updateAndRefresh(player, uuid,
+                        done -> context.manager().setScreenProgressBarVisible(uuid, periphId,
+                                !sc.isProgressBarVisible(), done));
                 case 35 -> context.updateAndRefresh(player, uuid,
                         done -> context.manager().resetScreenBasic(uuid, periphId, done));
 

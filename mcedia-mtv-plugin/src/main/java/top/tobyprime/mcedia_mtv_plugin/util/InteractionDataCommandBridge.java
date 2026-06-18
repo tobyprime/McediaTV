@@ -93,6 +93,7 @@ public final class InteractionDataCommandBridge {
         tag.putString("fill_mode", screen.getFillMode());
         tag.putString("background_texture", screen.getBackgroundTexture());
         tag.putBoolean("danmaku_visible", screen.isDanmakuVisible());
+        tag.putBoolean("progress_bar_visible", screen.isProgressBarVisible());
         return tag;
     }
 
