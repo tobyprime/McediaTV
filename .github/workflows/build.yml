@@ -80,11 +80,11 @@ jobs:
 
       - name: Download McediaCore Release artifacts
         # curl directly (not gh CLI): GH_TOKEN is scoped to McediaTV and
-        # can't access tobyprime/Mcedia's releases.  Public repo so
+        # can't access tobyprime/Mcedia's releases. Public repo so
         # unauthenticated API access is fine (60 req/hr limit).
         run: |
           mkdir -p release-jars
-          TAG="v1.0.1"
+          TAG="v$(grep '^mcedia_core_version' gradle.properties | cut -d= -f2 | tr -d ' ')"
           echo "Fetching release $TAG from tobyprime/Mcedia ..."
           API_JSON=$(curl -sL "https://api.github.com/repos/tobyprime/Mcedia/releases/tags/$TAG")
           if echo "$API_JSON" | jq -e '.assets | length == 0' > /dev/null 2>&1; then
