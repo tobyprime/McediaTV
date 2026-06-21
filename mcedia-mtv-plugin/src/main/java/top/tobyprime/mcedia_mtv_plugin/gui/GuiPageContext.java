@@ -2,6 +2,7 @@ package top.tobyprime.mcedia_mtv_plugin.gui;
 
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
+import top.tobyprime.mcedia_mtv_plugin.channel.HudBindingService;
 import top.tobyprime.mcedia_mtv_plugin.controller.MtvPeripheralController;
 import top.tobyprime.mcedia_mtv_plugin.controller.MtvPlaybackController;
 import top.tobyprime.mcedia_mtv_plugin.manager.MtvPlayerManager;
@@ -46,6 +47,10 @@ public class GuiPageContext {
 
     public MtvPlayerSelector selector() {
         return gui.getSelector();
+    }
+
+    public HudBindingService hudBinding() {
+        return gui.getHudBinding();
     }
 
     // ─────────────────────────────────────────────────────────

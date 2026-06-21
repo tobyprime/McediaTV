@@ -10,6 +10,7 @@ public final class MtvChannelProtocol {
     public static final String CHANNEL_SYNC = "mcedia_mtv:channel_sync";
     public static final String CHANNEL_REMOVE = "mcedia_mtv:channel_remove";
     public static final String CHANNEL_HEARTBEAT = "mcedia_mtv:channel_heartbeat";
+    public static final String CHANNEL_HUD_BINDING = "mcedia_mtv:hud_binding";
 
     private MtvChannelProtocol() {
     }
@@ -129,6 +130,25 @@ public final class MtvChannelProtocol {
         buffer.writeLong(heartbeat.durationUs());
         buffer.writeBoolean(heartbeat.error());
         buffer.writeBoolean(heartbeat.suspended());
+    }
+
+    public static byte[] encodeHudBinding(String channelId) {
+        var buffer = new FriendlyByteBuf(Unpooled.buffer());
+        writeHudBinding(buffer, channelId);
+        return toBytes(buffer);
+    }
+
+    public static void writeHudBinding(FriendlyByteBuf buffer, String channelId) {
+        buffer.writeUtf(channelId != null ? channelId : "");
+    }
+
+    public static String decodeHudBinding(byte[] message) {
+        var buffer = new FriendlyByteBuf(Unpooled.wrappedBuffer(message));
+        return readHudBinding(buffer);
+    }
+
+    public static String readHudBinding(FriendlyByteBuf buffer) {
+        return buffer.readUtf();
     }
 
     public static MtvAudienceHeartbeat readHeartbeat(FriendlyByteBuf buffer) {

@@ -4,10 +4,12 @@ import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.java.JavaPlugin;
 
+import top.tobyprime.mcedia_mtv_plugin.channel.HudBindingService;
 import top.tobyprime.mcedia_mtv_plugin.channel.MigrationHelper;
 import top.tobyprime.mcedia_mtv_plugin.channel.MtvChannelNetworkService;
 import top.tobyprime.mcedia_mtv_plugin.channel.SqLiteChannelRepository;
 import top.tobyprime.mcedia_mtv_plugin.command.MtvCommand;
+import top.tobyprime.mcedia_mtv_plugin.command.MtvHudCommand;
 import top.tobyprime.mcedia_mtv_plugin.controller.MtvPeripheralController;
 import top.tobyprime.mcedia_mtv_plugin.controller.MtvPlaybackController;
 import top.tobyprime.mcedia_mtv_plugin.gui.MtvGui;
@@ -24,6 +26,7 @@ public final class McediaMtvPlugin extends JavaPlugin {
     private MtvPlayerManager manager;
     private MtvGui gui;
     private MtvChannelNetworkService networkService;
+    private HudBindingService hudBindingService;
     private ScheduledTask audiencePruneTask;
     private ScheduledTask channelSyncTask;
 
@@ -43,10 +46,13 @@ public final class McediaMtvPlugin extends JavaPlugin {
         this.networkService = new MtvChannelNetworkService(this, channelService);
         channelService.setChangeListener(networkService::publishSnapshot);
         channelService.setRemoveListener(networkService::invalidateChannel);
+
+        this.hudBindingService = new HudBindingService(this);
+
         var controller = new MtvPeripheralController(manager);
         var playbackController = new MtvPlaybackController(manager);
         var selector = new MtvPlayerSelector(this, manager);
-        this.gui = new MtvGui(this, manager, controller, playbackController, selector);
+        this.gui = new MtvGui(this, manager, controller, playbackController, selector, hudBindingService);
 
         var mtvCommand = new MtvCommand(manager, controller, playbackController, gui);
         var command = getCommand("mtv");
@@ -55,6 +61,15 @@ public final class McediaMtvPlugin extends JavaPlugin {
         }
         command.setExecutor(mtvCommand);
         command.setTabCompleter(mtvCommand);
+
+        var hudCommand = getCommand("mtvhud");
+        var mtvHudCommand = new MtvHudCommand(hudBindingService);
+        if (hudCommand != null) {
+            hudCommand.setExecutor(mtvHudCommand);
+            hudCommand.setTabCompleter(mtvHudCommand);
+        } else {
+            getLogger().warning("未在 plugin.yml 中声明 /mtvhud 命令");
+        }
 
         this.audiencePruneTask = getServer().getGlobalRegionScheduler().runAtFixedRate(this, task ->
                 channelService.getAudienceSessionManager().pruneExpired(System.currentTimeMillis()),
@@ -68,6 +83,7 @@ public final class McediaMtvPlugin extends JavaPlugin {
         pluginManager.registerEvents(new MtvGuiListener(gui), this);
         pluginManager.registerEvents(new MtvRemoteControlListener(gui), this);
         pluginManager.registerEvents(new MtvChatListener(this, gui), this);
+        pluginManager.registerEvents(hudBindingService, this);
     }
 
     @Override

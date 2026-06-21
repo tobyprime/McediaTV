@@ -31,6 +31,7 @@ public final class MtvChannelNetworkService implements PluginMessageListener, Li
         messenger.registerOutgoingPluginChannel(plugin, MtvChannelProtocol.CHANNEL_SNAPSHOT);
         messenger.registerOutgoingPluginChannel(plugin, MtvChannelProtocol.CHANNEL_SYNC);
         messenger.registerOutgoingPluginChannel(plugin, MtvChannelProtocol.CHANNEL_REMOVE);
+        messenger.registerOutgoingPluginChannel(plugin, MtvChannelProtocol.CHANNEL_HUD_BINDING);
         messenger.registerIncomingPluginChannel(plugin, MtvChannelProtocol.CHANNEL_SUBSCRIBE, this);
         messenger.registerIncomingPluginChannel(plugin, MtvChannelProtocol.CHANNEL_UNSUBSCRIBE, this);
         messenger.registerIncomingPluginChannel(plugin, MtvChannelProtocol.CHANNEL_HEARTBEAT, this);
@@ -48,6 +49,7 @@ public final class MtvChannelNetworkService implements PluginMessageListener, Li
         messenger.unregisterOutgoingPluginChannel(plugin, MtvChannelProtocol.CHANNEL_SNAPSHOT);
         messenger.unregisterOutgoingPluginChannel(plugin, MtvChannelProtocol.CHANNEL_SYNC);
         messenger.unregisterOutgoingPluginChannel(plugin, MtvChannelProtocol.CHANNEL_REMOVE);
+        messenger.unregisterOutgoingPluginChannel(plugin, MtvChannelProtocol.CHANNEL_HUD_BINDING);
     }
 
     @Override

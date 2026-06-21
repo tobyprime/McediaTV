@@ -41,6 +41,11 @@ public class MainMenuPage extends GuiPage {
         inv.setItem(42, item(Material.PLAYER_HEAD, "我的频道",
                 "只查看我创建的公共频道"));
 
+        // ── 底部：HUD ──
+        inv.setItem(48, item(Material.ENDER_EYE, "HUD 小窗",
+                "用 HUD 小窗订阅频道播放视频"));
+        inv.setItem(50, item(Material.GRAY_STAINED_GLASS_PANE, " "));
+
         setupTitleBar(inv, nav, entry);
         openInventory(player, inv);
     }
@@ -94,6 +99,9 @@ public class MainMenuPage extends GuiPage {
                 st.put(MtvGui.PUBLIC_SORT_KEY, PublicChannelSort.RELEVANCE.name());
                 context.navigateTo(player, MtvGui.GuiType.PUBLIC_CHANNEL_LIST, null, null, st);
             }
+
+            // ── HUD ──
+            case 48 -> context.navigateTo(player, MtvGui.GuiType.HUD_MENU);
 
             // 中间分隔列 — 无操作
             case 22, 31, 40 -> { return true; }

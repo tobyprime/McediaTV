@@ -7,6 +7,9 @@ commands:
   mtv:
     description: 打开 MTV 管理 GUI
     usage: /mtv [gui]
+  mtvhud:
+    description: 控制 HUD 小窗播放
+    usage: /mtvhud [subscribe|unsubscribe|status]
 permissions:
   mtv.admin:
     description: 所有 MTV 管理权限
@@ -20,6 +23,8 @@ permissions:
       mtv.channel.create: true
       mtv.channel.manage.others: true
       mtv.channel.control.others: true
+      mtv.hud.subscribe: true
+      mtv.hud.unsubscribe: true
   mtv.player.edit.others:
     description: 编辑/删除别人创建的私有 MTV 播放器
     default: op
@@ -44,3 +49,9 @@ permissions:
   mtv.channel.control.others:
     description: 控制别人创建且未公开控制的公共频道播放
     default: op
+  mtv.hud.subscribe:
+    description: HUD 订阅频道
+    default: true
+  mtv.hud.unsubscribe:
+    description: HUD 取消订阅
+    default: true

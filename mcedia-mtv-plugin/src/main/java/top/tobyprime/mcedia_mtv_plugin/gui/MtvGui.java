@@ -5,6 +5,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.plugin.java.JavaPlugin;
+import top.tobyprime.mcedia_mtv_plugin.channel.HudBindingService;
 import top.tobyprime.mcedia_mtv_plugin.channel.ChannelRuntimeState;
 import top.tobyprime.mcedia_mtv_plugin.channel.PublicChannelSort;
 import top.tobyprime.mcedia_mtv_plugin.controller.MtvPeripheralController;
@@ -41,7 +42,8 @@ public class MtvGui {
         REMOTE_MENU,
         PUBLIC_CHANNEL_LIST,
         PUBLIC_CHANNEL_CREATE,
-        PUBLIC_CHANNEL_MANAGE
+        PUBLIC_CHANNEL_MANAGE,
+        HUD_MENU
     }
 
     // ─────────────────────────────────────────────────────────
@@ -103,6 +105,7 @@ public class MtvGui {
     private final MtvPeripheralController controller;
     private final MtvPlaybackController playbackController;
     private final MtvPlayerSelector selector;
+    private final HudBindingService hudBinding;
     private final GuiPageContext pageContext;
     private final Map<GuiType, GuiPage> pages = new LinkedHashMap<>();
     private final Map<UUID, NavigationState> playerNavs = new ConcurrentHashMap<>();
@@ -115,12 +118,14 @@ public class MtvGui {
     public MtvGui(JavaPlugin plugin, MtvPlayerManager manager,
                   MtvPeripheralController controller,
                   MtvPlaybackController playbackController,
-                  MtvPlayerSelector selector) {
+                  MtvPlayerSelector selector,
+                  HudBindingService hudBinding) {
         this.plugin = plugin;
         this.manager = manager;
         this.controller = controller;
         this.playbackController = playbackController;
         this.selector = selector;
+        this.hudBinding = hudBinding;
         this.pageContext = new GuiPageContext(this);
 
         registerPage(new MainMenuPage());
@@ -137,6 +142,7 @@ public class MtvGui {
         registerPage(new RemoteMenuPage());
         registerPage(new PublicChannelManagePage());
         registerPage(new PublicChannelCreatePage());
+        registerPage(new HudMenuPage());
     }
 
     // ─────────────────────────────────────────────────────────
@@ -402,6 +408,7 @@ public class MtvGui {
     public MtvPeripheralController getController() { return controller; }
     public MtvPlaybackController getPlaybackController() { return playbackController; }
     public MtvPlayerSelector getSelector()         { return selector; }
+    public HudBindingService getHudBinding()       { return hudBinding; }
     public boolean isClosed()                      { return closed; }
 
     // ─────────────────────────────────────────────────────────

@@ -100,6 +100,14 @@ public final class MtvChannelProtocol {
         buffer.writeUtf(request.channelId());
     }
 
+    public static void writeHudBinding(FriendlyByteBuf buffer, String channelId) {
+        buffer.writeUtf(channelId != null ? channelId : "");
+    }
+
+    public static String readHudBinding(FriendlyByteBuf buffer) {
+        return buffer.readUtf();
+    }
+
     public static byte[] encodeSubscription(MtvChannelSubscriptionRequest request) {
         var buffer = new FriendlyByteBuf(Unpooled.buffer());
         writeSubscription(buffer, request);
