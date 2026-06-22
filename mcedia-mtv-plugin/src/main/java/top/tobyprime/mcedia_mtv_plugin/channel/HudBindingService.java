@@ -5,6 +5,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,7 +32,7 @@ public final class HudBindingService implements Listener {
             return;
         }
         var pdc = player.getPersistentDataContainer();
-        String channelId = pdc.get(pdcKey, io.papermc.paper.persistence.PersistentDataTypes.STRING);
+        String channelId = pdc.get(pdcKey, PersistentDataType.STRING);
         sendPayload(player, channelId);
     }
 
@@ -40,7 +41,7 @@ public final class HudBindingService implements Listener {
             return;
         }
         var pdc = player.getPersistentDataContainer();
-        pdc.set(pdcKey, io.papermc.paper.persistence.PersistentDataTypes.STRING, channelId);
+        pdc.set(pdcKey, PersistentDataType.STRING, channelId);
         sendPayload(player, channelId);
         LOGGER.info("HUD subscribe: player={}, channel={}", player.getName(), channelId);
     }
@@ -60,7 +61,7 @@ public final class HudBindingService implements Listener {
             return null;
         }
         var pdc = player.getPersistentDataContainer();
-        return pdc.get(pdcKey, io.papermc.paper.persistence.PersistentDataTypes.STRING);
+        return pdc.get(pdcKey, PersistentDataType.STRING);
     }
 
     private void sendPayload(Player player, String channelId) {

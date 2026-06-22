@@ -17,6 +17,14 @@ public class HudMenuPage extends GuiPage {
     @Override
     protected void renderPage(Player player, GuiPageContext context,
                               NavigationState nav, PageEntry entry) {
+        // Check if returning from channel selector with a selection
+        String selected = entry.getState(ChannelSelectorPage.SELECTED_KEY, "");
+        if (!selected.isBlank()) {
+            context.hudBinding().subscribe(player, selected);
+            entry.putState(ChannelSelectorPage.SELECTED_KEY, "");
+            player.sendMessage("HUD 已订阅频道: " + selected);
+        }
+
         var inv = createInventory(entry);
 
         var hud = context.hudBinding();
@@ -32,7 +40,7 @@ public class HudMenuPage extends GuiPage {
         }
 
         inv.setItem(29, item(Material.WRITABLE_BOOK, "订阅频道",
-                "输入频道 ID 来订阅 HUD 小窗"));
+                "从公共频道列表中选择"));
         inv.setItem(33, item(Material.REDSTONE, "取消订阅",
                 "停止 HUD 播放"));
 
@@ -59,7 +67,9 @@ public class HudMenuPage extends GuiPage {
                     player.sendMessage("你没有权限执行此操作。");
                     return true;
                 }
-                context.requestInput(player, "请输入要订阅的频道 ID。", "hud_subscribe");
+                var st = context.newState();
+                st.put(ChannelSelectorPage.RETURN_KEY, MtvGui.GuiType.HUD_MENU.name());
+                context.navigateTo(player, MtvGui.GuiType.CHANNEL_SELECTOR, null, null, st);
             }
             default -> { return false; }
         }
@@ -69,19 +79,6 @@ public class HudMenuPage extends GuiPage {
     @Override
     public boolean handleChatInput(Player player, GuiPageContext context,
                                     PageEntry entry, String message) {
-        String awaiting = entry.getState().get(MtvGui.AWAITING_KEY);
-        if (!"hud_subscribe".equals(awaiting)) return false;
-
-        String input = message.trim();
-        if (input.isBlank()) {
-            context.runOnPlayer(player, () -> player.sendMessage("频道 ID 不能为空。"));
-            return true;
-        }
-        context.hudBinding().subscribe(player, input);
-        context.runOnPlayer(player, () -> {
-            player.sendMessage("HUD 已订阅频道: " + input);
-            context.navigateTo(player, MtvGui.GuiType.HUD_MENU);
-        });
-        return true;
+        return false;
     }
 }

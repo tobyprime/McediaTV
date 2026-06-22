@@ -37,6 +37,10 @@ public final class ClientChannelSession {
         return channelId;
     }
 
+    public ClientChannelPlaybackSnapshot getSnapshot() {
+        return snapshot;
+    }
+
     public PlayerHost getHost() {
         return host;
     }

@@ -20,6 +20,10 @@ public record ClientChannelPlaybackSnapshot(
         return mediaUrl != null && !mediaUrl.isBlank();
     }
 
+    public boolean isPlaying() {
+        return hasMedia() && "PLAYING".equals(state) && !completed && !paused;
+    }
+
     public ClientChannelPlaybackSnapshot receivedNow(long receivedAtMonotonicMs) {
         return new ClientChannelPlaybackSnapshot(
                 channelId,

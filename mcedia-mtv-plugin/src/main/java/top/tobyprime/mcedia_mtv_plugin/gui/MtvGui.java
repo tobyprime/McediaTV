@@ -43,7 +43,8 @@ public class MtvGui {
         PUBLIC_CHANNEL_LIST,
         PUBLIC_CHANNEL_CREATE,
         PUBLIC_CHANNEL_MANAGE,
-        HUD_MENU
+        HUD_MENU,
+        CHANNEL_SELECTOR
     }
 
     // ─────────────────────────────────────────────────────────
@@ -143,6 +144,7 @@ public class MtvGui {
         registerPage(new PublicChannelManagePage());
         registerPage(new PublicChannelCreatePage());
         registerPage(new HudMenuPage());
+        registerPage(new ChannelSelectorPage());
     }
 
     // ─────────────────────────────────────────────────────────
