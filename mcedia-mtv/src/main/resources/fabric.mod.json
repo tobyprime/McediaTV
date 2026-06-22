@@ -13,7 +13,7 @@
   },
   "mixins": ["mcedia_mtv.client.mixins.json"],
   "depends": {
-    "minecraft": "${minecraft_version}",
+    "minecraft": "${minecraft_version_range}",
     "mcedia_core": "*"
   }
 }
