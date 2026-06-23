@@ -314,9 +314,9 @@ public class MtvPlayerManager {
             var s = p.findScreen(periphId);
             if (s == null) return false;
             s.setFillMode(switch (s.getFillMode()) {
-                case "fill" -> "keep_aspect_cover";
-                case "keep_aspect_cover" -> "keep_aspect_fit";
-                case "keep_aspect_fit" -> "fill";
+                case "keep_aspect_cover" -> "fill";
+                case "fill" -> "keep_aspect_fit";
+                case "keep_aspect_fit" -> "keep_aspect_cover";
                 default -> "fill";
             });
             return true;

@@ -66,20 +66,20 @@ public class ScreenSettingsPage extends GuiPage {
             inv.setItem(31, item(Material.RED_CONCRETE,
                     "§c− §7调暗", "§7当前: §f" + bright, "§7点击 −1"));
 
-            // ── 右栏 (17,26,35,34): 开关 / 操作 ──
+            // ── 右栏 (17,26,35,44): 开关 / 操作 ──
 
             inv.setItem(17, item(Material.PAINTING,
-                    "§d🎨 填充: " + sc.getFillMode(), "§7点击切换填充模式"));
+                    "§d🎨 填充: " + fillModeDisplayName(sc.getFillMode()), "§7点击切换填充模式"));
 
             var danmakuIcon = sc.isDanmakuVisible() ? Material.LIME_DYE : Material.GRAY_DYE;
             inv.setItem(26, item(danmakuIcon,
                     "§a💬 弹幕: " + (sc.isDanmakuVisible() ? "开" : "关"), "§7点击切换弹幕显示"));
 
             var progressIcon = sc.isProgressBarVisible() ? Material.LIME_DYE : Material.GRAY_DYE;
-            inv.setItem(34, item(progressIcon,
+            inv.setItem(35, item(progressIcon,
                     "§6📊 进度条: " + (sc.isProgressBarVisible() ? "开" : "关"), "§7点击切换进度条显示"));
 
-            inv.setItem(35, item(Material.STRUCTURE_VOID,
+            inv.setItem(44, item(Material.STRUCTURE_VOID,
                     "§e↺ 重置显示", "§7亮度/填充/纹理恢复默认"));
 
             // ── Row 4 (36-44): XYZ + 重置 + 吸附 ──
@@ -201,10 +201,10 @@ public class ScreenSettingsPage extends GuiPage {
                 case 26 -> context.updateAndRefresh(player, uuid,
                         done -> context.manager().setScreenDanmakuVisible(uuid, periphId,
                                 !sc.isDanmakuVisible(), done));
-                case 34 -> context.updateAndRefresh(player, uuid,
+                case 35 -> context.updateAndRefresh(player, uuid,
                         done -> context.manager().setScreenProgressBarVisible(uuid, periphId,
                                 !sc.isProgressBarVisible(), done));
-                case 35 -> context.updateAndRefresh(player, uuid,
+                case 44 -> context.updateAndRefresh(player, uuid,
                         done -> context.manager().resetScreenBasic(uuid, periphId, done));
 
                 // ── Row 4: XYZ + 重置 + 吸附 ──
@@ -256,5 +256,14 @@ public class ScreenSettingsPage extends GuiPage {
             }
         });
         return true;
+    }
+
+    private static String fillModeDisplayName(String mode) {
+        return switch (mode) {
+            case "keep_aspect_cover" -> "保持比例";
+            case "fill" -> "填充";
+            case "keep_aspect_fit" -> "无背景保持比例";
+            default -> mode;
+        };
     }
 }
