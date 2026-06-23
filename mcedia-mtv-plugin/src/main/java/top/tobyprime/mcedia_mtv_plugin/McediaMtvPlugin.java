@@ -9,7 +9,6 @@ import top.tobyprime.mcedia_mtv_plugin.channel.MigrationHelper;
 import top.tobyprime.mcedia_mtv_plugin.channel.MtvChannelNetworkService;
 import top.tobyprime.mcedia_mtv_plugin.channel.SqLiteChannelRepository;
 import top.tobyprime.mcedia_mtv_plugin.command.MtvCommand;
-import top.tobyprime.mcedia_mtv_plugin.command.MtvHudCommand;
 import top.tobyprime.mcedia_mtv_plugin.controller.MtvPeripheralController;
 import top.tobyprime.mcedia_mtv_plugin.controller.MtvPlaybackController;
 import top.tobyprime.mcedia_mtv_plugin.gui.MtvGui;
@@ -54,22 +53,13 @@ public final class McediaMtvPlugin extends JavaPlugin {
         var selector = new MtvPlayerSelector(this, manager);
         this.gui = new MtvGui(this, manager, controller, playbackController, selector, hudBindingService);
 
-        var mtvCommand = new MtvCommand(manager, controller, playbackController, gui);
+        var mtvCommand = new MtvCommand(gui);
         var command = getCommand("mtv");
         if (command == null) {
             throw new IllegalStateException("未在 plugin.yml 中声明 /mtv 命令");
         }
         command.setExecutor(mtvCommand);
         command.setTabCompleter(mtvCommand);
-
-        var hudCommand = getCommand("mtvhud");
-        var mtvHudCommand = new MtvHudCommand(hudBindingService);
-        if (hudCommand != null) {
-            hudCommand.setExecutor(mtvHudCommand);
-            hudCommand.setTabCompleter(mtvHudCommand);
-        } else {
-            getLogger().warning("未在 plugin.yml 中声明 /mtvhud 命令");
-        }
 
         this.audiencePruneTask = getServer().getGlobalRegionScheduler().runAtFixedRate(this, task ->
                 channelService.getAudienceSessionManager().pruneExpired(System.currentTimeMillis()),

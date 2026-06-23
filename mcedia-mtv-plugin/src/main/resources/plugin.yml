@@ -5,11 +5,8 @@ api-version: '${apiLevel}'
 folia-supported: true
 commands:
   mtv:
-    description: 打开 MTV 管理 GUI
-    usage: /mtv [gui]
-  mtvhud:
-    description: 控制 HUD 小窗播放
-    usage: /mtvhud [subscribe|unsubscribe|status]
+    description: 打开遥控器界面
+    usage: /mtv
 permissions:
   mtv.admin:
     description: 所有 MTV 管理权限
