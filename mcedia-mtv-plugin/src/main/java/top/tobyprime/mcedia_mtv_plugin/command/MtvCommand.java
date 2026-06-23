@@ -32,6 +32,7 @@ public class MtvCommand implements CommandExecutor, TabCompleter {
     private void sendHelp(CommandSender sender) {
         sender.sendMessage("/mtv - 打开 MTV 主菜单");
         sender.sendMessage("/mtv gui - 打开 MTV 主菜单");
+        sender.sendMessage("/mtv control - 打开遥控器界面");
         sender.sendMessage("/mtv create <name> - 在自己位置创建 MTV 播放器");
         sender.sendMessage("player 与 channel 的控制已改为通过 GUI 完成。请使用 /mtv 进入界面操作。");
     }
@@ -59,6 +60,10 @@ public class MtvCommand implements CommandExecutor, TabCompleter {
                 openGui(sender);
                 return true;
             }
+            if ("control".equalsIgnoreCase(args[0])) {
+                openControl(sender);
+                return true;
+            }
             if ("help".equalsIgnoreCase(args[0])) {
                 sendHelp(sender);
                 return true;
@@ -76,7 +81,7 @@ public class MtvCommand implements CommandExecutor, TabCompleter {
     public List<String> onTabComplete(CommandSender sender, org.bukkit.command.Command command, String alias, String[] args) {
         if (args.length == 1) {
             String input = args[0].toLowerCase(Locale.ROOT);
-            return java.util.stream.Stream.of("gui", "help", "create")
+            return java.util.stream.Stream.of("gui", "control", "help", "create")
                     .filter(option -> option.startsWith(input))
                     .toList();
         }
@@ -100,6 +105,17 @@ public class MtvCommand implements CommandExecutor, TabCompleter {
             return;
         }
         gui.navigateTo(player, MtvGui.GuiType.MAIN_MENU, null, null, null);
+    }
+
+    private void openControl(CommandSender sender) {
+        if (!hasPermission(sender, "mtv.gui")) {
+            return;
+        }
+        if (!(sender instanceof Player player)) {
+            sender.sendMessage("只有玩家可以打开遥控器界面。");
+            return;
+        }
+        gui.navigateTo(player, MtvGui.GuiType.REMOTE_MENU, null, null, null);
     }
 
     private void createPlayer(CommandSender sender, String name) {
