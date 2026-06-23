@@ -10,7 +10,7 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * `/mtv` 用于打开遥控器界面。
+ * `/mtv` 用于打开主菜单，`/mtv control` 用于打开遥控器界面。
  */
 public class MtvCommand implements CommandExecutor, TabCompleter {
     private final MtvGui gui;
@@ -20,7 +20,7 @@ public class MtvCommand implements CommandExecutor, TabCompleter {
     }
 
     private void sendHelp(CommandSender sender) {
-        sender.sendMessage("/mtv - 打开遥控器界面");
+        sender.sendMessage("/mtv - 打开 MTV 主菜单");
         sender.sendMessage("/mtv control - 打开遥控器界面");
     }
 
@@ -38,7 +38,11 @@ public class MtvCommand implements CommandExecutor, TabCompleter {
 
     @Override
     public boolean onCommand(CommandSender sender, org.bukkit.command.Command command, String label, String[] args) {
-        if (args.length == 0 || "control".equalsIgnoreCase(args[0])) {
+        if (args.length == 0) {
+            openMainMenu(sender);
+            return true;
+        }
+        if ("control".equalsIgnoreCase(args[0])) {
             openControl(sender);
             return true;
         }
@@ -55,6 +59,17 @@ public class MtvCommand implements CommandExecutor, TabCompleter {
                     .toList();
         }
         return List.of();
+    }
+
+    private void openMainMenu(CommandSender sender) {
+        if (!hasPermission(sender, "mtv.gui")) {
+            return;
+        }
+        if (!(sender instanceof Player player)) {
+            sender.sendMessage("只有玩家可以打开 MTV 主菜单。");
+            return;
+        }
+        gui.navigateTo(player, MtvGui.GuiType.MAIN_MENU, null, null, null);
     }
 
     private void openControl(CommandSender sender) {
