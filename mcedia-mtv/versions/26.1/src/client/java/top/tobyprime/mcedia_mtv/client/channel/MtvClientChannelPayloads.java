@@ -6,6 +6,7 @@ import net.fabricmc.fabric.api.networking.v1.PacketSender;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientPacketListener;
+import top.tobyprime.mcedia_mtv.client.HudChannelPlayer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -16,6 +17,7 @@ public final class MtvClientChannelPayloads {
     }
 
     public static void register() {
+        PayloadTypeRegistry.clientboundPlay().register(MtvHudBindingPayload.TYPE, MtvHudBindingPayload.CODEC);
         PayloadTypeRegistry.clientboundPlay().register(MtvChannelClientSnapshotPayload.TYPE, MtvChannelClientSnapshotPayload.CODEC);
         PayloadTypeRegistry.clientboundPlay().register(MtvChannelClientSyncPayload.TYPE, MtvChannelClientSyncPayload.CODEC);
         PayloadTypeRegistry.clientboundPlay().register(MtvChannelRemovePayload.TYPE, MtvChannelRemovePayload.CODEC);
@@ -31,6 +33,9 @@ public final class MtvClientChannelPayloads {
         ClientPlayNetworking.registerGlobalReceiver(MtvChannelRemovePayload.TYPE, (payload, context) ->
                 safeHandle("remove", payload.channelId(), null, () ->
                         ClientChannelPlaybackManager.getInstance().onRemove(payload.channelId())));
+        ClientPlayNetworking.registerGlobalReceiver(MtvHudBindingPayload.TYPE, (payload, context) ->
+                safeHandle("hud_binding", payload.channelId(), null, () ->
+                        HudChannelPlayer.getInstance().onBinding(payload.channelId())));
         ClientPlayConnectionEvents.JOIN.register(MtvClientChannelPayloads::onJoin);
         ClientPlayConnectionEvents.DISCONNECT.register(MtvClientChannelPayloads::onDisconnect);
         LOGGER.debug("Registered MTV client channel payloads and connection listeners");

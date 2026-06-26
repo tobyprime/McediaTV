@@ -78,6 +78,13 @@ public class RemoteMenuPage extends GuiPage {
             inv.setItem(35, item(Material.RED_CONCRETE,
                     "§c− §7减小音量", "§7当前: §f" + volStr, "§7点击 −0.1"));
 
+            // ── Row 4 (36-44): ⏸ 暂停 — 居中 ──
+            boolean paused = channelState != null && channelState.isPaused();
+            inv.setItem(40, item(
+                    paused ? Material.LIME_DYE : Material.ORANGE_DYE,
+                    paused ? "§a▶ 继续播放" : "§6⏸ 暂停",
+                    "§7点击" + (paused ? "继续播放" : "暂停当前播放")));
+
             // ── Row 5 (45-53): ⏯️ 播放控制 — 底部居中 ──
             //     [⏮][⏪−20s][◀−5s][设置URL][▶+5s][⏩+20s][⏭]
 
@@ -181,6 +188,13 @@ public class RemoteMenuPage extends GuiPage {
                     float volume = Math.max(0.0F, Math.min(1.0F, snap.getMasterVolume() + step));
                     context.updateAndRefresh(player, uuid,
                             done -> context.manager().setMasterVolume(uuid, volume, done));
+                }
+
+                // ── Row 4: ⏸ 暂停 ──
+                case 40 -> {
+                    if (!canManage(player, context, snap)) return;
+                    context.updateAndRefresh(player, uuid,
+                            done -> context.playbackController().togglePause(uuid, done));
                 }
             }
         });
