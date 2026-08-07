@@ -3,7 +3,9 @@ package top.tobyprime.mcedia_mtv_plugin.channel.worldui;
 import org.junit.jupiter.api.Test;
 import top.tobyprime.mcedia_mtv_plugin.channel.ChannelPlaylistItem;
 import top.tobyprime.mcedia_mtv_plugin.channel.ChannelRuntimeState;
+import top.tobyprime.mcedia_mtv_plugin.channel.MtvChannelBinding;
 import top.tobyprime.mcedia_mtv_plugin.channel.MtvChannelType;
+import top.tobyprime.mcedia_mtv_plugin.model.ManagedMtvPlayer;
 
 import java.util.UUID;
 
@@ -46,6 +48,20 @@ class WorldUiControlDispatcherTest {
                 request(WorldUiControlOperation.APPEND, new WorldUiControlArgument.MediaUrl(" https://example.test/video ")), state));
         assertEquals(WorldUiControlError.NONE, WorldUiControlDispatcher.validateArgument(
                 request(WorldUiControlOperation.SET_PLAY_ORDER, new WorldUiControlArgument.PlayOrderMode("LOOP_ALL")), state));
+    }
+
+    @Test
+    void selfBindingRequiresTheExistingMtvPermissionPolicy() {
+        var target = new ManagedMtvPlayer();
+        target.setUuid(UUID.randomUUID());
+        target.setOwner(UUID.randomUUID());
+        target.setPublic(false);
+
+        assertEquals(false, WorldUiControlDispatcher.canControlTargetBinding(null, target, MtvChannelBinding.self(target.getUuid())));
+        assertEquals(true, WorldUiControlDispatcher.canControlTargetBinding(null, target, MtvChannelBinding.broadcast("channel")));
+
+        target.setPublic(true);
+        assertEquals(true, WorldUiControlDispatcher.canControlTargetBinding(null, target, MtvChannelBinding.self(target.getUuid())));
     }
 
     private static WorldUiControlRequest request(WorldUiControlOperation operation, WorldUiControlArgument argument) {

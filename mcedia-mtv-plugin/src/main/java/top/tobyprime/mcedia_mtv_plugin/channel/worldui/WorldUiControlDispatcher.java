@@ -82,11 +82,6 @@ public final class WorldUiControlDispatcher {
             done.accept(rejected(request, targetError, revision));
             return;
         }
-        var hitValidation = hitValidator.validate(player, target, request.screenId(), request.hitU(), request.hitV());
-        if (!hitValidation.accepted()) {
-            done.accept(rejected(request, hitValidation.error(), revision));
-            return;
-        }
 
         MtvChannelBinding binding = channelService.resolveBinding(target);
         ChannelRuntimeState state = channelService.ensureChannelState(binding.channelId());
@@ -99,8 +94,17 @@ public final class WorldUiControlDispatcher {
             done.accept(rejected(request, WorldUiControlError.CHANNEL_MISMATCH, revision));
             return;
         }
+        if (!canControlTargetBinding(player, target, binding)) {
+            done.accept(rejected(request, WorldUiControlError.PERMISSION_DENIED, revision));
+            return;
+        }
         if (!channelService.canControlChannelPlayback(player, state)) {
             done.accept(rejected(request, WorldUiControlError.PERMISSION_DENIED, revision));
+            return;
+        }
+        var hitValidation = hitValidator.validate(player, target, request.screenId(), request.hitU(), request.hitV());
+        if (!hitValidation.accepted()) {
+            done.accept(rejected(request, hitValidation.error(), revision));
             return;
         }
         if (request.operation().changesChannelRevision() && request.expectedRevision() != revision) {
@@ -280,6 +284,11 @@ public final class WorldUiControlDispatcher {
             return WorldUiControlResult.rejected(requestId(request), WorldUiControlError.MALFORMED_REQUEST, 0L);
         }
         return null;
+    }
+
+    /** Self channels inherit the owning MTV's existing container-GUI permission policy. */
+    static boolean canControlTargetBinding(Player player, ManagedMtvPlayer target, MtvChannelBinding binding) {
+        return binding == null || !binding.isSelf() || MtvPlayerManager.canEditPlayer(player, target);
     }
 
     private long revisionFor(ManagedMtvPlayer target, WorldUiControlRequest request) {
