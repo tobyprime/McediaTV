@@ -7,9 +7,15 @@ import top.tobyprime.mcedia_mtv_plugin.channel.worldui.WorldUiPlaylistManifest;
 import top.tobyprime.mcedia_mtv_plugin.channel.worldui.WorldUiPlaylistPage;
 import top.tobyprime.mcedia_mtv_plugin.channel.worldui.WorldUiPlaylistPageRequest;
 import top.tobyprime.mcedia_mtv_plugin.channel.worldui.WorldUiCapabilities;
+import top.tobyprime.mcedia_mtv_plugin.channel.worldui.WorldUiControlArgument;
+import top.tobyprime.mcedia_mtv_plugin.channel.worldui.WorldUiControlError;
+import top.tobyprime.mcedia_mtv_plugin.channel.worldui.WorldUiControlOperation;
+import top.tobyprime.mcedia_mtv_plugin.channel.worldui.WorldUiControlRequest;
+import top.tobyprime.mcedia_mtv_plugin.channel.worldui.WorldUiControlResult;
 
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 
 public final class MtvChannelProtocol {
     public static final String CHANNEL_SUBSCRIBE = "mcedia_mtv:channel_subscribe";
@@ -23,13 +29,18 @@ public final class MtvChannelProtocol {
     public static final String CHANNEL_PLAYLIST_MANIFEST = "mcedia_mtv:channel_playlist_manifest";
     public static final String CHANNEL_PLAYLIST_PAGE_REQUEST = "mcedia_mtv:channel_playlist_page_request";
     public static final String CHANNEL_PLAYLIST_PAGE = "mcedia_mtv:channel_playlist_page";
+    public static final String CHANNEL_CONTROL_REQUEST = "mcedia_mtv:channel_control_request";
+    public static final String CHANNEL_CONTROL_RESULT = "mcedia_mtv:channel_control_result";
     public static final int WORLD_UI_PROTOCOL_VERSION = 1;
     public static final int MAX_PLAYLIST_PAGE_ITEMS = 32;
     public static final int MAX_PLAYLIST_PAGE_BYTES = 24 * 1024;
     public static final int MAX_MEDIA_URL_LENGTH = 2_048;
 
     private static final int MAX_CHANNEL_ID_LENGTH = 256;
+    private static final int MAX_SCREEN_ID_LENGTH = 128;
     private static final int MAX_PLAY_ORDER_MODE_LENGTH = 32;
+    private static final int MAX_CONTROL_REQUEST_BYTES = 4 * 1024;
+    private static final int MAX_CONTROL_RESULT_BYTES = 64;
     private static final Set<String> PLAY_ORDER_MODES = Set.of("SEQUENTIAL", "SHUFFLE", "LOOP_ALL", "LOOP_ONE", "CURRENT_ONLY");
 
     private MtvChannelProtocol() {
@@ -175,6 +186,95 @@ public final class MtvChannelProtocol {
         validatePageRequest(request);
         ensureFullyRead(buffer, "playlist page request");
         return request;
+    }
+
+    public static byte[] encodeControlRequest(WorldUiControlRequest request) {
+        var buffer = new FriendlyByteBuf(Unpooled.buffer());
+        writeControlRequest(buffer, request);
+        byte[] encoded = toBytes(buffer);
+        if (encoded.length > MAX_CONTROL_REQUEST_BYTES) {
+            throw invalidPacket("control request", "encoded length exceeds " + MAX_CONTROL_REQUEST_BYTES + " bytes");
+        }
+        return encoded;
+    }
+
+    public static WorldUiControlRequest decodeControlRequest(byte[] message) {
+        if (message == null || message.length > MAX_CONTROL_REQUEST_BYTES) {
+            throw invalidPacket("control request", "encoded length exceeds " + MAX_CONTROL_REQUEST_BYTES + " bytes");
+        }
+        return readControlRequest(new FriendlyByteBuf(Unpooled.wrappedBuffer(message)));
+    }
+
+    public static void writeControlRequest(FriendlyByteBuf buffer, WorldUiControlRequest request) {
+        validateControlRequest(request);
+        buffer.writeUUID(request.targetMtvUuid());
+        buffer.writeUtf(request.screenId(), MAX_SCREEN_ID_LENGTH);
+        buffer.writeUtf(request.channelId(), MAX_CHANNEL_ID_LENGTH);
+        buffer.writeLong(request.requestId());
+        buffer.writeLong(request.expectedRevision());
+        buffer.writeFloat(request.hitU());
+        buffer.writeFloat(request.hitV());
+        buffer.writeVarInt(request.operation().ordinal());
+        writeControlArgument(buffer, request.operation(), request.argument());
+    }
+
+    public static WorldUiControlRequest readControlRequest(FriendlyByteBuf buffer) {
+        if (buffer.readableBytes() > MAX_CONTROL_REQUEST_BYTES) {
+            throw invalidPacket("control request", "encoded length exceeds " + MAX_CONTROL_REQUEST_BYTES + " bytes");
+        }
+        UUID targetMtvUuid = buffer.readUUID();
+        String screenId = buffer.readUtf(MAX_SCREEN_ID_LENGTH);
+        String channelId = buffer.readUtf(MAX_CHANNEL_ID_LENGTH);
+        long requestId = buffer.readLong();
+        long expectedRevision = buffer.readLong();
+        float hitU = buffer.readFloat();
+        float hitV = buffer.readFloat();
+        WorldUiControlOperation operation = readEnum(buffer, WorldUiControlOperation.values(), "control operation");
+        WorldUiControlArgument argument = readControlArgument(buffer, operation);
+        var request = new WorldUiControlRequest(targetMtvUuid, screenId, channelId, requestId, expectedRevision, hitU, hitV, operation, argument);
+        validateControlRequest(request);
+        ensureFullyRead(buffer, "control request");
+        return request;
+    }
+
+    public static byte[] encodeControlResult(WorldUiControlResult result) {
+        var buffer = new FriendlyByteBuf(Unpooled.buffer());
+        writeControlResult(buffer, result);
+        byte[] encoded = toBytes(buffer);
+        if (encoded.length > MAX_CONTROL_RESULT_BYTES) {
+            throw invalidPacket("control result", "encoded length exceeds " + MAX_CONTROL_RESULT_BYTES + " bytes");
+        }
+        return encoded;
+    }
+
+    public static WorldUiControlResult decodeControlResult(byte[] message) {
+        if (message == null || message.length > MAX_CONTROL_RESULT_BYTES) {
+            throw invalidPacket("control result", "encoded length exceeds " + MAX_CONTROL_RESULT_BYTES + " bytes");
+        }
+        return readControlResult(new FriendlyByteBuf(Unpooled.wrappedBuffer(message)));
+    }
+
+    public static void writeControlResult(FriendlyByteBuf buffer, WorldUiControlResult result) {
+        validateControlResult(result);
+        buffer.writeLong(result.requestId());
+        buffer.writeBoolean(result.accepted());
+        buffer.writeVarInt(result.error().ordinal());
+        buffer.writeLong(result.revision());
+    }
+
+    public static WorldUiControlResult readControlResult(FriendlyByteBuf buffer) {
+        if (buffer.readableBytes() > MAX_CONTROL_RESULT_BYTES) {
+            throw invalidPacket("control result", "encoded length exceeds " + MAX_CONTROL_RESULT_BYTES + " bytes");
+        }
+        var result = new WorldUiControlResult(
+                buffer.readLong(),
+                buffer.readBoolean(),
+                readEnum(buffer, WorldUiControlError.values(), "control error"),
+                buffer.readLong()
+        );
+        validateControlResult(result);
+        ensureFullyRead(buffer, "control result");
+        return result;
     }
 
     public static byte[] encodePlaylistPage(WorldUiPlaylistPage page) {
@@ -401,6 +501,99 @@ public final class MtvChannelProtocol {
             throw invalidPacket("playlist page", field + " is negative");
         }
         return value;
+    }
+
+    private static void validateControlRequest(WorldUiControlRequest request) {
+        if (request == null || request.targetMtvUuid() == null || request.operation() == null || request.argument() == null
+                || request.screenId() == null || request.screenId().isBlank() || request.screenId().length() > MAX_SCREEN_ID_LENGTH
+                || request.channelId() == null || request.channelId().isBlank() || request.channelId().length() > MAX_CHANNEL_ID_LENGTH
+                || request.requestId() < 0L || request.expectedRevision() < 0L
+                || !validScreenUv(request.hitU()) || !validScreenUv(request.hitV())) {
+            throw invalidPacket("control request", "field is invalid");
+        }
+        switch (request.operation()) {
+            case TOGGLE_PAUSE, NEXT, PREVIOUS, CLEAR, TOGGLE_MUTE -> requireArgument(request.argument(), WorldUiControlArgument.None.class, request.operation());
+            case SEEK_ABSOLUTE -> {
+                long value = requireArgument(request.argument(), WorldUiControlArgument.PositionUs.class, request.operation()).value();
+                if (value < 0L) throw invalidPacket("control request", "absolute seek is negative");
+            }
+            case SEEK_RELATIVE -> requireArgument(request.argument(), WorldUiControlArgument.PositionUs.class, request.operation());
+            case SET_SPEED -> validateScalar(request.argument(), request.operation(), 0.25F, 4.0F);
+            case SET_MASTER_VOLUME -> validateScalar(request.argument(), request.operation(), 0.0F, 1.0F);
+            case PLAY_INDEX, REMOVE, MOVE_FRONT, MOVE_BACK -> {
+                if (requireArgument(request.argument(), WorldUiControlArgument.PlaylistIndex.class, request.operation()).value() < 0) {
+                    throw invalidPacket("control request", "playlist index is negative");
+                }
+            }
+            case PREPEND, APPEND, INSERT_NEXT, INSERT_AND_PLAY -> {
+                String mediaUrl = requireArgument(request.argument(), WorldUiControlArgument.MediaUrl.class, request.operation()).value();
+                if (mediaUrl == null || mediaUrl.isBlank() || mediaUrl.length() > MAX_MEDIA_URL_LENGTH) {
+                    throw invalidPacket("control request", "mediaUrl is invalid");
+                }
+            }
+            case SET_PLAY_ORDER -> {
+                String mode = requireArgument(request.argument(), WorldUiControlArgument.PlayOrderMode.class, request.operation()).value();
+                if (mode == null || !PLAY_ORDER_MODES.contains(mode)) {
+                    throw invalidPacket("control request", "play order is invalid");
+                }
+            }
+        }
+    }
+
+    private static void validateControlResult(WorldUiControlResult result) {
+        if (result == null || result.requestId() < 0L || result.revision() < 0L || result.error() == null
+                || result.accepted() != (result.error() == WorldUiControlError.NONE)) {
+            throw invalidPacket("control result", "field is invalid");
+        }
+    }
+
+    private static void writeControlArgument(FriendlyByteBuf buffer, WorldUiControlOperation operation, WorldUiControlArgument argument) {
+        switch (operation) {
+            case TOGGLE_PAUSE, NEXT, PREVIOUS, CLEAR, TOGGLE_MUTE -> { }
+            case SEEK_ABSOLUTE, SEEK_RELATIVE -> buffer.writeLong(((WorldUiControlArgument.PositionUs) argument).value());
+            case SET_SPEED, SET_MASTER_VOLUME -> buffer.writeFloat(((WorldUiControlArgument.Scalar) argument).value());
+            case PLAY_INDEX, REMOVE, MOVE_FRONT, MOVE_BACK -> buffer.writeVarInt(((WorldUiControlArgument.PlaylistIndex) argument).value());
+            case PREPEND, APPEND, INSERT_NEXT, INSERT_AND_PLAY -> buffer.writeUtf(((WorldUiControlArgument.MediaUrl) argument).value(), MAX_MEDIA_URL_LENGTH);
+            case SET_PLAY_ORDER -> buffer.writeUtf(((WorldUiControlArgument.PlayOrderMode) argument).value(), MAX_PLAY_ORDER_MODE_LENGTH);
+        }
+    }
+
+    private static WorldUiControlArgument readControlArgument(FriendlyByteBuf buffer, WorldUiControlOperation operation) {
+        return switch (operation) {
+            case TOGGLE_PAUSE, NEXT, PREVIOUS, CLEAR, TOGGLE_MUTE -> WorldUiControlArgument.None.INSTANCE;
+            case SEEK_ABSOLUTE, SEEK_RELATIVE -> new WorldUiControlArgument.PositionUs(buffer.readLong());
+            case SET_SPEED, SET_MASTER_VOLUME -> new WorldUiControlArgument.Scalar(buffer.readFloat());
+            case PLAY_INDEX, REMOVE, MOVE_FRONT, MOVE_BACK -> new WorldUiControlArgument.PlaylistIndex(readNonNegativeInt(buffer, "playlist index"));
+            case PREPEND, APPEND, INSERT_NEXT, INSERT_AND_PLAY -> new WorldUiControlArgument.MediaUrl(readNonBlankUtf(buffer, MAX_MEDIA_URL_LENGTH, "mediaUrl"));
+            case SET_PLAY_ORDER -> new WorldUiControlArgument.PlayOrderMode(readPlayOrderMode(buffer));
+        };
+    }
+
+    private static void validateScalar(WorldUiControlArgument argument, WorldUiControlOperation operation, float minimum, float maximum) {
+        float value = requireArgument(argument, WorldUiControlArgument.Scalar.class, operation).value();
+        if (!Float.isFinite(value) || value < minimum || value > maximum) {
+            throw invalidPacket("control request", "scalar is invalid");
+        }
+    }
+
+    private static <T extends WorldUiControlArgument> T requireArgument(WorldUiControlArgument argument, Class<T> expectedType,
+                                                                          WorldUiControlOperation operation) {
+        if (!expectedType.isInstance(argument)) {
+            throw invalidPacket("control request", "argument does not match " + operation);
+        }
+        return expectedType.cast(argument);
+    }
+
+    private static <E extends Enum<E>> E readEnum(FriendlyByteBuf buffer, E[] values, String field) {
+        int ordinal = buffer.readVarInt();
+        if (ordinal < 0 || ordinal >= values.length) {
+            throw invalidPacket("control request", field + " is invalid");
+        }
+        return values[ordinal];
+    }
+
+    private static boolean validScreenUv(float value) {
+        return Float.isFinite(value) && value >= 0.0F && value <= 1.0F;
     }
 
 

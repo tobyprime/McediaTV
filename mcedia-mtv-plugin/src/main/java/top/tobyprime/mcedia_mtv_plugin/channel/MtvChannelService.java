@@ -304,6 +304,19 @@ public final class MtvChannelService {
         });
     }
 
+    public boolean setPlayOrderMode(String channelId, ChannelPlayOrderMode playOrderMode) {
+        if (playOrderMode == null) {
+            return false;
+        }
+        return mutatePlayback(channelId, state -> {
+            if (state.getPlayOrderMode() == playOrderMode) {
+                return false;
+            }
+            state.setPlayOrderMode(playOrderMode);
+            return true;
+        });
+    }
+
     public ChannelRuntimeState createPublicChannel(Player player, String channelName, String description) {
         if (player == null || !player.hasPermission("mtv.channel.create")) {
             return null;

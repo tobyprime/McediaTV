@@ -8,6 +8,8 @@ import top.tobyprime.mcedia_mtv_plugin.channel.MtvChannelProtocol;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import java.util.UUID;
+
 class MtvChannelProtocolWorldUiTest {
     @Test
     void manifestAndPageRequestRoundTrip() {
@@ -32,5 +34,25 @@ class MtvChannelProtocolWorldUiTest {
         var capabilities = new WorldUiCapabilities(1, 32, 7L);
 
         assertEquals(capabilities, MtvChannelProtocol.decodeCapabilities(MtvChannelProtocol.encodeCapabilities(capabilities)));
+    }
+
+    @Test
+    void controlRequestAndResultRoundTrip() {
+        var request = new WorldUiControlRequest(UUID.randomUUID(), "screen_0", "channel", 4L, 8L,
+                0.5F, 0.75F, WorldUiControlOperation.SET_MASTER_VOLUME, new WorldUiControlArgument.Scalar(0.4F));
+        var result = WorldUiControlResult.rejected(4L, WorldUiControlError.STALE_REVISION, 9L);
+
+        assertEquals(request, MtvChannelProtocol.decodeControlRequest(MtvChannelProtocol.encodeControlRequest(request)));
+        assertEquals(result, MtvChannelProtocol.decodeControlResult(MtvChannelProtocol.encodeControlResult(result)));
+    }
+
+    @Test
+    void controlRequestRejectsTrailingBytes() {
+        var buffer = new FriendlyByteBuf(Unpooled.buffer());
+        MtvChannelProtocol.writeControlRequest(buffer, new WorldUiControlRequest(UUID.randomUUID(), "screen_0", "channel", 4L, 8L,
+                0.5F, 0.75F, WorldUiControlOperation.NEXT, WorldUiControlArgument.None.INSTANCE));
+        buffer.writeByte(1);
+
+        assertThrows(IllegalArgumentException.class, () -> MtvChannelProtocol.readControlRequest(buffer));
     }
 }
