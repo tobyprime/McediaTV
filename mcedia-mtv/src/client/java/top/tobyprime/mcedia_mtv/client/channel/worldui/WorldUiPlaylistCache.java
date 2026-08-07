@@ -10,8 +10,13 @@ import java.util.Set;
 
 public final class WorldUiPlaylistCache {
     private static final int PAGE_SIZE = 32;
+    private static final WorldUiPlaylistCache INSTANCE = new WorldUiPlaylistCache();
 
     private final Map<String, ChannelPages> channels = new HashMap<>();
+
+    public static WorldUiPlaylistCache getInstance() {
+        return INSTANCE;
+    }
 
     public synchronized void applyManifest(WorldUiPlaylistManifest manifest) {
         ChannelPages state = channels.computeIfAbsent(manifest.channelId(), ignored -> new ChannelPages());

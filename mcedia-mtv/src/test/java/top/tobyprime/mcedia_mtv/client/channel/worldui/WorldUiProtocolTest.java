@@ -123,4 +123,11 @@ class WorldUiProtocolTest {
 
         assertEquals(capabilities, MtvChannelProtocol.decodeCapabilities(MtvChannelProtocol.encodeCapabilities(capabilities)));
     }
+
+    @Test
+    void playlistPageRequestRoundTrips() {
+        var request = new WorldUiPlaylistPageRequest("channel", 17L, 32);
+
+        assertEquals(request, MtvChannelProtocol.decodePlaylistPageRequest(MtvChannelProtocol.encodePlaylistPageRequest(request)));
+    }
 }

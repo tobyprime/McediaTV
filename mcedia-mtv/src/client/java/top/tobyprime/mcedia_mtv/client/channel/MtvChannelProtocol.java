@@ -15,6 +15,7 @@ import top.tobyprime.mcedia_mtv.client.channel.worldui.WorldUiControlOperation;
 import top.tobyprime.mcedia_mtv.client.channel.worldui.WorldUiControlRequest;
 import top.tobyprime.mcedia_mtv.client.channel.worldui.WorldUiControlResult;
 import top.tobyprime.mcedia_mtv.client.channel.worldui.WorldUiCapabilities;
+import top.tobyprime.mcedia_mtv.client.channel.worldui.WorldUiPlaylistPageRequest;
 
 public final class MtvChannelProtocol {
     public static final String CHANNEL_SUBSCRIBE = "mcedia_mtv:channel_subscribe";
@@ -39,6 +40,7 @@ public final class MtvChannelProtocol {
     private static final int MAX_PLAY_ORDER_MODE_LENGTH = 32;
     private static final int MAX_CONTROL_REQUEST_BYTES = 4 * 1024;
     private static final int MAX_CONTROL_RESULT_BYTES = 64;
+    private static final int MAX_PAGE_REQUEST_BYTES = 512;
     private static final Set<String> PLAY_ORDER_MODES = Set.of("SEQUENTIAL", "SHUFFLE", "LOOP_ALL", "LOOP_ONE", "CURRENT_ONLY");
 
     private MtvChannelProtocol() {
@@ -236,6 +238,40 @@ public final class MtvChannelProtocol {
         return page;
     }
 
+    public static byte[] encodePlaylistPageRequest(WorldUiPlaylistPageRequest request) {
+        var buffer = new FriendlyByteBuf(Unpooled.buffer());
+        writePlaylistPageRequest(buffer, request);
+        return toBytes(buffer);
+    }
+
+    public static WorldUiPlaylistPageRequest decodePlaylistPageRequest(byte[] message) {
+        if (message.length > MAX_PAGE_REQUEST_BYTES) {
+            throw invalidPacket("playlist page request", "encoded length exceeds " + MAX_PAGE_REQUEST_BYTES + " bytes");
+        }
+        return readPlaylistPageRequest(new FriendlyByteBuf(Unpooled.wrappedBuffer(message)));
+    }
+
+    public static void writePlaylistPageRequest(FriendlyByteBuf buffer, WorldUiPlaylistPageRequest request) {
+        validatePageRequest(request);
+        buffer.writeUtf(request.channelId(), MAX_CHANNEL_ID_LENGTH);
+        buffer.writeLong(request.knownRevision());
+        buffer.writeVarInt(request.offset());
+    }
+
+    public static WorldUiPlaylistPageRequest readPlaylistPageRequest(FriendlyByteBuf buffer) {
+        if (buffer.readableBytes() > MAX_PAGE_REQUEST_BYTES) {
+            throw invalidPacket("playlist page request", "encoded length exceeds " + MAX_PAGE_REQUEST_BYTES + " bytes");
+        }
+        var request = new WorldUiPlaylistPageRequest(
+                readNonBlankUtf(buffer, MAX_CHANNEL_ID_LENGTH, "channelId"),
+                readNonNegativeLong(buffer, "knownRevision"),
+                readNonNegativeInt(buffer, "offset")
+        );
+        validatePageRequest(request);
+        ensureFullyRead(buffer, "playlist page request");
+        return request;
+    }
+
     public static byte[] encodeControlRequest(WorldUiControlRequest request) {
         var buffer = new FriendlyByteBuf(Unpooled.buffer());
         writeControlRequest(buffer, request);
@@ -384,6 +420,14 @@ public final class MtvChannelProtocol {
                 || capabilities.maxPageItems() > MAX_PLAYLIST_PAGE_ITEMS
                 || capabilities.featureFlags() < 0L) {
             throw invalidPacket("world UI capabilities", "field is invalid");
+        }
+    }
+
+    private static void validatePageRequest(WorldUiPlaylistPageRequest request) {
+        if (request == null || request.channelId() == null || request.channelId().isBlank()
+                || request.channelId().length() > MAX_CHANNEL_ID_LENGTH || request.knownRevision() < 0L
+                || request.offset() < 0 || request.offset() % MAX_PLAYLIST_PAGE_ITEMS != 0) {
+            throw invalidPacket("playlist page request", "field is invalid");
         }
     }
 

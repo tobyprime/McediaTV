@@ -6,13 +6,13 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-final class MtvChannelClientPacketSender {
+public final class MtvChannelClientPacketSender {
     private static final Logger LOGGER = LoggerFactory.getLogger(MtvChannelClientPacketSender.class);
 
     private MtvChannelClientPacketSender() {
     }
 
-    static void send(CustomPacketPayload payload) {
+    public static void send(CustomPacketPayload payload) {
         var mc = Minecraft.getInstance();
         if (mc.player == null) {
             LOGGER.warn("Rejected MTV client packet: type={}, reason=no-client-player", payload.getClass().getSimpleName());

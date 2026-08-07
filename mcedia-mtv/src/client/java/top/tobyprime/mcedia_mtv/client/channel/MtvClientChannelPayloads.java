@@ -9,6 +9,10 @@ import net.minecraft.client.multiplayer.ClientPacketListener;
 import top.tobyprime.mcedia_mtv.client.HudChannelPlayer;
 import top.tobyprime.mcedia_mtv.client.channel.worldui.MtvWorldUiCapabilitiesPayload;
 import top.tobyprime.mcedia_mtv.client.channel.worldui.WorldUiCapabilityState;
+import top.tobyprime.mcedia_mtv.client.channel.worldui.MtvWorldUiPlaylistManifestPayload;
+import top.tobyprime.mcedia_mtv.client.channel.worldui.MtvWorldUiPlaylistPagePayload;
+import top.tobyprime.mcedia_mtv.client.channel.worldui.MtvWorldUiPlaylistPageRequestPayload;
+import top.tobyprime.mcedia_mtv.client.channel.worldui.WorldUiPlaylistCache;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -24,9 +28,12 @@ public final class MtvClientChannelPayloads {
         PayloadTypeRegistry.playS2C().register(MtvChannelClientSyncPayload.TYPE, MtvChannelClientSyncPayload.CODEC);
         PayloadTypeRegistry.playS2C().register(MtvChannelRemovePayload.TYPE, MtvChannelRemovePayload.CODEC);
         PayloadTypeRegistry.playS2C().register(MtvWorldUiCapabilitiesPayload.TYPE, MtvWorldUiCapabilitiesPayload.CODEC);
+        PayloadTypeRegistry.playS2C().register(MtvWorldUiPlaylistManifestPayload.TYPE, MtvWorldUiPlaylistManifestPayload.CODEC);
+        PayloadTypeRegistry.playS2C().register(MtvWorldUiPlaylistPagePayload.TYPE, MtvWorldUiPlaylistPagePayload.CODEC);
         PayloadTypeRegistry.playC2S().register(MtvChannelClientSubscribePayload.TYPE, MtvChannelClientSubscribePayload.CODEC);
         PayloadTypeRegistry.playC2S().register(MtvChannelClientUnsubscribePayload.TYPE, MtvChannelClientUnsubscribePayload.CODEC);
         PayloadTypeRegistry.playC2S().register(MtvChannelClientHeartbeatPayload.TYPE, MtvChannelClientHeartbeatPayload.CODEC);
+        PayloadTypeRegistry.playC2S().register(MtvWorldUiPlaylistPageRequestPayload.TYPE, MtvWorldUiPlaylistPageRequestPayload.CODEC);
         ClientPlayNetworking.registerGlobalReceiver(MtvChannelClientSnapshotPayload.TYPE, (payload, context) ->
                 safeHandle("snapshot", payload.snapshot().channelId(), payload.snapshot().revision(), () ->
                         ClientChannelPlaybackManager.getInstance().onSnapshot(payload.snapshot())));
@@ -42,6 +49,12 @@ public final class MtvClientChannelPayloads {
         ClientPlayNetworking.registerGlobalReceiver(MtvWorldUiCapabilitiesPayload.TYPE, (payload, context) ->
                 safeHandle("world_ui_capabilities", "", null, () ->
                         WorldUiCapabilityState.getInstance().onCapabilities(payload.capabilities())));
+        ClientPlayNetworking.registerGlobalReceiver(MtvWorldUiPlaylistManifestPayload.TYPE, (payload, context) ->
+                safeHandle("playlist_manifest", payload.manifest().channelId(), payload.manifest().revision(), () ->
+                        WorldUiPlaylistCache.getInstance().applyManifest(payload.manifest())));
+        ClientPlayNetworking.registerGlobalReceiver(MtvWorldUiPlaylistPagePayload.TYPE, (payload, context) ->
+                safeHandle("playlist_page", payload.page().channelId(), payload.page().revision(), () ->
+                        WorldUiPlaylistCache.getInstance().applyPage(payload.page())));
         ClientPlayConnectionEvents.JOIN.register(MtvClientChannelPayloads::onJoin);
         ClientPlayConnectionEvents.DISCONNECT.register(MtvClientChannelPayloads::onDisconnect);
         LOGGER.debug("Registered MTV client channel payloads and connection listeners");
@@ -62,6 +75,8 @@ public final class MtvClientChannelPayloads {
                 ClientChannelPlaybackManager.getInstance()::clear
         );
         lifecycle.onJoin();
+        WorldUiCapabilityState.getInstance().clear();
+        WorldUiPlaylistCache.getInstance().clear();
         LOGGER.info("Open MTV client channel state: server={}, existing sessions retained for join payloads",
                 client.getCurrentServer() == null ? "singleplayer" : client.getCurrentServer().ip);
     }
@@ -75,5 +90,6 @@ public final class MtvClientChannelPayloads {
                 client.getCurrentServer() == null ? "singleplayer" : client.getCurrentServer().ip);
         lifecycle.onDisconnect();
         WorldUiCapabilityState.getInstance().clear();
+        WorldUiPlaylistCache.getInstance().clear();
     }
 }
