@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Objects;
 import java.util.function.LongSupplier;
+import java.util.function.Consumer;
 import top.tobyprime.mcedia_mtv.client.metadata.MtvMediaMetadataCache;
 
 public final class WorldUiPlaylistCache {
@@ -16,14 +17,20 @@ public final class WorldUiPlaylistCache {
     private static final WorldUiPlaylistCache INSTANCE = new WorldUiPlaylistCache();
 
     private final LongSupplier clockNanos;
+    private final Consumer<String> metadataPrefetcher;
     private final Map<String, ChannelPages> channels = new HashMap<>();
 
     public WorldUiPlaylistCache() {
-        this(System::nanoTime);
+        this(System::nanoTime, mediaUrl -> MtvMediaMetadataCache.getInstance().resolveAsync(mediaUrl));
     }
 
     WorldUiPlaylistCache(LongSupplier clockNanos) {
+        this(clockNanos, mediaUrl -> MtvMediaMetadataCache.getInstance().resolveAsync(mediaUrl));
+    }
+
+    WorldUiPlaylistCache(LongSupplier clockNanos, Consumer<String> metadataPrefetcher) {
         this.clockNanos = Objects.requireNonNull(clockNanos, "clockNanos");
+        this.metadataPrefetcher = Objects.requireNonNull(metadataPrefetcher, "metadataPrefetcher");
     }
 
     public static WorldUiPlaylistCache getInstance() {
@@ -46,9 +53,6 @@ public final class WorldUiPlaylistCache {
         }
         state.pages.put(page.offset(), page);
         state.pendingOffsets.remove(page.offset());
-        for (String mediaUrl : page.mediaUrls()) {
-            MtvMediaMetadataCache.getInstance().resolveAsync(mediaUrl);
-        }
     }
 
     public synchronized Optional<WorldUiPlaylistManifest> manifest(String channelId) {
@@ -93,6 +97,29 @@ public final class WorldUiPlaylistCache {
         ChannelPages state = channels.get(channelId);
         if (state != null) {
             state.pendingOffsets.remove(offset);
+        }
+    }
+
+    /** Prefetches only the list rows currently visible to the world UI. */
+    public synchronized void prefetchRange(String channelId, int start, int end) {
+        if (start < 0 || end < start) {
+            return;
+        }
+        ChannelPages state = channels.get(channelId);
+        if (state == null || state.manifest == null || state.manifest.itemCount() == 0) {
+            return;
+        }
+        int last = Math.min(end, state.manifest.itemCount() - 1);
+        for (int index = start; index <= last; index++) {
+            int offset = (index / PAGE_SIZE) * PAGE_SIZE;
+            WorldUiPlaylistPage page = state.pages.get(offset);
+            if (page == null) {
+                continue;
+            }
+            int pageIndex = index - page.offset();
+            if (pageIndex >= 0 && pageIndex < page.mediaUrls().size()) {
+                metadataPrefetcher.accept(page.mediaUrls().get(pageIndex));
+            }
         }
     }
 

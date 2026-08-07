@@ -3,6 +3,7 @@ package top.tobyprime.mcedia_mtv.client.channel.worldui;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.ArrayList;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -48,5 +49,19 @@ class WorldUiPlaylistCacheTest {
         clock.addAndGet(3_000_000_000L);
 
         assertEquals(List.of(0), cache.missingOffsetsForVisibleRange("channel", 0, 1));
+    }
+
+    @Test
+    void onlyVisibleRowsArePrefetchedAfterAPageArrives() {
+        var prefetched = new ArrayList<String>();
+        var cache = new WorldUiPlaylistCache(() -> 1L, prefetched::add);
+        cache.applyManifest(new WorldUiPlaylistManifest("channel", 3L, 32, 0, "SEQUENTIAL"));
+        cache.applyPage(new WorldUiPlaylistPage("channel", 3L, 32, 0, "SEQUENTIAL", 0,
+                List.of("zero", "one", "two", "three")));
+
+        assertTrue(prefetched.isEmpty());
+        cache.prefetchRange("channel", 1, 2);
+
+        assertEquals(List.of("one", "two"), prefetched);
     }
 }

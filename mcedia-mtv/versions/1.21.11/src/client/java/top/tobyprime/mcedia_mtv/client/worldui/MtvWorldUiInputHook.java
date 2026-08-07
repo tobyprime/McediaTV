@@ -87,6 +87,8 @@ public final class MtvWorldUiInputHook {
         WorldUiPlaylistCache.getInstance().manifest(target.channelId()).ifPresent(manifest -> {
             int start = MtvWorldUiRenderer.presentation().playlistStart();
             int last = Math.max(0, manifest.itemCount() - 1);
+            WorldUiPlaylistCache.getInstance().prefetchRange(target.channelId(), start, Math.min(last, start + 7));
+            WorldUiPlaylistCache.getInstance().prefetchRange(target.channelId(), Math.max(0, manifest.cursor() - 1), Math.min(last, manifest.cursor() + 1));
             requestRange(target.channelId(), manifest.revision(), start, Math.min(last, start + 7));
             requestRange(target.channelId(), manifest.revision(), Math.max(0, manifest.cursor() - 1), Math.min(last, manifest.cursor() + 1));
             requestRange(target.channelId(), manifest.revision(), Math.max(0, start - 32), Math.min(last, start + 31));
