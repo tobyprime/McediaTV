@@ -42,6 +42,21 @@ class WorldUiLayoutTest {
         assertEquals(new WorldUiControlArgument.PositionUs(75_000_000L), request.argument());
     }
 
+    @Test
+    void expandedControlsUseTheNewestChannelRevision() {
+        var sender = new RecordingSender();
+        var first = new WorldUiInteractionState.Target(UUID.randomUUID(), "screen_0", "self:test", 9L);
+        var refreshed = new WorldUiInteractionState.Target(first.mtvUuid(), "screen_0", "self:test", 10L);
+        var state = new WorldUiInteractionState(sender);
+        var layout = new WorldUiLayout();
+
+        state.onPrimaryPress(first, layout.hit(0.98F, 0.98F, false), 0.98F, 0.98F, 100_000_000L);
+        state.onPrimaryPress(refreshed, layout.hit(0.50F, 0.72F, true), 0.50F, 0.72F, 100_000_000L);
+
+        assertEquals(1, sender.requests.size());
+        assertEquals(10L, sender.requests.getFirst().expectedRevision());
+    }
+
     private static final class RecordingSender implements WorldUiInteractionState.ControlSender {
         private final List<WorldUiControlRequest> requests = new ArrayList<>();
 

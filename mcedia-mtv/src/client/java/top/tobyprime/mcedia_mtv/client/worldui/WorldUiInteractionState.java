@@ -23,7 +23,14 @@ public final class WorldUiInteractionState {
     }
 
     public boolean isExpanded(Target target) {
-        return target != null && target.equals(expandedTarget);
+        return sameScreen(target, expandedTarget);
+    }
+
+    /** Refreshes the revision carried by later controls without changing the expanded screen. */
+    public void refreshTarget(Target target) {
+        if (sameScreen(target, expandedTarget)) {
+            expandedTarget = target;
+        }
     }
 
     public void onPrimaryPress(Target target, WorldUiHit hit, float u, float v, long durationUs) {
@@ -82,7 +89,7 @@ public final class WorldUiInteractionState {
     }
 
     private void toggle(Target target) {
-        if (target.equals(expandedTarget)) {
+        if (sameScreen(target, expandedTarget)) {
             collapse();
             return;
         }
@@ -110,6 +117,13 @@ public final class WorldUiInteractionState {
 
     private static float clamp(float value) {
         return Float.isFinite(value) ? Math.max(0.0F, Math.min(1.0F, value)) : 0.0F;
+    }
+
+    private static boolean sameScreen(Target first, Target second) {
+        return first != null && second != null
+                && first.mtvUuid().equals(second.mtvUuid())
+                && first.screenId().equals(second.screenId())
+                && first.channelId().equals(second.channelId());
     }
 
     public record Target(UUID mtvUuid, String screenId, String channelId, long revision) {

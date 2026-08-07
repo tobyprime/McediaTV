@@ -118,6 +118,15 @@ public final class ClientChannelPlaybackManager {
         }
     }
 
+    /** Returns the latest authoritative snapshot already received for an attached channel. */
+    public ClientChannelPlaybackSnapshot snapshot(String channelId) {
+        if (channelId == null || channelId.isBlank()) {
+            return ClientChannelPlaybackSnapshot.EMPTY;
+        }
+        var session = sessions.get(channelId);
+        return session == null ? ClientChannelPlaybackSnapshot.EMPTY : session.getSnapshot();
+    }
+
     public void clear() {
         LOGGER.info("Clearing MTV channel sessions: count={}", sessions.size());
         for (var session : sessions.values()) {

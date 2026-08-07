@@ -4,7 +4,8 @@
   "package": "top.tobyprime.mcedia_mtv.client.mixin",
   "compatibilityLevel": "JAVA_25",
   "client": [
-    "MixinItemDisplayRenderer"
+    "MixinItemDisplayRenderer",
+    "MixinMinecraftWorldUiInput"
   ],
   "injectors": {
     "defaultRequire": 1
