@@ -22,4 +22,18 @@ class WorldUiWatchRegistryTest {
         assertTrue(registry.watchers(first).isEmpty());
         assertEquals(Set.of(player), registry.watchers(second));
     }
+
+    @Test
+    void removingAnMtvClearsEveryWatcherForThatTarget() {
+        var registry = new WorldUiWatchRegistry();
+        var firstPlayer = UUID.randomUUID();
+        var secondPlayer = UUID.randomUUID();
+        var mtv = UUID.randomUUID();
+
+        registry.watch(firstPlayer, mtv);
+        registry.watch(secondPlayer, mtv);
+        registry.unwatchMtv(mtv);
+
+        assertTrue(registry.watchers(mtv).isEmpty());
+    }
 }

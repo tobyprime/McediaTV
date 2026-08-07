@@ -31,6 +31,20 @@ public final class WorldUiWatchRegistry {
         }
     }
 
+    /** Removes every observation of a target that was deleted or unloaded. */
+    public void unwatchMtv(UUID mtvId) {
+        if (mtvId == null) {
+            return;
+        }
+        Set<UUID> players = watchersByMtv.remove(mtvId);
+        if (players == null) {
+            return;
+        }
+        for (UUID playerId : players) {
+            watchedByPlayer.remove(playerId, mtvId);
+        }
+    }
+
     public Set<UUID> watchers(UUID mtvId) {
         Set<UUID> watchers = watchersByMtv.get(mtvId);
         return watchers == null ? Set.of() : Set.copyOf(watchers);

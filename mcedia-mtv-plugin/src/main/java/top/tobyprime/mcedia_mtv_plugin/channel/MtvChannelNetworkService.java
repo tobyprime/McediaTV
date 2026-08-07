@@ -36,6 +36,7 @@ public final class MtvChannelNetworkService implements PluginMessageListener, Li
     private final WorldUiRateLimiter worldUiRateLimiter = new WorldUiRateLimiter();
     private final WorldUiControlDispatcher worldUiControlDispatcher;
     private final WorldUiWatchRegistry worldUiWatchRegistry = new WorldUiWatchRegistry();
+    private final Map<UUID, String> watchedChannelsByMtv = new ConcurrentHashMap<>();
     private final Map<String, WorldUiControlState> lastControlStates = new ConcurrentHashMap<>();
     private volatile boolean closed;
 
@@ -90,6 +91,7 @@ public final class MtvChannelNetworkService implements PluginMessageListener, Li
         messenger.unregisterOutgoingPluginChannel(plugin, MtvChannelProtocol.CHANNEL_CONTROL_RESULT);
         messenger.unregisterOutgoingPluginChannel(plugin, MtvChannelProtocol.WORLD_UI_CONTROL_STATE);
         worldUiWatchRegistry.clear();
+        watchedChannelsByMtv.clear();
         lastControlStates.clear();
     }
 
@@ -185,6 +187,9 @@ public final class MtvChannelNetworkService implements PluginMessageListener, Li
         }
         int recipients = broadcastRemove(channelId);
         LOGGER.debug("Invalidated MTV channel: channel={}, recipients={}", channelId, recipients);
+        for (var entry : watchedChannelsByMtv.entrySet()) {
+            if (channelId.equals(entry.getValue())) clearMtvWatch(entry.getKey());
+        }
         channelService.getAudienceSessionManager().invalidateChannel(channelId);
     }
 
@@ -263,15 +268,19 @@ public final class MtvChannelNetworkService implements PluginMessageListener, Li
             LOGGER.warn("Failed to decode MTV world UI watch request from {}", player.getName(), e);
             return;
         }
-        if (!worldUiRateLimiter.tryAcquire(player.getUniqueId(), WorldUiRateLimiter.RequestType.WATCH)) {
-            return;
-        }
         if (!watch) {
             worldUiWatchRegistry.unwatch(player.getUniqueId());
+            if (worldUiWatchRegistry.watchers(request.targetMtvUuid()).isEmpty()) {
+                watchedChannelsByMtv.remove(request.targetMtvUuid());
+            }
+            return;
+        }
+        if (!worldUiRateLimiter.tryAcquire(player.getUniqueId(), WorldUiRateLimiter.RequestType.WATCH)) {
             return;
         }
         channelService.getManager().withManagedPlayer(request.targetMtvUuid(), target -> {
             worldUiWatchRegistry.watch(player.getUniqueId(), request.targetMtvUuid());
+            watchedChannelsByMtv.put(request.targetMtvUuid(), channelService.resolveBinding(target).channelId());
             sendControlState(player, target, true);
             return Boolean.TRUE;
         }, ignored -> { });
@@ -286,8 +295,13 @@ public final class MtvChannelNetworkService implements PluginMessageListener, Li
             channelService.getManager().withManagedPlayer(mtvUuid, target -> {
                 sendControlState(player, target, false);
                 return Boolean.TRUE;
-            }, ignored -> { });
+            }, ignored -> clearMtvWatch(mtvUuid));
         }
+    }
+
+    /** Clears world UI watchers and cached state when an MTV entity is deleted. */
+    public void onMtvRemoved(UUID mtvUuid) {
+        clearMtvWatch(mtvUuid);
     }
 
     private void sendControlState(Player player, top.tobyprime.mcedia_mtv_plugin.model.ManagedMtvPlayer target, boolean force) {
@@ -496,7 +510,15 @@ public final class MtvChannelNetworkService implements PluginMessageListener, Li
         channelService.getAudienceSessionManager().unregisterClient(player.getUniqueId());
         worldUiRateLimiter.clear(player.getUniqueId());
         worldUiWatchRegistry.unwatch(player.getUniqueId());
+        watchedChannelsByMtv.entrySet().removeIf(entry -> worldUiWatchRegistry.watchers(entry.getKey()).isEmpty());
         lastControlStates.keySet().removeIf(key -> key.startsWith(player.getUniqueId() + ":"));
         LOGGER.debug("Unregistered MTV client: player={}", player.getName());
+    }
+
+    private void clearMtvWatch(UUID mtvUuid) {
+        if (mtvUuid == null) return;
+        worldUiWatchRegistry.unwatchMtv(mtvUuid);
+        watchedChannelsByMtv.remove(mtvUuid);
+        lastControlStates.keySet().removeIf(key -> key.endsWith(":" + mtvUuid));
     }
 }

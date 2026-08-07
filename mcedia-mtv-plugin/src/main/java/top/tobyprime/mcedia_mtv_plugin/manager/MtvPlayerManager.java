@@ -33,6 +33,7 @@ public class MtvPlayerManager {
     private final JavaPlugin plugin;
     private final MtvChannelService channelService;
     private volatile Consumer<UUID> playerStateChangeListener = ignored -> { };
+    private volatile Consumer<UUID> playerRemovedListener = ignored -> { };
 
     public MtvPlayerManager(JavaPlugin plugin) {
         this.plugin = plugin;
@@ -49,6 +50,10 @@ public class MtvPlayerManager {
 
     public void setPlayerStateChangeListener(Consumer<UUID> listener) {
         playerStateChangeListener = listener == null ? ignored -> { } : listener;
+    }
+
+    public void setPlayerRemovedListener(Consumer<UUID> listener) {
+        playerRemovedListener = listener == null ? ignored -> { } : listener;
     }
 
 
@@ -211,6 +216,7 @@ public class MtvPlayerManager {
 
     public void deletePlayerAsync(UUID uuid, Consumer<Boolean> done) {
         channelService.unregister(uuid);
+        playerRemovedListener.accept(uuid);
         withDisplay(uuid, display -> {
             display.remove();
             return Boolean.TRUE;
