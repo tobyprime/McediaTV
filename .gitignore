@@ -21,3 +21,4 @@ replay_pid*
 
 .claude/
 .codegraph/
+.worktrees/
