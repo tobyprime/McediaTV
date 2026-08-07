@@ -241,7 +241,7 @@ jobs:
       - name: Resolve Java version for Paper ${{ matrix.server_version }}
         id: jdk
         run: |
-          if [ '${{ matrix.server_version }}' = '26.1' ]; then
+          if [ '${{ matrix.server_version }}' = '26.1' ] || [ '${{ matrix.server_version }}' = '26.2' ]; then
             echo "java_version=25" >> "$GITHUB_OUTPUT"
           else
             echo "java_version=21" >> "$GITHUB_OUTPUT"

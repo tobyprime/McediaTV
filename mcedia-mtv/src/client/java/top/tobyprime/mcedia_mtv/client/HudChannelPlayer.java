@@ -82,11 +82,16 @@ public final class HudChannelPlayer {
     }
 
     public void onBinding(@Nullable String channelId) {
+        LOGGER.info("HUD binding received: requestedChannel={}, currentChannel={}, sessionPresent={}, screenEnabled={}",
+                channelId, currentChannelId, channelSession != null, screenEnabled);
         if (channelId == null || channelId.isBlank()) {
+            LOGGER.info("HUD binding is empty; unsubscribing current HUD channel");
             unsubscribe();
             return;
         }
         if (channelId.equals(currentChannelId)) {
+            LOGGER.warn("HUD binding ignored as duplicate: channel={}, sessionPresent={}, hostId={}",
+                    channelId, channelSession != null, currentHostId());
             return;
         }
         unsubscribe();
@@ -117,6 +122,7 @@ public final class HudChannelPlayer {
     }
 
     private void subscribe(String channelId) {
+        LOGGER.info("HUD subscribe begin: channel={}", channelId);
         var speakerLeft = new HudSpeakerPeripheral();
         speakerLeft.setAudioChannelMode(SpeakerAudioChannelMode.LEFT);
         var speakerRight = new HudSpeakerPeripheral();
@@ -132,6 +138,7 @@ public final class HudChannelPlayer {
 
         var hostManager = MediaPlayerHostManager.get();
         var resolvedHostId = hostManager.getHostId(session.getHost());
+        LOGGER.info("HUD channel session attached: channel={}, hostId={}", channelId, resolvedHostId);
         if (resolvedHostId == null) {
             closeSafely(speakerLeft);
             closeSafely(speakerRight);
@@ -140,13 +147,29 @@ public final class HudChannelPlayer {
             return;
         }
 
-        hostManager.assignPeripheralToHost(resolvedHostId, speakerLeft);
-        hostManager.assignPeripheralToHost(resolvedHostId, speakerRight);
+        boolean leftAttached = hostManager.assignPeripheralToHost(resolvedHostId, speakerLeft);
+        boolean rightAttached = hostManager.assignPeripheralToHost(resolvedHostId, speakerRight);
+        if (!leftAttached || !rightAttached) {
+            LOGGER.error("HUD speaker attachment failed: channel={}, hostId={}, leftAttached={}, rightAttached={}",
+                    channelId, resolvedHostId, leftAttached, rightAttached);
+            if (leftAttached) session.getHost().removePeripheral(speakerLeft);
+            if (rightAttached) session.getHost().removePeripheral(speakerRight);
+            closeSafely(speakerLeft);
+            closeSafely(speakerRight);
+            ClientChannelPlaybackManager.getInstance().detach(channelId);
+            return;
+        }
 
         if (screenEnabled) {
             var screen = createScreen();
-            hostManager.assignPeripheralToHost(resolvedHostId, screen);
-            this.hudScreen = screen;
+            boolean screenAttached = hostManager.assignPeripheralToHost(resolvedHostId, screen);
+            LOGGER.info("HUD screen attachment result: channel={}, hostId={}, attached={}",
+                    channelId, resolvedHostId, screenAttached);
+            if (screenAttached) {
+                this.hudScreen = screen;
+            } else {
+                closeSafely(screen);
+            }
         }
 
         this.cachedHostId = resolvedHostId;
@@ -156,13 +179,19 @@ public final class HudChannelPlayer {
         this.currentChannelId = channelId;
         this.nonPlayingSinceMs = 0;
 
-        LOGGER.info("HUD channel player subscribed to {}", channelId);
+        LOGGER.info("HUD channel player subscribed: channel={}, hostId={}, screenAttached={}",
+                channelId, resolvedHostId, hudScreen != null);
     }
 
     public void unsubscribe() {
-        if (currentChannelId == null) return;
+        if (currentChannelId == null) {
+            LOGGER.debug("HUD unsubscribe skipped: no current channel");
+            return;
+        }
 
         var channelId = currentChannelId;
+        LOGGER.info("HUD unsubscribe begin: channel={}, sessionPresent={}, hostId={}",
+                channelId, channelSession != null, currentHostId());
         currentChannelId = null;
 
         if (channelSession != null) {
@@ -184,10 +213,11 @@ public final class HudChannelPlayer {
         cachedHostId = null;
         nonPlayingSinceMs = 0;
 
-        LOGGER.info("HUD channel player unsubscribed from {}", channelId);
+        LOGGER.info("HUD channel player unsubscribed: channel={}", channelId);
     }
 
     public void cleanup() {
+        LOGGER.info("HUD cleanup requested: currentChannel={}, sessionPresent={}", currentChannelId, channelSession != null);
         unsubscribe();
     }
 
@@ -198,8 +228,14 @@ public final class HudChannelPlayer {
             closeSafely(screen);
             return;
         }
-        MediaPlayerHostManager.get().assignPeripheralToHost(cachedHostId, screen);
-        this.hudScreen = screen;
+        boolean assigned = MediaPlayerHostManager.get().assignPeripheralToHost(cachedHostId, screen);
+        LOGGER.info("HUD screen attachment result: channel={}, hostId={}, attached={}",
+                currentChannelId, cachedHostId, assigned);
+        if (assigned) {
+            this.hudScreen = screen;
+        } else {
+            closeSafely(screen);
+        }
     }
 
     private void detachScreen() {
@@ -214,11 +250,18 @@ public final class HudChannelPlayer {
         if (channelSession == null || hudScreen == null) return;
         if (attached) {
             if (cachedHostId != null) {
-                MediaPlayerHostManager.get().assignPeripheralToHost(cachedHostId, hudScreen);
+                boolean assigned = MediaPlayerHostManager.get().assignPeripheralToHost(cachedHostId, hudScreen);
+                LOGGER.debug("HUD screen visibility attachment: channel={}, hostId={}, attached={}",
+                        currentChannelId, cachedHostId, assigned);
             }
         } else {
             channelSession.getHost().removePeripheral(hudScreen);
+            LOGGER.debug("HUD screen detached while channel is not playing: channel={}", currentChannelId);
         }
+    }
+
+    private @Nullable Integer currentHostId() {
+        return channelSession == null ? null : MediaPlayerHostManager.get().getHostId(channelSession.getHost());
     }
 
     private HudScreenPeripheral createScreen() {

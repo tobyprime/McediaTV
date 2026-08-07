@@ -224,6 +224,10 @@ dependencies {
 
     compileOnly "org.jspecify:jspecify:1.0.0"
 
+    testImplementation platform('org.junit:junit-bom:5.12.2')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
     switch (moduleName) {
         case 'mcedia-mtv':
             if (allInOne) {
@@ -239,6 +243,10 @@ dependencies {
         default:
             throw new GradleException("Unsupported Fabric module: ${moduleName}")
     }
+}
+
+tasks.withType(Test).configureEach {
+    useJUnitPlatform()
 }
 
 processResources {

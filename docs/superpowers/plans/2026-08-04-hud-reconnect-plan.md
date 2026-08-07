@@ -21,7 +21,7 @@
 
 **Files:**
 - Create: `mcedia-mtv/src/test/java/top/tobyprime/mcedia_mtv/client/channel/MtvClientConnectionLifecycleTest.java`
-- Create: `mcedia-mtv/src/client/java/top/tobyprime/mcedia_mtv/client/channel/MtvClientConnectionLifecycle.java`
+- Create: `mcedia-mtv/src/main/java/top/tobyprime/mcedia_mtv/client/channel/MtvClientConnectionLifecycle.java`
 
 **Interfaces:**
 - Produces `MtvClientConnectionLifecycle.onJoin()` and `MtvClientConnectionLifecycle.onDisconnect(Runnable hudCleanup, Runnable sessionClear)` for the connection callbacks.

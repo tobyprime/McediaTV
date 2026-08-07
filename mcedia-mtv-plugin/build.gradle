@@ -6,10 +6,10 @@ plugins {
 }
 
 group = 'top.tobyprime'
-version = '1.2.0'
+version = '1.2.1'
 
 // ========== 版本切换 ==========
-// 通过 -PserverVersion=26.1 切换目标服务端版本
+// 通过 -PserverVersion=26.2 切换目标服务端版本
 // 默认值可在 gradle.properties 或此处修改
 def serverVersion = findProperty('serverVersion') ?: '1.21.11'
 
@@ -31,6 +31,24 @@ def versionConfig = [
         paperVersion: '26.1.2',
         javaVersion : 25,
         apiLevel    : '26.1',
+        javaFlags   : [
+            '-XX:+AlwaysPreTouch', '-XX:+DisableExplicitGC',
+            '-XX:+ParallelRefProcEnabled', '-XX:+PerfDisableSharedMem',
+            '-XX:+UnlockExperimentalVMOptions', '-XX:+UseG1GC',
+            '-XX:G1HeapRegionSize=8M', '-XX:G1HeapWastePercent=5',
+            '-XX:G1MaxNewSizePercent=40', '-XX:G1MixedGCCountTarget=4',
+            '-XX:G1MixedGCLiveThresholdPercent=90', '-XX:G1NewSizePercent=30',
+            '-XX:G1RSetUpdatingPauseTimePercent=5', '-XX:G1ReservePercent=20',
+            '-XX:InitiatingHeapOccupancyPercent=15', '-XX:MaxGCPauseMillis=200',
+            '-XX:MaxTenuringThreshold=1', '-XX:SurvivorRatio=32'
+        ]
+    ],
+    '26.2': [
+        paperBundle : '26.2.build.92-stable',
+        paperApi    : '26.2.build.92-stable',
+        paperVersion: '26.2',
+        javaVersion : 25,
+        apiLevel    : '26.2',
         javaFlags   : [
             '-XX:+AlwaysPreTouch', '-XX:+DisableExplicitGC',
             '-XX:+ParallelRefProcEnabled', '-XX:+PerfDisableSharedMem',

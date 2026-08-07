@@ -43,6 +43,7 @@ public final class MtvClientChannelPayloads {
 
     private static void safeHandle(String packetType, String channelId, Long revision, Runnable action) {
         try {
+            LOGGER.debug("Handling MTV {} payload: channel={}, revision={}", packetType, channelId, revision);
             action.run();
         } catch (Exception e) {
             LOGGER.warn("Failed to handle MTV {} packet: channel={}, revision={}", packetType, channelId, revision, e);
@@ -50,12 +51,22 @@ public final class MtvClientChannelPayloads {
     }
 
     private static void onJoin(ClientPacketListener handler, PacketSender sender, Minecraft client) {
-        ClientChannelPlaybackManager.getInstance().clear();
-        LOGGER.debug("Open MTV client channel state: server={}", client.getCurrentServer() == null ? "singleplayer" : client.getCurrentServer().ip);
+        var lifecycle = new MtvClientConnectionLifecycle(
+                HudChannelPlayer.getInstance()::cleanup,
+                ClientChannelPlaybackManager.getInstance()::clear
+        );
+        lifecycle.onJoin();
+        LOGGER.info("Open MTV client channel state: server={}, existing sessions retained for join payloads",
+                client.getCurrentServer() == null ? "singleplayer" : client.getCurrentServer().ip);
     }
 
     private static void onDisconnect(ClientPacketListener handler, Minecraft client) {
-        LOGGER.debug("Close MTV client channel state");
-        ClientChannelPlaybackManager.getInstance().clear();
+        var lifecycle = new MtvClientConnectionLifecycle(
+                HudChannelPlayer.getInstance()::cleanup,
+                ClientChannelPlaybackManager.getInstance()::clear
+        );
+        LOGGER.info("Close MTV client channel state: server={}",
+                client.getCurrentServer() == null ? "singleplayer" : client.getCurrentServer().ip);
+        lifecycle.onDisconnect();
     }
 }

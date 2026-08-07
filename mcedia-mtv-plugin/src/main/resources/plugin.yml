@@ -1,5 +1,5 @@
 name: McediaMtvPlugin
-version: '1.2.2'
+version: '1.2.1'
 main: top.tobyprime.mcedia_mtv_plugin.McediaMtvPlugin
 api-version: '${apiLevel}'
 folia-supported: true

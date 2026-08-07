@@ -31,6 +31,7 @@ public final class ClientChannelSession {
         this.channelId = channelId;
         var handle = MediaPlayerHostManager.get().createHostAndGetId(new DecoderConfiguration.Builder().build());
         this.host = handle.host();
+        LOGGER.info("Created MTV channel session: channel={}, hostId={}", channelId, handle.hostId());
     }
 
     public String getChannelId() {
@@ -47,10 +48,12 @@ public final class ClientChannelSession {
 
     public void attach() {
         attachments++;
+        LOGGER.debug("Attached MTV channel consumer: channel={}, attachments={}", channelId, attachments);
     }
 
     public void detach() {
         attachments = Math.max(0, attachments - 1);
+        LOGGER.debug("Detached MTV channel consumer: channel={}, attachments={}", channelId, attachments);
     }
 
     public boolean isUnused() {
@@ -70,6 +73,8 @@ public final class ClientChannelSession {
         }
         forceResyncRequested = forceResyncRequested || forceResync;
         this.snapshot = snapshot;
+        LOGGER.debug("Updated MTV channel snapshot: channel={}, revision={}, hasMedia={}, forceResync={}",
+                channelId, snapshot.revision(), snapshot.hasMedia(), forceResyncRequested);
     }
 
     public void tick() {
@@ -104,6 +109,8 @@ public final class ClientChannelSession {
     }
 
     public void destroy() {
+        LOGGER.info("Destroying MTV channel session: channel={}, attachments={}, hasMedia={}",
+                channelId, attachments, snapshot.hasMedia());
         suspend();
         MediaPlayerHostManager.get().requestDestroy(host);
     }
