@@ -72,8 +72,6 @@ public final class MtvWorldUiRenderer {
         quad(collector, pose, camera, screen, .06F, .845F, .80F, .885F, 0xFF373737);
         float progress = progress(snapshot);
         if (progress > 0F) quad(collector, pose, camera, screen, .06F, .845F, .06F + .74F * progress, .885F, 0xFFE0E0E0);
-        quad(collector, pose, camera, screen, .84F, .845F, .96F, .885F, 0xFF373737);
-        quad(collector, pose, camera, screen, .84F, .845F, .93F, .885F, 0xFFE0E0E0);
     }
 
     private static void drawTransport(SubmitNodeCollector collector, PoseStack pose, Vec3 camera, WorldUiScreenRaycast.Screen screen) {
@@ -84,12 +82,13 @@ public final class MtvWorldUiRenderer {
         quad(collector, pose, camera, screen, .76F, .69F, .82F, .79F, 0xFF333333);
         quad(collector, pose, camera, screen, .77F, .71F, .81F, .72F, 0xFFE0E0E0);
         quad(collector, pose, camera, screen, .77F, .74F, .81F, .75F, 0xFFE0E0E0);
+        quad(collector, pose, camera, screen, .84F, .69F, .90F, .79F, 0xFF333333);
         quad(collector, pose, camera, screen, .90F, .69F, .96F, .79F, 0xFF333333);
     }
 
     private static void drawVolume(SubmitNodeCollector collector, PoseStack pose, Vec3 camera, WorldUiScreenRaycast.Screen screen, float volume) {
-        quad(collector, pose, camera, screen, .84F, .72F, .96F, .76F, 0xFF373737);
-        quad(collector, pose, camera, screen, .84F, .72F, .84F + .12F * Math.max(0.0F, Math.min(1.0F, volume)), .76F, 0xFFE0E0E0);
+        quad(collector, pose, camera, screen, .84F, .845F, .96F, .885F, 0xFF373737);
+        quad(collector, pose, camera, screen, .84F, .845F, .84F + .12F * Math.max(0.0F, Math.min(1.0F, volume)), .885F, 0xFFE0E0E0);
     }
 
     private static void drawControlLabels(SubmitNodeCollector collector, PoseStack pose, Vec3 camera,

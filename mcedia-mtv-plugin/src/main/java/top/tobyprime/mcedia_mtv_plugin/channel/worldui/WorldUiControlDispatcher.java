@@ -291,6 +291,11 @@ public final class WorldUiControlDispatcher {
         return binding == null || !binding.isSelf() || MtvPlayerManager.canEditPlayer(player, target);
     }
 
+    /** Watching an MTV's control state uses the same permission policy as sending controls. */
+    public static boolean canWatchTarget(Player player, ManagedMtvPlayer target, MtvChannelBinding binding) {
+        return canControlTargetBinding(player, target, binding);
+    }
+
     private long revisionFor(ManagedMtvPlayer target, WorldUiControlRequest request) {
         if (target == null || target.getUuid() == null || !target.getUuid().equals(request.targetMtvUuid())) {
             return 0L;

@@ -4,6 +4,10 @@ package top.tobyprime.mcedia_mtv.client.worldui;
 public final class WorldUiLayout {
     private static final float TOGGLE_TRIGGER_START = 0.90F;
     private static final float TOGGLE_BUTTON_START = 0.93F;
+    private static final float SEEK_TRACK_START = 0.06F;
+    private static final float SEEK_TRACK_END = 0.80F;
+    private static final float VOLUME_TRACK_START = 0.84F;
+    private static final float VOLUME_TRACK_END = 0.96F;
     private static final float MIN_DETAIL_WIDTH = 0.80F;
     private static final float MIN_DETAIL_HEIGHT = 0.45F;
     private static final float MIN_DETAIL_ASPECT = 0.75F;
@@ -20,6 +24,22 @@ public final class WorldUiLayout {
     /** The outer hover area that makes the collapsed button visible. */
     public boolean isToggleTrigger(float u, float v) {
         return inScreen(u, v) && u >= TOGGLE_TRIGGER_START && v >= TOGGLE_TRIGGER_START;
+    }
+
+    /** Maps a pointer U on the progress track to a normalized 0..1 value. */
+    public static float seekFraction(float u) {
+        return fraction(u, SEEK_TRACK_START, SEEK_TRACK_END);
+    }
+
+    /** Maps a pointer U on the volume track to a normalized 0..1 value. */
+    public static float volumeFraction(float u) {
+        return fraction(u, VOLUME_TRACK_START, VOLUME_TRACK_END);
+    }
+
+    private static float fraction(float u, float start, float end) {
+        float span = end - start;
+        if (!Float.isFinite(u) || span <= 0.0F) return 0.0F;
+        return Math.max(0.0F, Math.min(1.0F, (u - start) / span));
     }
 
     public WorldUiHit hit(float u, float v, boolean expanded) {
@@ -57,10 +77,10 @@ public final class WorldUiLayout {
             return new WorldUiHit(WorldUiHit.Kind.ADD_MEDIA);
         }
         if (v >= 0.84F && v <= 0.92F) {
-            if (u <= 0.80F) {
+            if (u <= SEEK_TRACK_END) {
                 return new WorldUiHit(WorldUiHit.Kind.SEEK);
             }
-            if (u >= 0.84F) {
+            if (u >= VOLUME_TRACK_START) {
                 return new WorldUiHit(WorldUiHit.Kind.VOLUME);
             }
         }

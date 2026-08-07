@@ -82,8 +82,6 @@ public final class MtvWorldUiRenderer {
         quad(vertex, pose, camera, screen, 0.06F, 0.845F, 0.80F, 0.885F, 0xFF373737);
         float progress = progress(snapshot);
         if (progress > 0.0F) quad(vertex, pose, camera, screen, 0.06F, 0.845F, 0.06F + 0.74F * progress, 0.885F, 0xFFE0E0E0);
-        quad(vertex, pose, camera, screen, 0.84F, 0.845F, 0.96F, 0.885F, 0xFF373737);
-        quad(vertex, pose, camera, screen, 0.84F, 0.845F, 0.93F, 0.885F, 0xFFE0E0E0);
     }
 
     private static void drawTransport(VertexConsumer vertex, PoseStack.Pose pose, Vec3 camera, WorldUiScreenRaycast.Screen screen) {
@@ -94,12 +92,13 @@ public final class MtvWorldUiRenderer {
         quad(vertex, pose, camera, screen, 0.76F, 0.69F, 0.82F, 0.79F, 0xFF333333);
         quad(vertex, pose, camera, screen, 0.77F, 0.71F, 0.81F, 0.72F, 0xFFE0E0E0);
         quad(vertex, pose, camera, screen, 0.77F, 0.74F, 0.81F, 0.75F, 0xFFE0E0E0);
+        quad(vertex, pose, camera, screen, 0.84F, 0.69F, 0.90F, 0.79F, 0xFF333333);
         quad(vertex, pose, camera, screen, 0.90F, 0.69F, 0.96F, 0.79F, 0xFF333333);
     }
 
     private static void drawVolume(VertexConsumer vertex, PoseStack.Pose pose, Vec3 camera, WorldUiScreenRaycast.Screen screen, float volume) {
-        quad(vertex, pose, camera, screen, 0.84F, 0.72F, 0.96F, 0.76F, 0xFF373737);
-        quad(vertex, pose, camera, screen, 0.84F, 0.72F, 0.84F + 0.12F * Math.max(0.0F, Math.min(1.0F, volume)), 0.76F, 0xFFE0E0E0);
+        quad(vertex, pose, camera, screen, 0.84F, 0.845F, 0.96F, 0.885F, 0xFF373737);
+        quad(vertex, pose, camera, screen, 0.84F, 0.845F, 0.84F + 0.12F * Math.max(0.0F, Math.min(1.0F, volume)), 0.885F, 0xFFE0E0E0);
     }
 
     private static void drawControlLabels(PoseStack.Pose pose, MultiBufferSource bufferSource, Vec3 camera,

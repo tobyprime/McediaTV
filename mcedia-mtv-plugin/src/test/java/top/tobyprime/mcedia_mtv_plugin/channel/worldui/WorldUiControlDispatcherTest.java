@@ -64,6 +64,17 @@ class WorldUiControlDispatcherTest {
         assertEquals(true, WorldUiControlDispatcher.canControlTargetBinding(null, target, MtvChannelBinding.self(target.getUuid())));
     }
 
+    @Test
+    void watchTargetUsesTheSamePermissionPolicyAsControls() {
+        var target = new ManagedMtvPlayer();
+        target.setUuid(UUID.randomUUID());
+        target.setOwner(UUID.randomUUID());
+        target.setPublic(false);
+
+        assertEquals(false, WorldUiControlDispatcher.canWatchTarget(null, target, MtvChannelBinding.self(target.getUuid())));
+        assertEquals(true, WorldUiControlDispatcher.canWatchTarget(null, target, MtvChannelBinding.broadcast("channel")));
+    }
+
     private static WorldUiControlRequest request(WorldUiControlOperation operation, WorldUiControlArgument argument) {
         return new WorldUiControlRequest(UUID.randomUUID(), "screen_0", "channel", 1L, 0L,
                 0.5F, 0.5F, operation, argument);

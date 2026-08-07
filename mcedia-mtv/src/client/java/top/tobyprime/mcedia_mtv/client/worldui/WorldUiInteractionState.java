@@ -87,10 +87,10 @@ public final class WorldUiInteractionState {
         dragV = clamp(v);
         if (activeDrag == Drag.SEEK) {
             send(expandedTarget, dragU, dragV, WorldUiControlOperation.SEEK_ABSOLUTE,
-                    new WorldUiControlArgument.PositionUs(Math.round(Math.max(0L, durationUs) * dragU)));
+                    new WorldUiControlArgument.PositionUs(Math.round(Math.max(0L, durationUs) * WorldUiLayout.seekFraction(dragU))));
         } else {
             send(expandedTarget, dragU, dragV, WorldUiControlOperation.SET_MASTER_VOLUME,
-                    new WorldUiControlArgument.Scalar(dragU));
+                    new WorldUiControlArgument.Scalar(WorldUiLayout.volumeFraction(dragU)));
         }
         activeDrag = Drag.NONE;
     }

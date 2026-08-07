@@ -4,6 +4,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
+import org.bukkit.event.player.PlayerChangedWorldEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.messaging.PluginMessageListener;
@@ -140,6 +141,15 @@ public final class MtvChannelNetworkService implements PluginMessageListener, Li
     @EventHandler
     public void onPlayerQuit(PlayerQuitEvent event) {
         unregisterClient(event.getPlayer());
+    }
+
+    @EventHandler
+    public void onPlayerChangedWorld(PlayerChangedWorldEvent event) {
+        Player player = event.getPlayer();
+        worldUiWatchRegistry.unwatch(player.getUniqueId());
+        removeEmptyWatchedChannels();
+        lastControlStates.keySet().removeIf(key -> key.startsWith(player.getUniqueId() + ":"));
+        LOGGER.debug("Cleared MTV world UI watch after world change: player={}", player.getName());
     }
 
     public void publishSnapshot(String channelId) {
@@ -286,9 +296,14 @@ public final class MtvChannelNetworkService implements PluginMessageListener, Li
             if (!target.isPowered()) {
                 return Boolean.FALSE;
             }
+            var binding = channelService.resolveBinding(target);
+            if (player.getWorld() == null || !player.getWorld().getName().equals(target.getWorld())
+                    || !WorldUiControlDispatcher.canWatchTarget(player, target, binding)) {
+                return Boolean.FALSE;
+            }
             worldUiWatchRegistry.watch(player.getUniqueId(), request.targetMtvUuid());
             removeEmptyWatchedChannels();
-            watchedChannelsByMtv.put(request.targetMtvUuid(), channelService.resolveBinding(target).channelId());
+            watchedChannelsByMtv.put(request.targetMtvUuid(), binding.channelId());
             sendControlState(player, target, true);
             return Boolean.TRUE;
         }, ignored -> { });
