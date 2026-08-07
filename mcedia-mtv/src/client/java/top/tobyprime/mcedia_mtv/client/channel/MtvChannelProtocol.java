@@ -39,7 +39,7 @@ public final class MtvChannelProtocol {
     private static final int MAX_PLAY_ORDER_MODE_LENGTH = 32;
     private static final int MAX_CONTROL_REQUEST_BYTES = 4 * 1024;
     private static final int MAX_CONTROL_RESULT_BYTES = 64;
-    private static final Set<String> PLAY_ORDER_MODES = Set.of("SEQUENTIAL", "LOOP", "SHUFFLE", "CURRENT_ONLY");
+    private static final Set<String> PLAY_ORDER_MODES = Set.of("SEQUENTIAL", "SHUFFLE", "LOOP_ALL", "LOOP_ONE", "CURRENT_ONLY");
 
     private MtvChannelProtocol() {
     }

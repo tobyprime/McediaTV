@@ -14,7 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 class WorldUiProtocolTest {
     @Test
     void playlistManifestRoundTripsAllFields() {
-        var manifest = new WorldUiPlaylistManifest("channel:alpha", 17L, 96, 8, "LOOP");
+        var manifest = new WorldUiPlaylistManifest("channel:alpha", 17L, 96, 8, "LOOP_ALL");
 
         byte[] encoded = MtvChannelProtocol.encodePlaylistManifest(manifest);
 
@@ -24,7 +24,7 @@ class WorldUiProtocolTest {
     @Test
     void playlistPageRoundTripsWithinTheLimits() {
         var page = new WorldUiPlaylistPage(
-                "channel:alpha", 17L, 96, 8, "LOOP", 32,
+                "channel:alpha", 17L, 96, 8, "LOOP_ALL", 32,
                 List.of("https://example.test/one", "https://example.test/two")
         );
 
