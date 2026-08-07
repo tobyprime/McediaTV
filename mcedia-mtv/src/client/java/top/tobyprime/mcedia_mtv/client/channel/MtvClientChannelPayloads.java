@@ -12,6 +12,9 @@ import top.tobyprime.mcedia_mtv.client.channel.worldui.WorldUiCapabilityState;
 import top.tobyprime.mcedia_mtv.client.channel.worldui.MtvWorldUiPlaylistManifestPayload;
 import top.tobyprime.mcedia_mtv.client.channel.worldui.MtvWorldUiPlaylistPagePayload;
 import top.tobyprime.mcedia_mtv.client.channel.worldui.MtvWorldUiPlaylistPageRequestPayload;
+import top.tobyprime.mcedia_mtv.client.channel.worldui.MtvWorldUiControlRequestPayload;
+import top.tobyprime.mcedia_mtv.client.channel.worldui.MtvWorldUiControlResultPayload;
+import top.tobyprime.mcedia_mtv.client.channel.worldui.WorldUiControlSender;
 import top.tobyprime.mcedia_mtv.client.channel.worldui.WorldUiPlaylistCache;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,10 +33,12 @@ public final class MtvClientChannelPayloads {
         PayloadTypeRegistry.playS2C().register(MtvWorldUiCapabilitiesPayload.TYPE, MtvWorldUiCapabilitiesPayload.CODEC);
         PayloadTypeRegistry.playS2C().register(MtvWorldUiPlaylistManifestPayload.TYPE, MtvWorldUiPlaylistManifestPayload.CODEC);
         PayloadTypeRegistry.playS2C().register(MtvWorldUiPlaylistPagePayload.TYPE, MtvWorldUiPlaylistPagePayload.CODEC);
+        PayloadTypeRegistry.playS2C().register(MtvWorldUiControlResultPayload.TYPE, MtvWorldUiControlResultPayload.CODEC);
         PayloadTypeRegistry.playC2S().register(MtvChannelClientSubscribePayload.TYPE, MtvChannelClientSubscribePayload.CODEC);
         PayloadTypeRegistry.playC2S().register(MtvChannelClientUnsubscribePayload.TYPE, MtvChannelClientUnsubscribePayload.CODEC);
         PayloadTypeRegistry.playC2S().register(MtvChannelClientHeartbeatPayload.TYPE, MtvChannelClientHeartbeatPayload.CODEC);
         PayloadTypeRegistry.playC2S().register(MtvWorldUiPlaylistPageRequestPayload.TYPE, MtvWorldUiPlaylistPageRequestPayload.CODEC);
+        PayloadTypeRegistry.playC2S().register(MtvWorldUiControlRequestPayload.TYPE, MtvWorldUiControlRequestPayload.CODEC);
         ClientPlayNetworking.registerGlobalReceiver(MtvChannelClientSnapshotPayload.TYPE, (payload, context) ->
                 safeHandle("snapshot", payload.snapshot().channelId(), payload.snapshot().revision(), () ->
                         ClientChannelPlaybackManager.getInstance().onSnapshot(payload.snapshot())));
@@ -55,6 +60,9 @@ public final class MtvClientChannelPayloads {
         ClientPlayNetworking.registerGlobalReceiver(MtvWorldUiPlaylistPagePayload.TYPE, (payload, context) ->
                 safeHandle("playlist_page", payload.page().channelId(), payload.page().revision(), () ->
                         WorldUiPlaylistCache.getInstance().applyPage(payload.page())));
+        ClientPlayNetworking.registerGlobalReceiver(MtvWorldUiControlResultPayload.TYPE, (payload, context) ->
+                safeHandle("world_ui_control_result", "", payload.result().revision(), () ->
+                        WorldUiControlSender.getInstance().onResult(payload.result())));
         ClientPlayConnectionEvents.JOIN.register(MtvClientChannelPayloads::onJoin);
         ClientPlayConnectionEvents.DISCONNECT.register(MtvClientChannelPayloads::onDisconnect);
         LOGGER.debug("Registered MTV client channel payloads and connection listeners");
