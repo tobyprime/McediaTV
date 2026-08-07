@@ -13,6 +13,7 @@ import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
+import java.util.function.Consumer;
 import java.util.function.Function;
 
 public final class MtvMediaMetadataCache {
@@ -27,21 +28,29 @@ public final class MtvMediaMetadataCache {
     private final int capacity;
     private final Executor executor;
     private final Function<String, Media> resolver;
+    private final Consumer<String> coverPrefetcher;
     private final Object lock = new Object();
     private final LinkedHashMap<String, MtvMediaMetadata> entries = new LinkedHashMap<>(16, 0.75F, true);
     private final Map<String, CompletableFuture<MtvMediaMetadata>> inFlight = new LinkedHashMap<>();
 
     public MtvMediaMetadataCache() {
-        this(DEFAULT_CAPACITY, DEFAULT_EXECUTOR, MediaResolvers::resolve);
+        this(DEFAULT_CAPACITY, DEFAULT_EXECUTOR, MediaResolvers::resolve,
+                coverUrl -> MtvMediaCoverCache.getInstance().loadAsync(coverUrl));
     }
 
     public MtvMediaMetadataCache(int capacity, Executor executor, Function<String, Media> resolver) {
+        this(capacity, executor, resolver, ignored -> { });
+    }
+
+    public MtvMediaMetadataCache(int capacity, Executor executor, Function<String, Media> resolver,
+                                 Consumer<String> coverPrefetcher) {
         if (capacity <= 0) {
             throw new IllegalArgumentException("metadata cache capacity must be positive");
         }
         this.capacity = capacity;
         this.executor = Objects.requireNonNull(executor, "executor");
         this.resolver = Objects.requireNonNull(resolver, "resolver");
+        this.coverPrefetcher = Objects.requireNonNull(coverPrefetcher, "coverPrefetcher");
     }
 
     public static MtvMediaMetadataCache getInstance() {
@@ -85,6 +94,7 @@ public final class MtvMediaMetadataCache {
                         entries.remove(entries.keySet().iterator().next());
                     }
                 }
+                prefetchCover(result);
                 future.complete(result);
             });
             return future;
@@ -130,6 +140,17 @@ public final class MtvMediaMetadataCache {
                 MtvMediaMetadata.Status.RESOLVED,
                 ""
         );
+    }
+
+    private void prefetchCover(MtvMediaMetadata metadata) {
+        if (metadata.status() != MtvMediaMetadata.Status.RESOLVED || metadata.coverUrl().isBlank()) {
+            return;
+        }
+        try {
+            coverPrefetcher.accept(metadata.coverUrl());
+        } catch (RuntimeException ignored) {
+            // Cover downloads are an optional local enhancement and must not fail metadata resolution.
+        }
     }
 
     static String normalizeUrl(String rawUrl) {

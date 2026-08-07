@@ -3,14 +3,21 @@ package top.tobyprime.mcedia_mtv.client.worldui;
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderEvents;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Font;
 import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.rendertype.RenderTypes;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Vector3f;
+import org.joml.Matrix3f;
+import org.joml.Quaternionf;
 import top.tobyprime.mcedia_mtv.client.channel.ClientChannelPlaybackManager;
 import top.tobyprime.mcedia_mtv.client.channel.ClientChannelPlaybackSnapshot;
 import top.tobyprime.mcedia_mtv.client.channel.worldui.WorldUiPlaylistCache;
 import top.tobyprime.mcedia_mtv.client.channel.worldui.WorldUiControlStateCache;
+import top.tobyprime.mcedia_mtv.client.metadata.MtvMediaMetadata;
+import top.tobyprime.mcedia_mtv.client.metadata.MtvMediaMetadataCache;
 import top.tobyprime.mcedia_mtv.client.entityplayer.EntityPlayerHandle;
 import top.tobyprime.mcedia_mtv.client.entityplayer.EntityPlayerManager;
 
@@ -26,6 +33,7 @@ public final class MtvWorldUiRenderer {
     public static void initialize() {
         if (initialized) return;
         initialized = true;
+        MtvWorldUiRenderResources.getInstance().setTextureCleanup(MtvWorldUiCoverTextures::clear);
         LevelRenderEvents.AFTER_SOLID_FEATURES.register(context -> {
             var camera = Minecraft.getInstance().gameRenderer.mainCamera();
             if (camera == null) return;
@@ -50,6 +58,8 @@ public final class MtvWorldUiRenderer {
         drawTransport(collector, pose, camera, screen.plane());
         float volume = WorldUiControlStateCache.getInstance().state(screen.mtvUuid()) == null ? 1.0F : WorldUiControlStateCache.getInstance().state(screen.mtvUuid()).masterVolume();
         drawVolume(collector, pose, camera, screen.plane(), volume);
+        drawCover(collector, pose, camera, screen.plane(), snapshot);
+        drawMediaInfo(collector, pose, camera, screen.plane(), snapshot);
         if (PRESENTATION.isPlaylistExpanded()) drawPlaylist(collector, pose, camera, screen.plane(), snapshot);
         quad(collector, pose, camera, screen.plane(), .93F, .93F, .99F, .99F, 0xD9242828);
     }
@@ -95,6 +105,7 @@ public final class MtvWorldUiRenderer {
                 boolean current = present && index == manifest.cursor();
                 quad(collector, pose, camera, screen, .70F, top, .98F, bottom, current ? 0xFF666666 : 0xFF292929);
                 if (present) {
+                    if (page != null) drawMetadataText(collector, pose, camera, screen, page.mediaUrls().get(pageIndex), .71F, top + .02F, .0016F, 0xFFE8E8E8, 18);
                     quad(collector, pose, camera, screen, .80F, top + .01F, .84F, bottom - .01F, 0xFF515151);
                     quad(collector, pose, camera, screen, .85F, top + .01F, .89F, bottom - .01F, 0xFF515151);
                     quad(collector, pose, camera, screen, .90F, top + .01F, .94F, bottom - .01F, 0xFF515151);
@@ -102,6 +113,58 @@ public final class MtvWorldUiRenderer {
                 }
             }
         });
+    }
+
+    private static void drawMediaInfo(SubmitNodeCollector collector, PoseStack pose, Vec3 camera, WorldUiScreenRaycast.Screen screen, ClientChannelPlaybackSnapshot snapshot) {
+        drawMetadataText(collector, pose, camera, screen, snapshot.mediaUrl(), .08F, .10F, .0024F, 0xFFF0F0F0, 42);
+        MtvMediaMetadata metadata = MtvMediaMetadataCache.getInstance().cached(snapshot.mediaUrl());
+        if (metadata == null) return;
+        drawText(collector, pose, camera, screen, truncate(metadata.author(), 28), .08F, .15F, .0018F, 0xFFB8B8B8);
+        drawText(collector, pose, camera, screen, truncate(metadata.description(), 42), .08F, .20F, .0016F, 0xFF9A9A9A);
+    }
+
+    private static void drawCover(SubmitNodeCollector collector, PoseStack pose, Vec3 camera, WorldUiScreenRaycast.Screen screen,
+                                  ClientChannelPlaybackSnapshot snapshot) {
+        MtvMediaMetadata metadata = MtvMediaMetadataCache.getInstance().cached(snapshot.mediaUrl());
+        Identifier textureId = metadata == null ? null : MtvWorldUiCoverTextures.texture(metadata.coverUrl());
+        if (textureId == null) {
+            quad(collector, pose, camera, screen, .04F, .08F, .07F, .24F, 0xFF333333);
+            return;
+        }
+        texturedQuad(collector, pose, camera, screen, textureId, .04F, .08F, .07F, .24F);
+    }
+
+    private static void drawMetadataText(SubmitNodeCollector collector, PoseStack pose, Vec3 camera, WorldUiScreenRaycast.Screen screen,
+                                         String mediaUrl, float u, float v, float scale, int color, int maxChars) {
+        MtvMediaMetadata metadata = MtvMediaMetadataCache.getInstance().cached(mediaUrl);
+        if (metadata != null && metadata.status() == MtvMediaMetadata.Status.RESOLVED) {
+            drawText(collector, pose, camera, screen, truncate(metadata.title(), maxChars), u, v, scale, color);
+        }
+    }
+
+    private static void drawText(SubmitNodeCollector collector, PoseStack pose, Vec3 camera, WorldUiScreenRaycast.Screen screen,
+                                 String value, float u, float v, float scale, int color) {
+        if (value == null || value.isBlank()) return;
+        Vector3f origin = point(screen, u, v);
+        pose.pushPose();
+        pose.translate(origin.x - (float) camera.x, origin.y - (float) camera.y, origin.z - (float) camera.z);
+        pose.mulPose(textRotation(screen));
+        pose.scale(scale, scale, scale);
+        collector.submitText(pose, 0.0F, 0.0F, Component.literal(value).getVisualOrderText(), true,
+                Font.DisplayMode.SEE_THROUGH, color, 0, 15728880, 0);
+        pose.popPose();
+    }
+
+    private static Quaternionf textRotation(WorldUiScreenRaycast.Screen screen) {
+        Vector3f x = new Vector3f(screen.right()).normalize();
+        Vector3f y = new Vector3f(screen.up()).negate().normalize();
+        Vector3f z = new Vector3f(x).cross(y).normalize();
+        return new Quaternionf().setFromNormalized(new Matrix3f().set(x, y, z));
+    }
+
+    private static String truncate(String value, int maxChars) {
+        if (value == null) return "";
+        return value.length() <= maxChars ? value : value.substring(0, Math.max(0, maxChars - 1)) + "...";
     }
 
     private static float progress(ClientChannelPlaybackSnapshot snapshot) {
@@ -118,6 +181,17 @@ public final class MtvWorldUiRenderer {
             vertex.addVertex(pose, b.x - (float) camera.x, b.y - (float) camera.y, b.z - (float) camera.z).setColor(color);
             vertex.addVertex(pose, c.x - (float) camera.x, c.y - (float) camera.y, c.z - (float) camera.z).setColor(color);
             vertex.addVertex(pose, d.x - (float) camera.x, d.y - (float) camera.y, d.z - (float) camera.z).setColor(color);
+        });
+    }
+
+    private static void texturedQuad(SubmitNodeCollector collector, PoseStack poseStack, Vec3 camera, WorldUiScreenRaycast.Screen screen,
+                                     Identifier textureId, float left, float bottom, float right, float top) {
+        Vector3f a = point(screen, left, bottom), b = point(screen, right, bottom), c = point(screen, right, top), d = point(screen, left, top);
+        collector.submitCustomGeometry(poseStack, RenderTypes.text(textureId), (pose, vertex) -> {
+            vertex.addVertex(pose, a.x - (float) camera.x, a.y - (float) camera.y, a.z - (float) camera.z).setColor(0xFFFFFFFF).setUv(0F, 1F);
+            vertex.addVertex(pose, b.x - (float) camera.x, b.y - (float) camera.y, b.z - (float) camera.z).setColor(0xFFFFFFFF).setUv(1F, 1F);
+            vertex.addVertex(pose, c.x - (float) camera.x, c.y - (float) camera.y, c.z - (float) camera.z).setColor(0xFFFFFFFF).setUv(1F, 0F);
+            vertex.addVertex(pose, d.x - (float) camera.x, d.y - (float) camera.y, d.z - (float) camera.z).setColor(0xFFFFFFFF).setUv(0F, 0F);
         });
     }
 

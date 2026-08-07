@@ -17,6 +17,7 @@ import top.tobyprime.mcedia_mtv.client.channel.worldui.MtvWorldUiControlResultPa
 import top.tobyprime.mcedia_mtv.client.channel.worldui.WorldUiControlSender;
 import top.tobyprime.mcedia_mtv.client.channel.worldui.MtvWorldUiWatchPayload;
 import top.tobyprime.mcedia_mtv.client.channel.worldui.MtvWorldUiUnwatchPayload;
+import top.tobyprime.mcedia_mtv.client.worldui.MtvWorldUiRenderResources;
 import top.tobyprime.mcedia_mtv.client.channel.worldui.WorldUiPlaylistCache;
 import top.tobyprime.mcedia_mtv.client.channel.worldui.MtvWorldUiControlStatePayload;
 import top.tobyprime.mcedia_mtv.client.channel.worldui.WorldUiControlStateCache;
@@ -95,6 +96,7 @@ public final class MtvClientChannelPayloads {
         lifecycle.onJoin();
         WorldUiCapabilityState.getInstance().clear();
         WorldUiPlaylistCache.getInstance().clear();
+        MtvWorldUiRenderResources.getInstance().clear();
         WorldUiControlStateCache.getInstance().clear();
         LOGGER.info("Open MTV client channel state: server={}, existing sessions retained for join payloads",
                 client.getCurrentServer() == null ? "singleplayer" : client.getCurrentServer().ip);
@@ -110,6 +112,7 @@ public final class MtvClientChannelPayloads {
         lifecycle.onDisconnect();
         WorldUiCapabilityState.getInstance().clear();
         WorldUiPlaylistCache.getInstance().clear();
+        MtvWorldUiRenderResources.getInstance().clear();
         WorldUiControlStateCache.getInstance().clear();
     }
 }
