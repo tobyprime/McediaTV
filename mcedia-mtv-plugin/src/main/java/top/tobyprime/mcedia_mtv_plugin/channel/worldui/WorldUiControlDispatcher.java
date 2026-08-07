@@ -9,6 +9,7 @@ import top.tobyprime.mcedia_mtv_plugin.channel.MtvChannelService;
 import top.tobyprime.mcedia_mtv_plugin.manager.MtvPlayerManager;
 import top.tobyprime.mcedia_mtv_plugin.model.ManagedMtvPlayer;
 import top.tobyprime.mcedia_mtv_plugin.util.MediaUrlNormalizer;
+import top.tobyprime.mcedia_mtv_plugin.worldui.WorldUiScreenHitValidator;
 
 import java.util.Locale;
 import java.util.UUID;
@@ -25,11 +26,13 @@ public final class WorldUiControlDispatcher {
     private final MtvPlayerManager manager;
     private final MtvChannelService channelService;
     private final WorldUiRateLimiter rateLimiter;
+    private final WorldUiScreenHitValidator hitValidator;
 
     public WorldUiControlDispatcher(MtvPlayerManager manager, WorldUiRateLimiter rateLimiter) {
         this.manager = manager;
         this.channelService = manager.getChannelService();
         this.rateLimiter = rateLimiter == null ? new WorldUiRateLimiter() : rateLimiter;
+        this.hitValidator = new WorldUiScreenHitValidator();
     }
 
     public WorldUiControlDispatcher(MtvPlayerManager manager) {
@@ -77,6 +80,11 @@ public final class WorldUiControlDispatcher {
         WorldUiControlError targetError = validateTarget(player, target, request);
         if (targetError != WorldUiControlError.NONE) {
             done.accept(rejected(request, targetError, revision));
+            return;
+        }
+        var hitValidation = hitValidator.validate(player, target, request.screenId(), request.hitU(), request.hitV());
+        if (!hitValidation.accepted()) {
+            done.accept(rejected(request, hitValidation.error(), revision));
             return;
         }
 
