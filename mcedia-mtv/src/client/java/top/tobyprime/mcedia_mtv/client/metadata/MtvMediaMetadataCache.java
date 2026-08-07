@@ -104,6 +104,18 @@ public final class MtvMediaMetadataCache {
         }
     }
 
+    public MtvMediaMetadata cached(String rawUrl) {
+        String normalizedUrl;
+        try {
+            normalizedUrl = normalizeUrl(rawUrl);
+        } catch (Exception ignored) {
+            return null;
+        }
+        synchronized (lock) {
+            return entries.get(normalizedUrl);
+        }
+    }
+
     private MtvMediaMetadata resolve(String normalizedUrl) {
         Media media = Objects.requireNonNull(resolver.apply(normalizedUrl), "resolver returned null media");
         MediaInfo info = Objects.requireNonNull(media.getInfo(), "media info is missing");

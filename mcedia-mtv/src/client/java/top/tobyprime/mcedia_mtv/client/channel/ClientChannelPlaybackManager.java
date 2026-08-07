@@ -1,6 +1,7 @@
 package top.tobyprime.mcedia_mtv.client.channel;
 
 import net.minecraft.client.Minecraft;
+import top.tobyprime.mcedia_mtv.client.metadata.MtvMediaMetadataCache;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,6 +36,9 @@ public final class ClientChannelPlaybackManager {
     private void applySnapshot(ClientChannelPlaybackSnapshot snapshot, boolean forceResync) {
         if (snapshot == null || snapshot.channelId() == null || snapshot.channelId().isBlank()) {
             return;
+        }
+        if (snapshot.mediaUrl() != null && !snapshot.mediaUrl().isBlank()) {
+            MtvMediaMetadataCache.getInstance().resolveAsync(snapshot.mediaUrl());
         }
         var session = sessions.get(snapshot.channelId());
         if (session != null) {

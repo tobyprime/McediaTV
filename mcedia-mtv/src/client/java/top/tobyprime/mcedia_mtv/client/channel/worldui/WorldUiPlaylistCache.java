@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import top.tobyprime.mcedia_mtv.client.metadata.MtvMediaMetadataCache;
 
 public final class WorldUiPlaylistCache {
     private static final int PAGE_SIZE = 32;
@@ -35,6 +36,9 @@ public final class WorldUiPlaylistCache {
         }
         state.pages.put(page.offset(), page);
         state.pendingOffsets.remove(page.offset());
+        for (String mediaUrl : page.mediaUrls()) {
+            MtvMediaMetadataCache.getInstance().resolveAsync(mediaUrl);
+        }
     }
 
     public synchronized Optional<WorldUiPlaylistManifest> manifest(String channelId) {
