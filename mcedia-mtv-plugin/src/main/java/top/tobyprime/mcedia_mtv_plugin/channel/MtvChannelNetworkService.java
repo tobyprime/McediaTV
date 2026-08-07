@@ -19,6 +19,7 @@ import top.tobyprime.mcedia_mtv_plugin.channel.worldui.WorldUiCapabilities;
 import top.tobyprime.mcedia_mtv_plugin.channel.worldui.WorldUiControlDispatcher;
 import top.tobyprime.mcedia_mtv_plugin.channel.worldui.WorldUiControlRequest;
 import top.tobyprime.mcedia_mtv_plugin.channel.worldui.WorldUiControlResult;
+import top.tobyprime.mcedia_mtv_plugin.channel.worldui.WorldUiControlError;
 import top.tobyprime.mcedia_mtv_plugin.channel.worldui.WorldUiControlState;
 import top.tobyprime.mcedia_mtv_plugin.channel.worldui.WorldUiPlaylistPageRequest;
 import top.tobyprime.mcedia_mtv_plugin.channel.worldui.WorldUiPlaylistPublisher;
@@ -245,6 +246,9 @@ public final class MtvChannelNetworkService implements PluginMessageListener, Li
         }
         worldUiControlDispatcher.dispatch(player, request, result -> {
             sendControlResult(player, result);
+            if (!result.accepted() && result.error() == WorldUiControlError.STALE_REVISION) {
+                publishPlaylistManifest(request.channelId());
+            }
             if (result.accepted()) {
                 publishControlState(request.targetMtvUuid());
             }
