@@ -31,6 +31,7 @@ public final class McediaMtvPlugin extends JavaPlugin {
 
     @Override
     public void onEnable() {
+        saveDefaultConfig();
         this.manager = new MtvPlayerManager(this);
         var channelService = manager.getChannelService();
 

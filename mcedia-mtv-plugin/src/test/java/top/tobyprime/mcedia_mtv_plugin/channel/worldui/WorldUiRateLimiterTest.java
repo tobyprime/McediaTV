@@ -37,4 +37,21 @@ class WorldUiRateLimiterTest {
         assertTrue(limiter.tryAcquire(player, WorldUiRateLimiter.RequestType.WATCH));
         assertFalse(limiter.tryAcquire(player, WorldUiRateLimiter.RequestType.WATCH));
     }
+
+    @Test
+    void configuredBudgetsOverrideTheDefaultsWithoutChangingRequestFamilies() {
+        var clock = new AtomicLong(5_000L);
+        var limiter = new WorldUiRateLimiter(new WorldUiRateLimiter.Limits(1, 2, 3), clock::get);
+        var player = UUID.randomUUID();
+
+        assertTrue(limiter.tryAcquire(player, WorldUiRateLimiter.RequestType.CONTROL));
+        assertFalse(limiter.tryAcquire(player, WorldUiRateLimiter.RequestType.CONTROL));
+        assertTrue(limiter.tryAcquire(player, WorldUiRateLimiter.RequestType.PAGE));
+        assertTrue(limiter.tryAcquire(player, WorldUiRateLimiter.RequestType.PAGE));
+        assertFalse(limiter.tryAcquire(player, WorldUiRateLimiter.RequestType.PAGE));
+        assertTrue(limiter.tryAcquire(player, WorldUiRateLimiter.RequestType.WATCH));
+        assertTrue(limiter.tryAcquire(player, WorldUiRateLimiter.RequestType.WATCH));
+        assertTrue(limiter.tryAcquire(player, WorldUiRateLimiter.RequestType.WATCH));
+        assertFalse(limiter.tryAcquire(player, WorldUiRateLimiter.RequestType.WATCH));
+    }
 }

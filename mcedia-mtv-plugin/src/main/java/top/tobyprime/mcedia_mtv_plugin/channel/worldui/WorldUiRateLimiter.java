@@ -9,25 +9,29 @@ import java.util.function.LongSupplier;
 /** Fixed one-second request windows, keyed per player and request family. */
 public final class WorldUiRateLimiter {
     public enum RequestType {
-        CONTROL(10),
-        PAGE(4),
-        WATCH(2);
-
-        private final int limitPerSecond;
-
-        RequestType(int limitPerSecond) {
-            this.limitPerSecond = limitPerSecond;
-        }
+        CONTROL,
+        PAGE,
+        WATCH
     }
 
+    private final Limits limits;
     private final LongSupplier clockMillis;
     private final Map<UUID, EnumMap<RequestType, Window>> windows = new ConcurrentHashMap<>();
 
     public WorldUiRateLimiter() {
-        this(System::currentTimeMillis);
+        this(Limits.defaults(), System::currentTimeMillis);
     }
 
     public WorldUiRateLimiter(LongSupplier clockMillis) {
+        this(Limits.defaults(), clockMillis);
+    }
+
+    public WorldUiRateLimiter(Limits limits) {
+        this(limits, System::currentTimeMillis);
+    }
+
+    public WorldUiRateLimiter(Limits limits, LongSupplier clockMillis) {
+        this.limits = limits == null ? Limits.defaults() : limits;
         this.clockMillis = clockMillis == null ? System::currentTimeMillis : clockMillis;
     }
 
@@ -43,7 +47,7 @@ public final class WorldUiRateLimiter {
                 playerWindows.put(type, new Window(now, 1));
                 return true;
             }
-            if (window.count >= type.limitPerSecond) {
+            if (window.count >= limits.forType(type)) {
                 return false;
             }
             window.count++;
@@ -68,6 +72,27 @@ public final class WorldUiRateLimiter {
         private Window(long startedAtMillis, int count) {
             this.startedAtMillis = startedAtMillis;
             this.count = count;
+        }
+    }
+
+    /** Independently configurable per-player one-second request budgets. */
+    public record Limits(int controlPerSecond, int pagePerSecond, int watchPerSecond) {
+        public Limits {
+            if (controlPerSecond <= 0 || pagePerSecond <= 0 || watchPerSecond <= 0) {
+                throw new IllegalArgumentException("world UI rate limits must be positive");
+            }
+        }
+
+        public static Limits defaults() {
+            return new Limits(10, 4, 2);
+        }
+
+        private int forType(RequestType type) {
+            return switch (type) {
+                case CONTROL -> controlPerSecond;
+                case PAGE -> pagePerSecond;
+                case WATCH -> watchPerSecond;
+            };
         }
     }
 }

@@ -33,7 +33,7 @@ public final class MtvChannelNetworkService implements PluginMessageListener, Li
     private final Plugin plugin;
     private final MtvChannelService channelService;
     private final WorldUiPlaylistPublisher playlistPublisher;
-    private final WorldUiRateLimiter worldUiRateLimiter = new WorldUiRateLimiter();
+    private final WorldUiRateLimiter worldUiRateLimiter;
     private final WorldUiControlDispatcher worldUiControlDispatcher;
     private final WorldUiWatchRegistry worldUiWatchRegistry = new WorldUiWatchRegistry();
     private final Map<UUID, String> watchedChannelsByMtv = new ConcurrentHashMap<>();
@@ -43,6 +43,12 @@ public final class MtvChannelNetworkService implements PluginMessageListener, Li
     public MtvChannelNetworkService(Plugin plugin, MtvChannelService channelService) {
         this.plugin = plugin;
         this.channelService = channelService;
+        var config = plugin.getConfig();
+        this.worldUiRateLimiter = new WorldUiRateLimiter(new WorldUiRateLimiter.Limits(
+                positiveConfigValue(config.getInt("world-ui.rate-limits.control-per-second", 10), 10),
+                positiveConfigValue(config.getInt("world-ui.rate-limits.page-per-second", 4), 4),
+                positiveConfigValue(config.getInt("world-ui.rate-limits.watch-per-second", 2), 2)
+        ));
         this.playlistPublisher = new WorldUiPlaylistPublisher(plugin, channelService);
         this.worldUiControlDispatcher = new WorldUiControlDispatcher(channelService.getManager(), worldUiRateLimiter);
         registerChannels();
@@ -529,5 +535,9 @@ public final class MtvChannelNetworkService implements PluginMessageListener, Li
 
     private void removeEmptyWatchedChannels() {
         watchedChannelsByMtv.entrySet().removeIf(entry -> worldUiWatchRegistry.watchers(entry.getKey()).isEmpty());
+    }
+
+    private static int positiveConfigValue(int configured, int defaultValue) {
+        return configured > 0 ? configured : defaultValue;
     }
 }

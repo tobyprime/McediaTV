@@ -1,0 +1,5 @@
+world-ui:
+  rate-limits:
+    control-per-second: 10
+    page-per-second: 4
+    watch-per-second: 2
