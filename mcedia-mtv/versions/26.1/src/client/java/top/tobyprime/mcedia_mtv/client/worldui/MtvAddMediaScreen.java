@@ -60,7 +60,7 @@ public final class MtvAddMediaScreen extends Screen {
         boolean enabled = model.canConfirm();
         if (prepend != null) { prepend.active = enabled; insertNext.active = enabled; append.active = enabled; playNow.active = enabled; }
         MtvMediaMetadata metadata = model.preview();
-        model.onControlResult(WorldUiControlSender.getInstance().lastResult());
+        model.onControlResult(WorldUiControlSender.getInstance().consumeLastResult());
         previewText.setMessage(Component.literal(previewMessage(metadata)));
         if (model.consumeAccepted()) minecraft.setScreen(null);
     }

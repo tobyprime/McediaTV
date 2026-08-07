@@ -37,7 +37,7 @@ public final class MtvAddMediaScreen extends Screen {
     private Button addButton(int x, int y, String label, WorldUiAddMediaModel.AddMode mode) { return addRenderableWidget(Button.builder(Component.literal(label), button -> model.confirm(target, WorldUiControlSender.getInstance(), mode)).bounds(x, y, 104, 20).build()); }
     @Override public void tick() {
         super.tick(); boolean enabled = model.canConfirm(); if (prepend != null) { prepend.active = enabled; insertNext.active = enabled; append.active = enabled; playNow.active = enabled; }
-        model.onControlResult(WorldUiControlSender.getInstance().lastResult());
+        model.onControlResult(WorldUiControlSender.getInstance().consumeLastResult());
         MtvMediaMetadata metadata = model.preview(); previewText.setMessage(Component.literal(previewMessage(metadata)));
         if (model.consumeAccepted()) minecraft.gui.setScreen(null);
     }

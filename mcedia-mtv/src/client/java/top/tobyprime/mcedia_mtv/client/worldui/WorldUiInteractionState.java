@@ -3,15 +3,14 @@ package top.tobyprime.mcedia_mtv.client.worldui;
 import top.tobyprime.mcedia_mtv.client.channel.worldui.WorldUiControlArgument;
 import top.tobyprime.mcedia_mtv.client.channel.worldui.WorldUiControlOperation;
 import top.tobyprime.mcedia_mtv.client.channel.worldui.WorldUiControlRequest;
+import top.tobyprime.mcedia_mtv.client.channel.worldui.WorldUiRequestIds;
 
 import java.util.Objects;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicLong;
 
 /** Keeps local hover, expansion and drag state independent of Minecraft mappings. */
 public final class WorldUiInteractionState {
     private final ControlSender sender;
-    private final AtomicLong requestIds = new AtomicLong();
 
     private Target expandedTarget;
     private Drag activeDrag = Drag.NONE;
@@ -170,7 +169,7 @@ public final class WorldUiInteractionState {
     }
 
     private void send(Target target, float u, float v, WorldUiControlOperation operation, WorldUiControlArgument argument) {
-        sender.send(new WorldUiControlRequest(target.mtvUuid(), target.screenId(), target.channelId(), requestIds.incrementAndGet(),
+        sender.send(new WorldUiControlRequest(target.mtvUuid(), target.screenId(), target.channelId(), WorldUiRequestIds.next(),
                 target.revision(), u, v, operation, argument));
     }
 

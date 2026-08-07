@@ -38,7 +38,7 @@ public final class WorldUiControlSender implements WorldUiInteractionState.Contr
         }
     }
 
-    public void onResult(WorldUiControlResult result) {
+    public synchronized void onResult(WorldUiControlResult result) {
         lastResult = result;
     }
 
@@ -46,7 +46,14 @@ public final class WorldUiControlSender implements WorldUiInteractionState.Contr
         return lastResult;
     }
 
-    public void clearResult() {
+    /** Returns and clears the latest result so a stale packet cannot be replayed every tick. */
+    public synchronized WorldUiControlResult consumeLastResult() {
+        WorldUiControlResult result = lastResult;
+        lastResult = null;
+        return result;
+    }
+
+    public synchronized void clearResult() {
         lastResult = null;
     }
 }

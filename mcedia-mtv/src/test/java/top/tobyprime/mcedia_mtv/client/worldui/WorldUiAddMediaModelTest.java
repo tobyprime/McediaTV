@@ -39,6 +39,7 @@ class WorldUiAddMediaModelTest {
 
         assertTrue(model.canConfirm());
         assertTrue(model.confirm(new WorldUiInteractionState.Target(UUID.randomUUID(), "screen_0", "self:test", 4L), sender, WorldUiAddMediaModel.AddMode.INSERT_NEXT));
+        assertFalse(model.canConfirm());
         assertEquals(1, sender.requests.size());
         assertEquals("INSERT_NEXT", sender.requests.getFirst().operation().name());
         assertEquals("https://example.com/video", ((WorldUiControlArgument.MediaUrl) sender.requests.getFirst().argument()).value());
@@ -51,10 +52,14 @@ class WorldUiAddMediaModelTest {
         var model = new WorldUiAddMediaModel(url -> CompletableFuture.completedFuture(metadata));
         model.setInput("https://example.com/video");
         model.confirm(new WorldUiInteractionState.Target(UUID.randomUUID(), "screen_0", "self:test", 4L), sender, WorldUiAddMediaModel.AddMode.APPEND);
+        long requestId = sender.requests.getFirst().requestId();
 
-        model.onControlResult(new WorldUiControlResult(1L, false, WorldUiControlError.STALE_REVISION, 5L));
+        model.onControlResult(new WorldUiControlResult(requestId, false, WorldUiControlError.STALE_REVISION, 5L));
         assertFalse(model.consumeAccepted());
-        model.onControlResult(new WorldUiControlResult(1L, true, WorldUiControlError.NONE, 5L));
+        assertTrue(model.canConfirm());
+        model.confirm(new WorldUiInteractionState.Target(UUID.randomUUID(), "screen_0", "self:test", 5L), sender, WorldUiAddMediaModel.AddMode.APPEND);
+        long secondRequestId = sender.requests.getLast().requestId();
+        model.onControlResult(new WorldUiControlResult(secondRequestId, true, WorldUiControlError.NONE, 5L));
         assertTrue(model.consumeAccepted());
         assertFalse(model.consumeAccepted());
     }
@@ -67,7 +72,7 @@ class WorldUiAddMediaModelTest {
         model.setInput("https://example.com/video");
         model.confirm(new WorldUiInteractionState.Target(UUID.randomUUID(), "screen_0", "self:test", 4L), sender, WorldUiAddMediaModel.AddMode.APPEND);
 
-        model.onControlResult(new WorldUiControlResult(1L, false, WorldUiControlError.PERMISSION_DENIED, 4L));
+        model.onControlResult(new WorldUiControlResult(sender.requests.getFirst().requestId(), false, WorldUiControlError.PERMISSION_DENIED, 4L));
 
         assertEquals(WorldUiControlError.PERMISSION_DENIED, model.lastError());
         assertEquals(metadata, model.preview());
