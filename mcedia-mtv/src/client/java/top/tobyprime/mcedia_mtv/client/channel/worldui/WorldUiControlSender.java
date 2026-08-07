@@ -26,12 +26,16 @@ public final class WorldUiControlSender implements WorldUiInteractionState.Contr
 
     @Override
     public void watch(WorldUiInteractionState.Target target) {
-        // Watch registration is added by the version-specific screen adapter.
+        if (target != null && WorldUiCapabilityState.getInstance().supported()) {
+            MtvChannelClientPacketSender.send(new MtvWorldUiWatchPayload(new WorldUiWatchRequest(target.mtvUuid())));
+        }
     }
 
     @Override
     public void unwatch(WorldUiInteractionState.Target target) {
-        // Watch registration is added by the version-specific screen adapter.
+        if (target != null && WorldUiCapabilityState.getInstance().supported()) {
+            MtvChannelClientPacketSender.send(new MtvWorldUiUnwatchPayload(new WorldUiWatchRequest(target.mtvUuid())));
+        }
     }
 
     public void onResult(WorldUiControlResult result) {

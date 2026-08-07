@@ -37,6 +37,13 @@ class MtvChannelProtocolWorldUiTest {
     }
 
     @Test
+    void watchRequestRoundTripsTargetUuid() {
+        var request = new WorldUiWatchRequest(UUID.fromString("99999999-9999-9999-9999-999999999999"));
+
+        assertEquals(request, MtvChannelProtocol.decodeWatchRequest(MtvChannelProtocol.encodeWatchRequest(request)));
+    }
+
+    @Test
     void controlRequestAndResultRoundTrip() {
         var request = new WorldUiControlRequest(UUID.randomUUID(), "screen_0", "channel", 4L, 8L,
                 0.5F, 0.75F, WorldUiControlOperation.SET_MASTER_VOLUME, new WorldUiControlArgument.Scalar(0.4F));

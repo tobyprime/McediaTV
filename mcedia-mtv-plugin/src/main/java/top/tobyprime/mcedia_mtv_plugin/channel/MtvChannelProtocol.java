@@ -12,6 +12,7 @@ import top.tobyprime.mcedia_mtv_plugin.channel.worldui.WorldUiControlError;
 import top.tobyprime.mcedia_mtv_plugin.channel.worldui.WorldUiControlOperation;
 import top.tobyprime.mcedia_mtv_plugin.channel.worldui.WorldUiControlRequest;
 import top.tobyprime.mcedia_mtv_plugin.channel.worldui.WorldUiControlResult;
+import top.tobyprime.mcedia_mtv_plugin.channel.worldui.WorldUiWatchRequest;
 
 import java.util.List;
 import java.util.Set;
@@ -31,6 +32,8 @@ public final class MtvChannelProtocol {
     public static final String CHANNEL_PLAYLIST_PAGE = "mcedia_mtv:channel_playlist_page";
     public static final String CHANNEL_CONTROL_REQUEST = "mcedia_mtv:channel_control_request";
     public static final String CHANNEL_CONTROL_RESULT = "mcedia_mtv:channel_control_result";
+    public static final String CHANNEL_WORLD_UI_WATCH = "mcedia_mtv:channel_world_ui_watch";
+    public static final String CHANNEL_WORLD_UI_UNWATCH = "mcedia_mtv:channel_world_ui_unwatch";
     public static final int WORLD_UI_PROTOCOL_VERSION = 1;
     public static final int MAX_PLAYLIST_PAGE_ITEMS = 32;
     public static final int MAX_PLAYLIST_PAGE_BYTES = 24 * 1024;
@@ -196,6 +199,29 @@ public final class MtvChannelProtocol {
             throw invalidPacket("control request", "encoded length exceeds " + MAX_CONTROL_REQUEST_BYTES + " bytes");
         }
         return encoded;
+    }
+
+    public static byte[] encodeWatchRequest(WorldUiWatchRequest request) {
+        var buffer = new FriendlyByteBuf(Unpooled.buffer());
+        writeWatchRequest(buffer, request);
+        return toBytes(buffer);
+    }
+
+    public static WorldUiWatchRequest decodeWatchRequest(byte[] message) {
+        return readWatchRequest(new FriendlyByteBuf(Unpooled.wrappedBuffer(message)));
+    }
+
+    public static void writeWatchRequest(FriendlyByteBuf buffer, WorldUiWatchRequest request) {
+        if (request == null || request.targetMtvUuid() == null) {
+            throw invalidPacket("world UI watch", "targetMtvUuid is missing");
+        }
+        buffer.writeUUID(request.targetMtvUuid());
+    }
+
+    public static WorldUiWatchRequest readWatchRequest(FriendlyByteBuf buffer) {
+        var request = new WorldUiWatchRequest(buffer.readUUID());
+        ensureFullyRead(buffer, "world UI watch");
+        return request;
     }
 
     public static WorldUiControlRequest decodeControlRequest(byte[] message) {

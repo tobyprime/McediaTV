@@ -20,6 +20,8 @@ import top.tobyprime.mcedia_mtv_plugin.channel.worldui.WorldUiControlResult;
 import top.tobyprime.mcedia_mtv_plugin.channel.worldui.WorldUiPlaylistPageRequest;
 import top.tobyprime.mcedia_mtv_plugin.channel.worldui.WorldUiPlaylistPublisher;
 import top.tobyprime.mcedia_mtv_plugin.channel.worldui.WorldUiRateLimiter;
+import top.tobyprime.mcedia_mtv_plugin.channel.worldui.WorldUiWatchRegistry;
+import top.tobyprime.mcedia_mtv_plugin.channel.worldui.WorldUiWatchRequest;
 
 public final class MtvChannelNetworkService implements PluginMessageListener, Listener {
     private static final Logger LOGGER = LoggerFactory.getLogger(MtvChannelNetworkService.class);
@@ -29,6 +31,7 @@ public final class MtvChannelNetworkService implements PluginMessageListener, Li
     private final WorldUiPlaylistPublisher playlistPublisher;
     private final WorldUiRateLimiter worldUiRateLimiter = new WorldUiRateLimiter();
     private final WorldUiControlDispatcher worldUiControlDispatcher;
+    private final WorldUiWatchRegistry worldUiWatchRegistry = new WorldUiWatchRegistry();
     private volatile boolean closed;
 
     public MtvChannelNetworkService(Plugin plugin, MtvChannelService channelService) {
@@ -54,6 +57,8 @@ public final class MtvChannelNetworkService implements PluginMessageListener, Li
         messenger.registerIncomingPluginChannel(plugin, MtvChannelProtocol.CHANNEL_HEARTBEAT, this);
         messenger.registerIncomingPluginChannel(plugin, MtvChannelProtocol.CHANNEL_PLAYLIST_PAGE_REQUEST, this);
         messenger.registerIncomingPluginChannel(plugin, MtvChannelProtocol.CHANNEL_CONTROL_REQUEST, this);
+        messenger.registerIncomingPluginChannel(plugin, MtvChannelProtocol.CHANNEL_WORLD_UI_WATCH, this);
+        messenger.registerIncomingPluginChannel(plugin, MtvChannelProtocol.CHANNEL_WORLD_UI_UNWATCH, this);
     }
 
     public void shutdown() {
@@ -67,6 +72,8 @@ public final class MtvChannelNetworkService implements PluginMessageListener, Li
         messenger.unregisterIncomingPluginChannel(plugin, MtvChannelProtocol.CHANNEL_HEARTBEAT, this);
         messenger.unregisterIncomingPluginChannel(plugin, MtvChannelProtocol.CHANNEL_PLAYLIST_PAGE_REQUEST, this);
         messenger.unregisterIncomingPluginChannel(plugin, MtvChannelProtocol.CHANNEL_CONTROL_REQUEST, this);
+        messenger.unregisterIncomingPluginChannel(plugin, MtvChannelProtocol.CHANNEL_WORLD_UI_WATCH, this);
+        messenger.unregisterIncomingPluginChannel(plugin, MtvChannelProtocol.CHANNEL_WORLD_UI_UNWATCH, this);
         messenger.unregisterOutgoingPluginChannel(plugin, MtvChannelProtocol.CHANNEL_SNAPSHOT);
         messenger.unregisterOutgoingPluginChannel(plugin, MtvChannelProtocol.CHANNEL_SYNC);
         messenger.unregisterOutgoingPluginChannel(plugin, MtvChannelProtocol.CHANNEL_REMOVE);
@@ -75,6 +82,7 @@ public final class MtvChannelNetworkService implements PluginMessageListener, Li
         messenger.unregisterOutgoingPluginChannel(plugin, MtvChannelProtocol.CHANNEL_PLAYLIST_MANIFEST);
         messenger.unregisterOutgoingPluginChannel(plugin, MtvChannelProtocol.CHANNEL_PLAYLIST_PAGE);
         messenger.unregisterOutgoingPluginChannel(plugin, MtvChannelProtocol.CHANNEL_CONTROL_RESULT);
+        worldUiWatchRegistry.clear();
     }
 
     @Override
@@ -101,6 +109,14 @@ public final class MtvChannelNetworkService implements PluginMessageListener, Li
             }
             if (MtvChannelProtocol.CHANNEL_CONTROL_REQUEST.equals(channel)) {
                 handleControlRequest(player, message);
+                return;
+            }
+            if (MtvChannelProtocol.CHANNEL_WORLD_UI_WATCH.equals(channel)) {
+                handleWorldUiWatch(player, message, true);
+                return;
+            }
+            if (MtvChannelProtocol.CHANNEL_WORLD_UI_UNWATCH.equals(channel)) {
+                handleWorldUiWatch(player, message, false);
             }
         });
     }
@@ -221,6 +237,27 @@ public final class MtvChannelNetworkService implements PluginMessageListener, Li
             return;
         }
         worldUiControlDispatcher.dispatch(player, request, result -> sendControlResult(player, result));
+    }
+
+    private void handleWorldUiWatch(Player player, byte[] message, boolean watch) {
+        WorldUiWatchRequest request;
+        try {
+            request = MtvChannelProtocol.decodeWatchRequest(message);
+        } catch (Exception e) {
+            LOGGER.warn("Failed to decode MTV world UI watch request from {}", player.getName(), e);
+            return;
+        }
+        if (!worldUiRateLimiter.tryAcquire(player.getUniqueId(), WorldUiRateLimiter.RequestType.WATCH)) {
+            return;
+        }
+        if (!watch) {
+            worldUiWatchRegistry.unwatch(player.getUniqueId());
+            return;
+        }
+        channelService.getManager().withManagedPlayer(request.targetMtvUuid(), target -> {
+            worldUiWatchRegistry.watch(player.getUniqueId(), request.targetMtvUuid());
+            return Boolean.TRUE;
+        }, ignored -> { });
     }
 
     private void handleUnsubscribe(Player player, byte[] message) {
@@ -414,6 +451,7 @@ public final class MtvChannelNetworkService implements PluginMessageListener, Li
     private void unregisterClient(Player player) {
         channelService.getAudienceSessionManager().unregisterClient(player.getUniqueId());
         worldUiRateLimiter.clear(player.getUniqueId());
+        worldUiWatchRegistry.unwatch(player.getUniqueId());
         LOGGER.debug("Unregistered MTV client: player={}", player.getName());
     }
 }
