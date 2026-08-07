@@ -51,9 +51,10 @@ public final class MtvWorldUiRenderer {
         var target = new WorldUiInteractionState.Target(screen.mtvUuid(), screen.screenId(), screen.channelId(), snapshot.revision());
         if (!PRESENTATION.shouldRender(target)) return;
         if (!PRESENTATION.isExpanded(target)) {
-            quad(vertex, pose, camera, screen.plane(), .93F, .93F, .99F, .99F, 0xD9242828);
-            quad(vertex, pose, camera, screen.plane(), .955F, .945F, .975F, .975F, 0xFFF0F0F0);
-            drawText(pose, bufferSource, camera, screen.plane(), "+", .958F, .954F, .0014F, 0xFFFFFFFF);
+            float fade = PRESENTATION.hoverFade();
+            quad(vertex, pose, camera, screen.plane(), .93F, .93F, .99F, .99F, fadeColor(0xD9242828, fade));
+            quad(vertex, pose, camera, screen.plane(), .955F, .945F, .975F, .975F, fadeColor(0xFFF0F0F0, fade));
+            drawText(pose, bufferSource, camera, screen.plane(), "+", .958F, .954F, .0014F, fadeColor(0xFFFFFFFF, fade));
             return;
         }
         quad(vertex, pose, camera, screen.plane(), .02F, .65F, .98F, .98F, 0xD0101010);
@@ -205,6 +206,11 @@ public final class MtvWorldUiRenderer {
         long position = snapshot.anchorMediaTimeUs();
         if (!snapshot.paused()) position += Math.max(0L, snapshot.elapsedTimeMs()) * 1000L;
         return Math.max(0F, Math.min(1F, (float) position / snapshot.resolvedDurationUs()));
+    }
+
+    private static int fadeColor(int argb, float fade) {
+        int alpha = Math.round(((argb >>> 24) & 0xFF) * Math.max(0.0F, Math.min(1.0F, fade)));
+        return (alpha << 24) | (argb & 0x00FFFFFF);
     }
 
     private static void quad(VertexConsumer vertex, PoseStack.Pose pose, Vec3 camera, WorldUiScreenRaycast.Screen screen, float left, float bottom, float right, float top, int color) {

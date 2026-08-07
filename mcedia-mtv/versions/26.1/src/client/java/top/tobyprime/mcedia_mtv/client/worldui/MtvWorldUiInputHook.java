@@ -49,7 +49,8 @@ public final class MtvWorldUiInputHook {
             WorldUiPlaylistCache.getInstance().manifest(selection.target().channelId()).ifPresent(m -> INTERACTION.setPlayOrderMode(m.playOrderMode()));
         }
 
-        if (selection != null && MtvWorldUiRenderer.presentation().isPlaylistExpanded()) requestVisiblePage(selection.target());
+                MtvWorldUiRenderer.presentation().tickHoverFade(selection != null && MtvWorldUiRenderer.presentation().hoveringToggleTrigger());
+if (selection != null && MtvWorldUiRenderer.presentation().isPlaylistExpanded()) requestVisiblePage(selection.target());
 
         boolean down = client.options.keyAttack.isDown();
         if (down && !primaryDown && selection != null) {

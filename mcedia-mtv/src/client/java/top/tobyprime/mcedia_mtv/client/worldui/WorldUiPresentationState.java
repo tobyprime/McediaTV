@@ -9,17 +9,23 @@ import java.util.Objects;
 public final class WorldUiPresentationState {
     private final WorldUiLayout layout = new WorldUiLayout();
 
+    private static final float FADE_IN_STEP = 0.25F;
+    private static final float FADE_OUT_STEP = 0.15F;
+
     private WorldUiInteractionState.Target hoveredTarget;
     private float hoveredU;
     private float hoveredV;
     private WorldUiInteractionState.Target expandedTarget;
     private boolean playlistExpanded;
     private int playlistStart;
+    private WorldUiInteractionState.Target fadeTarget;
+    private float hoverFade;
 
     public void update(WorldUiInteractionState.Target target, float u, float v) {
         hoveredTarget = target;
         hoveredU = u;
         hoveredV = v;
+        fadeTarget = target;
         if (sameScreen(expandedTarget, target)) {
             expandedTarget = target;
         }
@@ -33,12 +39,36 @@ public final class WorldUiPresentationState {
         expandedTarget = Objects.requireNonNull(target, "target");
         playlistExpanded = false;
         playlistStart = 0;
+        hoverFade = 1.0F;
     }
 
     public void collapse() {
         expandedTarget = null;
         playlistExpanded = false;
         playlistStart = 0;
+        fadeTarget = null;
+        hoverFade = 0.0F;
+    }
+
+    /** Steps the collapsed toggle alpha toward visible or hidden once per tick. */
+    public void tickHoverFade(boolean hovering) {
+        if (hovering) {
+            hoverFade = Math.min(1.0F, hoverFade + FADE_IN_STEP);
+        } else {
+            hoverFade = Math.max(0.0F, hoverFade - FADE_OUT_STEP);
+            if (hoverFade <= 0.0F) {
+                fadeTarget = null;
+            }
+        }
+    }
+
+    public float hoverFade() {
+        return hoverFade;
+    }
+
+    /** True while the pointer is inside the bottom-right collapsed toggle trigger. */
+    public boolean hoveringToggleTrigger() {
+        return hoveredTarget != null && layout.isToggleTrigger(hoveredU, hoveredV);
     }
 
     public boolean isExpanded(WorldUiInteractionState.Target target) {
@@ -49,7 +79,9 @@ public final class WorldUiPresentationState {
         if (target == null) {
             return false;
         }
-        return isExpanded(target) || (sameScreen(target, hoveredTarget) && layout.isToggleTrigger(hoveredU, hoveredV));
+        return isExpanded(target)
+                || (sameScreen(target, hoveredTarget) && layout.isToggleTrigger(hoveredU, hoveredV))
+                || (sameScreen(target, fadeTarget) && hoverFade > 0.0F);
     }
 
     public WorldUiHit hit() {
