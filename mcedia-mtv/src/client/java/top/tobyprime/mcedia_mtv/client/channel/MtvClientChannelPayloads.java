@@ -18,6 +18,8 @@ import top.tobyprime.mcedia_mtv.client.channel.worldui.WorldUiControlSender;
 import top.tobyprime.mcedia_mtv.client.channel.worldui.MtvWorldUiWatchPayload;
 import top.tobyprime.mcedia_mtv.client.channel.worldui.MtvWorldUiUnwatchPayload;
 import top.tobyprime.mcedia_mtv.client.channel.worldui.WorldUiPlaylistCache;
+import top.tobyprime.mcedia_mtv.client.channel.worldui.MtvWorldUiControlStatePayload;
+import top.tobyprime.mcedia_mtv.client.channel.worldui.WorldUiControlStateCache;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,6 +38,7 @@ public final class MtvClientChannelPayloads {
         PayloadTypeRegistry.playS2C().register(MtvWorldUiPlaylistManifestPayload.TYPE, MtvWorldUiPlaylistManifestPayload.CODEC);
         PayloadTypeRegistry.playS2C().register(MtvWorldUiPlaylistPagePayload.TYPE, MtvWorldUiPlaylistPagePayload.CODEC);
         PayloadTypeRegistry.playS2C().register(MtvWorldUiControlResultPayload.TYPE, MtvWorldUiControlResultPayload.CODEC);
+        PayloadTypeRegistry.playS2C().register(MtvWorldUiControlStatePayload.TYPE, MtvWorldUiControlStatePayload.CODEC);
         PayloadTypeRegistry.playC2S().register(MtvChannelClientSubscribePayload.TYPE, MtvChannelClientSubscribePayload.CODEC);
         PayloadTypeRegistry.playC2S().register(MtvChannelClientUnsubscribePayload.TYPE, MtvChannelClientUnsubscribePayload.CODEC);
         PayloadTypeRegistry.playC2S().register(MtvChannelClientHeartbeatPayload.TYPE, MtvChannelClientHeartbeatPayload.CODEC);
@@ -67,6 +70,9 @@ public final class MtvClientChannelPayloads {
         ClientPlayNetworking.registerGlobalReceiver(MtvWorldUiControlResultPayload.TYPE, (payload, context) ->
                 safeHandle("world_ui_control_result", "", payload.result().revision(), () ->
                         WorldUiControlSender.getInstance().onResult(payload.result())));
+        ClientPlayNetworking.registerGlobalReceiver(MtvWorldUiControlStatePayload.TYPE, (payload, context) ->
+                safeHandle("world_ui_control_state", payload.state().channelId(), payload.state().channelRevision(), () ->
+                        WorldUiControlStateCache.getInstance().apply(payload.state())));
         ClientPlayConnectionEvents.JOIN.register(MtvClientChannelPayloads::onJoin);
         ClientPlayConnectionEvents.DISCONNECT.register(MtvClientChannelPayloads::onDisconnect);
         LOGGER.debug("Registered MTV client channel payloads and connection listeners");
@@ -89,6 +95,7 @@ public final class MtvClientChannelPayloads {
         lifecycle.onJoin();
         WorldUiCapabilityState.getInstance().clear();
         WorldUiPlaylistCache.getInstance().clear();
+        WorldUiControlStateCache.getInstance().clear();
         LOGGER.info("Open MTV client channel state: server={}, existing sessions retained for join payloads",
                 client.getCurrentServer() == null ? "singleplayer" : client.getCurrentServer().ip);
     }
@@ -103,5 +110,6 @@ public final class MtvClientChannelPayloads {
         lifecycle.onDisconnect();
         WorldUiCapabilityState.getInstance().clear();
         WorldUiPlaylistCache.getInstance().clear();
+        WorldUiControlStateCache.getInstance().clear();
     }
 }

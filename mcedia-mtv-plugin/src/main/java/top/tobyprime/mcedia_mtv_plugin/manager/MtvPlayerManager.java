@@ -32,6 +32,7 @@ public class MtvPlayerManager {
 
     private final JavaPlugin plugin;
     private final MtvChannelService channelService;
+    private volatile Consumer<UUID> playerStateChangeListener = ignored -> { };
 
     public MtvPlayerManager(JavaPlugin plugin) {
         this.plugin = plugin;
@@ -44,6 +45,10 @@ public class MtvPlayerManager {
 
     public JavaPlugin getPlugin() {
         return plugin;
+    }
+
+    public void setPlayerStateChangeListener(Consumer<UUID> listener) {
+        playerStateChangeListener = listener == null ? ignored -> { } : listener;
     }
 
 
@@ -219,6 +224,7 @@ public class MtvPlayerManager {
                 return Boolean.FALSE;
             }
             applyEntityState(display, player);
+            if (player.getUuid() != null) playerStateChangeListener.accept(player.getUuid());
             return Boolean.TRUE;
         }, result -> done.accept(Boolean.TRUE.equals(result)));
     }

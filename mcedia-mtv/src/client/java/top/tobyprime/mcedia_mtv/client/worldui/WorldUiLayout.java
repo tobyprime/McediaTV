@@ -28,7 +28,9 @@ public final class WorldUiLayout {
             return new WorldUiHit(WorldUiHit.Kind.PLAYLIST_ITEM, row);
         }
         if (playlistExpanded && v >= 0.04F && v <= 0.09F) {
-            if (u >= 0.70F && u <= 0.82F) return new WorldUiHit(WorldUiHit.Kind.SET_PLAY_ORDER);
+            if (u >= 0.70F && u <= 0.76F) return new WorldUiHit(WorldUiHit.Kind.SET_PLAY_ORDER);
+            if (u >= 0.77F && u <= 0.81F) return new WorldUiHit(WorldUiHit.Kind.PLAYLIST_PREVIOUS_PAGE);
+            if (u >= 0.82F && u <= 0.86F) return new WorldUiHit(WorldUiHit.Kind.PLAYLIST_NEXT_PAGE);
             if (u >= 0.88F && u <= 0.98F) return new WorldUiHit(WorldUiHit.Kind.CLEAR_PLAYLIST);
         }
         if (u >= 0.76F && u <= 0.82F && v >= 0.68F && v <= 0.80F) {

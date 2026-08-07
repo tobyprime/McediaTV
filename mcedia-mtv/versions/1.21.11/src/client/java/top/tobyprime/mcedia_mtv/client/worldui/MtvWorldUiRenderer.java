@@ -10,6 +10,7 @@ import org.joml.Vector3f;
 import top.tobyprime.mcedia_mtv.client.channel.ClientChannelPlaybackManager;
 import top.tobyprime.mcedia_mtv.client.channel.ClientChannelPlaybackSnapshot;
 import top.tobyprime.mcedia_mtv.client.channel.worldui.WorldUiPlaylistCache;
+import top.tobyprime.mcedia_mtv.client.channel.worldui.WorldUiControlStateCache;
 import top.tobyprime.mcedia_mtv.client.entityplayer.EntityPlayerHandle;
 import top.tobyprime.mcedia_mtv.client.entityplayer.EntityPlayerManager;
 
@@ -47,7 +48,8 @@ public final class MtvWorldUiRenderer {
         quad(vertex, pose, camera, screen.plane(), .02F, .65F, .98F, .98F, 0xD0101010);
         drawProgress(vertex, pose, camera, screen.plane(), snapshot);
         drawTransport(vertex, pose, camera, screen.plane());
-        drawVolume(vertex, pose, camera, screen.plane());
+        float volume = WorldUiControlStateCache.getInstance().state(screen.mtvUuid()) == null ? 1.0F : WorldUiControlStateCache.getInstance().state(screen.mtvUuid()).masterVolume();
+        drawVolume(vertex, pose, camera, screen.plane(), volume);
         if (PRESENTATION.isPlaylistExpanded()) drawPlaylist(vertex, pose, camera, screen.plane(), snapshot);
         quad(vertex, pose, camera, screen.plane(), .93F, .93F, .99F, .99F, 0xD9242828);
     }
@@ -61,29 +63,36 @@ public final class MtvWorldUiRenderer {
     }
 
     private static void drawTransport(VertexConsumer vertex, PoseStack.Pose pose, Vec3 camera, WorldUiScreenRaycast.Screen screen) {
+        quad(vertex, pose, camera, screen, .20F, .69F, .28F, .79F, 0xFF333333);
         quad(vertex, pose, camera, screen, .30F, .69F, .42F, .79F, 0xFF333333);
         quad(vertex, pose, camera, screen, .44F, .69F, .56F, .79F, 0xFFE0E0E0);
         quad(vertex, pose, camera, screen, .58F, .69F, .70F, .79F, 0xFF333333);
         quad(vertex, pose, camera, screen, .76F, .69F, .82F, .79F, 0xFF333333);
         quad(vertex, pose, camera, screen, .77F, .71F, .81F, .72F, 0xFFE0E0E0);
         quad(vertex, pose, camera, screen, .77F, .74F, .81F, .75F, 0xFFE0E0E0);
+        quad(vertex, pose, camera, screen, .90F, .69F, .96F, .79F, 0xFF333333);
     }
 
-    private static void drawVolume(VertexConsumer vertex, PoseStack.Pose pose, Vec3 camera, WorldUiScreenRaycast.Screen screen) {
+    private static void drawVolume(VertexConsumer vertex, PoseStack.Pose pose, Vec3 camera, WorldUiScreenRaycast.Screen screen, float volume) {
         quad(vertex, pose, camera, screen, .84F, .72F, .96F, .76F, 0xFF373737);
-        quad(vertex, pose, camera, screen, .84F, .72F, .93F, .76F, 0xFFE0E0E0);
+        quad(vertex, pose, camera, screen, .84F, .72F, .84F + .12F * Math.max(0.0F, Math.min(1.0F, volume)), .76F, 0xFFE0E0E0);
     }
 
     private static void drawPlaylist(VertexConsumer vertex, PoseStack.Pose pose, Vec3 camera, WorldUiScreenRaycast.Screen screen, ClientChannelPlaybackSnapshot snapshot) {
         quad(vertex, pose, camera, screen, .68F, .04F, .98F, .64F, 0xE0161616);
         quad(vertex, pose, camera, screen, .70F, .05F, .82F, .09F, 0xFF3A3A3A);
+        quad(vertex, pose, camera, screen, .77F, .05F, .81F, .09F, 0xFF555555);
+        quad(vertex, pose, camera, screen, .82F, .05F, .86F, .09F, 0xFF555555);
         quad(vertex, pose, camera, screen, .88F, .05F, .98F, .09F, 0xFF3A3A3A);
         WorldUiPlaylistCache.getInstance().manifest(snapshot.channelId()).ifPresent(manifest -> {
-            var page = WorldUiPlaylistCache.getInstance().pageAt(snapshot.channelId(), 0).orElse(null);
+            int start = PRESENTATION.playlistStart();
+            var page = WorldUiPlaylistCache.getInstance().pageAt(snapshot.channelId(), (start / 32) * 32).orElse(null);
             for (int row = 0; row < 7; row++) {
                 float top = .10F + row * .08F, bottom = top + .065F;
-                boolean present = page != null && row < page.mediaUrls().size();
-                boolean current = present && row == manifest.cursor();
+                int index = start + row;
+                int pageIndex = page == null ? -1 : index - page.offset();
+                boolean present = pageIndex >= 0 && pageIndex < page.mediaUrls().size();
+                boolean current = present && index == manifest.cursor();
                 quad(vertex, pose, camera, screen, .70F, top, .98F, bottom, current ? 0xFF666666 : 0xFF292929);
                 if (present) {
                     quad(vertex, pose, camera, screen, .80F, top + .01F, .84F, bottom - .01F, 0xFF515151);

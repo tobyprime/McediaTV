@@ -9,6 +9,7 @@ import top.tobyprime.mcedia_mtv.client.channel.worldui.WorldUiCapabilityState;
 import top.tobyprime.mcedia_mtv.client.channel.worldui.WorldUiControlSender;
 import top.tobyprime.mcedia_mtv.client.channel.worldui.WorldUiPlaylistCache;
 import top.tobyprime.mcedia_mtv.client.channel.worldui.WorldUiPlaylistPageSender;
+import top.tobyprime.mcedia_mtv.client.channel.worldui.WorldUiControlStateCache;
 import top.tobyprime.mcedia_mtv.client.entityplayer.EntityPlayerHandle;
 import top.tobyprime.mcedia_mtv.client.entityplayer.EntityPlayerManager;
 
@@ -25,7 +26,7 @@ public final class MtvWorldUiInputHook {
         if (!WorldUiCapabilityState.getInstance().supported() || client.screen != null || client.player == null) { reset(); return; }
         var selection = select(client);
         if (selection == null) MtvWorldUiRenderer.presentation().clearHover();
-        else { MtvWorldUiRenderer.presentation().update(selection.target(), selection.u(), selection.v()); INTERACTION.refreshTarget(selection.target()); WorldUiPlaylistCache.getInstance().manifest(selection.target().channelId()).ifPresent(m -> INTERACTION.setPlayOrderMode(m.playOrderMode())); }
+        else { MtvWorldUiRenderer.presentation().update(selection.target(), selection.u(), selection.v()); INTERACTION.refreshTarget(selection.target()); var controlState = WorldUiControlStateCache.getInstance().state(selection.target().mtvUuid()); if (controlState != null) INTERACTION.setMasterVolume(controlState.masterVolume()); WorldUiPlaylistCache.getInstance().manifest(selection.target().channelId()).ifPresent(m -> INTERACTION.setPlayOrderMode(m.playOrderMode())); }
         boolean down = client.options.keyAttack.isDown();
         if (down && !primaryDown && selection != null) {
             var presentation = MtvWorldUiRenderer.presentation();
@@ -40,6 +41,15 @@ public final class MtvWorldUiInputHook {
                 if (hit.kind() == WorldUiHit.Kind.QUEUE) {
                     presentation.togglePlaylist();
                     if (presentation.isPlaylistExpanded()) requestVisiblePage(selection.target());
+                    primaryDown = down;
+                    return;
+                }
+                if (hit.kind() == WorldUiHit.Kind.PLAYLIST_PREVIOUS_PAGE || hit.kind() == WorldUiHit.Kind.PLAYLIST_NEXT_PAGE) {
+                    WorldUiPlaylistCache.getInstance().manifest(selection.target().channelId()).ifPresent(manifest -> {
+                        if (hit.kind() == WorldUiHit.Kind.PLAYLIST_PREVIOUS_PAGE) presentation.previousPlaylistPage();
+                        else presentation.nextPlaylistPage(manifest.itemCount());
+                        requestVisiblePage(selection.target());
+                    });
                     primaryDown = down;
                     return;
                 }
@@ -74,11 +84,19 @@ public final class MtvWorldUiInputHook {
     private static void reset() { MtvWorldUiRenderer.presentation().clearHover(); MtvWorldUiRenderer.presentation().collapse(); if (primaryDown && consumesAttack) INTERACTION.collapse(); primaryDown = false; consumesAttack = false; }
     private static void requestVisiblePage(WorldUiInteractionState.Target target) {
         WorldUiPlaylistCache.getInstance().manifest(target.channelId()).ifPresent(manifest -> {
-            int end = Math.min(7, Math.max(0, manifest.itemCount() - 1));
-            for (int offset : WorldUiPlaylistCache.getInstance().missingOffsetsForVisibleRange(target.channelId(), 0, end)) {
-                WorldUiPlaylistPageSender.request(target.channelId(), manifest.revision(), offset);
-            }
+            int start = MtvWorldUiRenderer.presentation().playlistStart();
+            int last = Math.max(0, manifest.itemCount() - 1);
+            requestRange(target.channelId(), manifest.revision(), start, Math.min(last, start + 7));
+            requestRange(target.channelId(), manifest.revision(), Math.max(0, manifest.cursor() - 1), Math.min(last, manifest.cursor() + 1));
+            requestRange(target.channelId(), manifest.revision(), Math.max(0, start - 32), Math.min(last, start + 31));
+            requestRange(target.channelId(), manifest.revision(), start + 32, Math.min(last, start + 63));
         });
+    }
+    private static void requestRange(String channelId, long revision, int start, int end) {
+        if (end < start) return;
+        for (int offset : WorldUiPlaylistCache.getInstance().missingOffsetsForVisibleRange(channelId, start, end)) {
+            WorldUiPlaylistPageSender.request(channelId, revision, offset);
+        }
     }
     private static boolean hasCachedItem(String channelId, int index) {
         if (index < 0) return false;

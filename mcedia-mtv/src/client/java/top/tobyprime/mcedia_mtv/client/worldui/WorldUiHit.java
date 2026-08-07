@@ -18,7 +18,9 @@ public record WorldUiHit(Kind kind, int index) {
         MOVE_FRONT,
         MOVE_BACK,
         CLEAR_PLAYLIST,
-        SET_PLAY_ORDER
+        SET_PLAY_ORDER,
+        PLAYLIST_PREVIOUS_PAGE,
+        PLAYLIST_NEXT_PAGE
     }
 
     public static final WorldUiHit NONE = new WorldUiHit(Kind.NONE, -1);

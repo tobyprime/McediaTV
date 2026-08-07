@@ -10,6 +10,7 @@ import java.util.Set;
 
 public final class WorldUiPlaylistCache {
     private static final int PAGE_SIZE = 32;
+    private static final int MAX_PENDING_REQUESTS = 4;
     private static final WorldUiPlaylistCache INSTANCE = new WorldUiPlaylistCache();
 
     private final Map<String, ChannelPages> channels = new HashMap<>();
@@ -61,7 +62,7 @@ public final class WorldUiPlaylistCache {
         int last = (Math.min(visibleEnd, state.manifest.itemCount() - 1) / PAGE_SIZE) * PAGE_SIZE;
         var missing = new ArrayList<Integer>();
         for (int offset = first; offset <= last; offset += PAGE_SIZE) {
-            if (!state.pages.containsKey(offset) && state.pendingOffsets.add(offset)) {
+            if (!state.pages.containsKey(offset) && state.pendingOffsets.size() < MAX_PENDING_REQUESTS && state.pendingOffsets.add(offset)) {
                 missing.add(offset);
             }
         }

@@ -62,4 +62,10 @@ class MtvChannelProtocolWorldUiTest {
 
         assertThrows(IllegalArgumentException.class, () -> MtvChannelProtocol.readControlRequest(buffer));
     }
+
+    @Test
+    void controlStateRoundTrips() {
+        var state = new WorldUiControlState(UUID.randomUUID(), "channel", .35F, true, 19L);
+        assertEquals(state, MtvChannelProtocol.decodeWorldUiControlState(MtvChannelProtocol.encodeWorldUiControlState(state)));
+    }
 }

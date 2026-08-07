@@ -14,6 +14,7 @@ public final class WorldUiPresentationState {
     private float hoveredV;
     private WorldUiInteractionState.Target expandedTarget;
     private boolean playlistExpanded;
+    private int playlistStart;
 
     public void update(WorldUiInteractionState.Target target, float u, float v) {
         hoveredTarget = target;
@@ -30,11 +31,14 @@ public final class WorldUiPresentationState {
 
     public void expand(WorldUiInteractionState.Target target) {
         expandedTarget = Objects.requireNonNull(target, "target");
+        playlistExpanded = false;
+        playlistStart = 0;
     }
 
     public void collapse() {
         expandedTarget = null;
         playlistExpanded = false;
+        playlistStart = 0;
     }
 
     public boolean isExpanded(WorldUiInteractionState.Target target) {
@@ -52,7 +56,11 @@ public final class WorldUiPresentationState {
         if (hoveredTarget == null) {
             return WorldUiHit.NONE;
         }
-        return layout.hit(hoveredU, hoveredV, isExpanded(hoveredTarget), playlistExpanded);
+        WorldUiHit hit = layout.hit(hoveredU, hoveredV, isExpanded(hoveredTarget), playlistExpanded);
+        return switch (hit.kind()) {
+            case PLAYLIST_ITEM, REMOVE_ITEM, MOVE_FRONT, MOVE_BACK -> new WorldUiHit(hit.kind(), playlistStart + hit.index());
+            default -> hit;
+        };
     }
 
     public WorldUiInteractionState.Target hoveredTarget() {
@@ -73,6 +81,20 @@ public final class WorldUiPresentationState {
 
     public void togglePlaylist() {
         playlistExpanded = !playlistExpanded;
+        if (!playlistExpanded) playlistStart = 0;
+    }
+
+    public int playlistStart() {
+        return playlistStart;
+    }
+
+    public void previousPlaylistPage() {
+        playlistStart = Math.max(0, playlistStart - 8);
+    }
+
+    public void nextPlaylistPage(int itemCount) {
+        int lastStart = Math.max(0, ((Math.max(0, itemCount) - 1) / 8) * 8);
+        playlistStart = Math.min(lastStart, playlistStart + 8);
     }
 
     private static boolean sameScreen(WorldUiInteractionState.Target first, WorldUiInteractionState.Target second) {

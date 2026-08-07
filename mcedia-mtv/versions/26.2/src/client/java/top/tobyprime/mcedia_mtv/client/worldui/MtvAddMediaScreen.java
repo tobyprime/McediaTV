@@ -8,6 +8,7 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import top.tobyprime.mcedia_mtv.client.channel.worldui.WorldUiControlSender;
 import top.tobyprime.mcedia_mtv.client.metadata.MtvMediaMetadata;
+import top.tobyprime.mcedia_mtv.client.metadata.MtvMediaCoverCache;
 
 /** Full-screen local URL preview and bounded playlist insertion controls. */
 public final class MtvAddMediaScreen extends Screen {
@@ -32,7 +33,7 @@ public final class MtvAddMediaScreen extends Screen {
     @Override public void tick() {
         super.tick(); boolean enabled = model.canConfirm(); if (prepend != null) { prepend.active = enabled; insertNext.active = enabled; append.active = enabled; playNow.active = enabled; }
         model.onControlResult(WorldUiControlSender.getInstance().lastResult());
-        MtvMediaMetadata metadata = model.preview(); previewText.setMessage(Component.literal(metadata == null ? (model.resolving() ? "Resolving locally..." : "Waiting for local preview") : "Title: " + metadata.title() + " | Author: " + metadata.author() + " | Platform: " + metadata.platform() + " | Description: " + metadata.description() + " | Cover: " + (metadata.coverUrl().isBlank() ? "fallback" : "local cover")));
+        MtvMediaMetadata metadata = model.preview(); previewText.setMessage(Component.literal(metadata == null ? (model.resolving() ? "Resolving locally..." : "Waiting for local preview") : "Title: " + metadata.title() + " | Author: " + metadata.author() + " | Platform: " + metadata.platform() + " | Description: " + metadata.description() + " | Cover: " + MtvMediaCoverCache.getInstance().statusLabel(metadata.coverUrl())));
         if (model.consumeAccepted()) minecraft.gui.setScreen(null);
     }
 }

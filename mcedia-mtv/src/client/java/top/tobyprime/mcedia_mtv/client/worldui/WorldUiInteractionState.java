@@ -19,6 +19,8 @@ public final class WorldUiInteractionState {
     private float dragV;
     private int speedIndex;
     private String playOrderMode = "SEQUENTIAL";
+    private float masterVolume = 1.0F;
+    private float savedVolume = 1.0F;
 
     public WorldUiInteractionState(ControlSender sender) {
         this.sender = Objects.requireNonNull(sender, "sender");
@@ -37,6 +39,12 @@ public final class WorldUiInteractionState {
 
     public void setPlayOrderMode(String mode) {
         if (mode != null && !mode.isBlank()) playOrderMode = mode;
+    }
+
+    public void setMasterVolume(float volume) {
+        if (!Float.isFinite(volume)) return;
+        masterVolume = Math.max(0.0F, Math.min(1.0F, volume));
+        if (masterVolume > 0.0F) savedVolume = masterVolume;
     }
 
     public void onPrimaryPress(Target target, WorldUiHit hit, float u, float v, long durationUs) {
@@ -110,7 +118,7 @@ public final class WorldUiInteractionState {
             case NEXT -> WorldUiControlOperation.NEXT;
             case PREVIOUS -> WorldUiControlOperation.PREVIOUS;
             case SPEED -> WorldUiControlOperation.SET_SPEED;
-            case MUTE -> WorldUiControlOperation.TOGGLE_MUTE;
+            case MUTE -> WorldUiControlOperation.SET_MASTER_VOLUME;
             case PLAYLIST_ITEM -> WorldUiControlOperation.PLAY_INDEX;
             case REMOVE_ITEM -> WorldUiControlOperation.REMOVE;
             case MOVE_FRONT -> WorldUiControlOperation.MOVE_FRONT;
@@ -124,6 +132,7 @@ public final class WorldUiInteractionState {
                 case PLAYLIST_ITEM, REMOVE_ITEM, MOVE_FRONT, MOVE_BACK -> new WorldUiControlArgument.PlaylistIndex(hit.index());
                 case SET_PLAY_ORDER -> new WorldUiControlArgument.PlayOrderMode(nextPlayOrderMode());
                 case SPEED -> new WorldUiControlArgument.Scalar(nextSpeed());
+                case MUTE -> new WorldUiControlArgument.Scalar(masterVolume <= 0.0F ? savedVolume : 0.0F);
                 default -> WorldUiControlArgument.None.INSTANCE;
             };
             send(target, dragU, dragV, operation, argument);

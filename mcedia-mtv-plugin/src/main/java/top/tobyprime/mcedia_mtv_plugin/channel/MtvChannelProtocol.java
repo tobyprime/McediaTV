@@ -5,6 +5,7 @@ import net.minecraft.network.FriendlyByteBuf;
 
 import top.tobyprime.mcedia_mtv_plugin.channel.worldui.WorldUiPlaylistManifest;
 import top.tobyprime.mcedia_mtv_plugin.channel.worldui.WorldUiPlaylistPage;
+import top.tobyprime.mcedia_mtv_plugin.channel.worldui.WorldUiControlState;
 import top.tobyprime.mcedia_mtv_plugin.channel.worldui.WorldUiPlaylistPageRequest;
 import top.tobyprime.mcedia_mtv_plugin.channel.worldui.WorldUiCapabilities;
 import top.tobyprime.mcedia_mtv_plugin.channel.worldui.WorldUiControlArgument;
@@ -34,6 +35,7 @@ public final class MtvChannelProtocol {
     public static final String CHANNEL_CONTROL_RESULT = "mcedia_mtv:channel_control_result";
     public static final String CHANNEL_WORLD_UI_WATCH = "mcedia_mtv:channel_world_ui_watch";
     public static final String CHANNEL_WORLD_UI_UNWATCH = "mcedia_mtv:channel_world_ui_unwatch";
+    public static final String WORLD_UI_CONTROL_STATE = "mcedia_mtv:world_ui_control_state";
     public static final int WORLD_UI_PROTOCOL_VERSION = 1;
     public static final int MAX_PLAYLIST_PAGE_ITEMS = 32;
     public static final int MAX_PLAYLIST_PAGE_BYTES = 24 * 1024;
@@ -44,6 +46,7 @@ public final class MtvChannelProtocol {
     private static final int MAX_PLAY_ORDER_MODE_LENGTH = 32;
     private static final int MAX_CONTROL_REQUEST_BYTES = 4 * 1024;
     private static final int MAX_CONTROL_RESULT_BYTES = 64;
+    private static final int MAX_CONTROL_STATE_BYTES = 512;
     private static final Set<String> PLAY_ORDER_MODES = Set.of("SEQUENTIAL", "SHUFFLE", "LOOP_ALL", "LOOP_ONE", "CURRENT_ONLY");
 
     private MtvChannelProtocol() {
@@ -301,6 +304,43 @@ public final class MtvChannelProtocol {
         validateControlResult(result);
         ensureFullyRead(buffer, "control result");
         return result;
+    }
+
+    public static byte[] encodeWorldUiControlState(WorldUiControlState state) {
+        var buffer = new FriendlyByteBuf(Unpooled.buffer());
+        writeWorldUiControlState(buffer, state);
+        byte[] encoded = toBytes(buffer);
+        if (encoded.length > MAX_CONTROL_STATE_BYTES) {
+            throw invalidPacket("world UI control state", "encoded length exceeds " + MAX_CONTROL_STATE_BYTES + " bytes");
+        }
+        return encoded;
+    }
+
+    public static WorldUiControlState decodeWorldUiControlState(byte[] message) {
+        if (message == null || message.length > MAX_CONTROL_STATE_BYTES) {
+            throw invalidPacket("world UI control state", "encoded length exceeds " + MAX_CONTROL_STATE_BYTES + " bytes");
+        }
+        return readWorldUiControlState(new FriendlyByteBuf(Unpooled.wrappedBuffer(message)));
+    }
+
+    public static void writeWorldUiControlState(FriendlyByteBuf buffer, WorldUiControlState state) {
+        validateWorldUiControlState(state);
+        buffer.writeUUID(state.mtvUuid());
+        buffer.writeUtf(state.channelId(), MAX_CHANNEL_ID_LENGTH);
+        buffer.writeFloat(state.masterVolume());
+        buffer.writeBoolean(state.canControl());
+        buffer.writeLong(state.channelRevision());
+    }
+
+    public static WorldUiControlState readWorldUiControlState(FriendlyByteBuf buffer) {
+        if (buffer.readableBytes() > MAX_CONTROL_STATE_BYTES) {
+            throw invalidPacket("world UI control state", "encoded length exceeds " + MAX_CONTROL_STATE_BYTES + " bytes");
+        }
+        var state = new WorldUiControlState(buffer.readUUID(), buffer.readUtf(MAX_CHANNEL_ID_LENGTH),
+                buffer.readFloat(), buffer.readBoolean(), buffer.readLong());
+        validateWorldUiControlState(state);
+        ensureFullyRead(buffer, "world UI control state");
+        return state;
     }
 
     public static byte[] encodePlaylistPage(WorldUiPlaylistPage page) {
@@ -570,6 +610,14 @@ public final class MtvChannelProtocol {
         if (result == null || result.requestId() < 0L || result.revision() < 0L || result.error() == null
                 || result.accepted() != (result.error() == WorldUiControlError.NONE)) {
             throw invalidPacket("control result", "field is invalid");
+        }
+    }
+
+    private static void validateWorldUiControlState(WorldUiControlState state) {
+        if (state == null || state.mtvUuid() == null || state.channelId() == null || state.channelId().isBlank()
+                || state.channelId().length() > MAX_CHANNEL_ID_LENGTH || !Float.isFinite(state.masterVolume())
+                || state.masterVolume() < 0.0F || state.masterVolume() > 1.0F || state.channelRevision() < 0L) {
+            throw invalidPacket("world UI control state", "field is invalid");
         }
     }
 

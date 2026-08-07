@@ -6,6 +6,7 @@ import top.tobyprime.mcedia_mtv.client.channel.worldui.WorldUiControlRequest;
 import top.tobyprime.mcedia_mtv.client.channel.worldui.WorldUiControlResult;
 import top.tobyprime.mcedia_mtv.client.metadata.MtvMediaMetadata;
 import top.tobyprime.mcedia_mtv.client.metadata.MtvMediaMetadataCache;
+import top.tobyprime.mcedia_mtv.client.metadata.MtvMediaCoverCache;
 
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
@@ -45,6 +46,9 @@ public final class WorldUiAddMediaModel {
             resolving = false;
             preview = failure == null && metadata != null
                     ? metadata : MtvMediaMetadata.failed(resolvingInput, failure == null ? "no metadata" : failure.getMessage());
+            if (preview.status() == MtvMediaMetadata.Status.RESOLVED && !preview.coverUrl().isBlank()) {
+                MtvMediaCoverCache.getInstance().loadAsync(preview.coverUrl());
+            }
         });
     }
 

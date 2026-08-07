@@ -78,7 +78,8 @@ class WorldUiLayoutTest {
         state.onPrimaryPress(target, layout.hit(.92F, .72F, true), .92F, .72F, 1L);
         assertEquals("SET_SPEED", sender.requests.get(0).operation().name());
         assertEquals(new WorldUiControlArgument.Scalar(.5F), sender.requests.get(0).argument());
-        assertEquals("TOGGLE_MUTE", sender.requests.get(1).operation().name());
+        assertEquals("SET_MASTER_VOLUME", sender.requests.get(1).operation().name());
+        assertEquals(new WorldUiControlArgument.Scalar(0.0F), sender.requests.get(1).argument());
     }
 
     private static final class RecordingSender implements WorldUiInteractionState.ControlSender {

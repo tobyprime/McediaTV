@@ -137,4 +137,15 @@ class WorldUiProtocolTest {
 
         assertEquals(request, MtvChannelProtocol.decodeWatchRequest(MtvChannelProtocol.encodeWatchRequest(request)));
     }
+
+    @Test
+    void controlStateRoundTripsAndRejectsTrailingBytes() {
+        var state = new WorldUiControlState(UUID.randomUUID(), "channel", .35F, true, 19L);
+        assertEquals(state, MtvChannelProtocol.decodeWorldUiControlState(MtvChannelProtocol.encodeWorldUiControlState(state)));
+
+        var buffer = new FriendlyByteBuf(Unpooled.buffer());
+        MtvChannelProtocol.writeWorldUiControlState(buffer, state);
+        buffer.writeByte(1);
+        assertThrows(IllegalArgumentException.class, () -> MtvChannelProtocol.readWorldUiControlState(buffer));
+    }
 }

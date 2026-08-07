@@ -43,6 +43,7 @@ public final class McediaMtvPlugin extends JavaPlugin {
         channelService.loadPersistedStates();
         channelService.getAudienceSessionManager().setActiveTimeoutMs(AUDIENCE_TIMEOUT_MS);
         this.networkService = new MtvChannelNetworkService(this, channelService);
+        manager.setPlayerStateChangeListener(networkService::publishControlState);
         channelService.setChangeListener(networkService::publishSnapshot);
         channelService.setPlaylistChangeListener(networkService::publishPlaylistManifest);
         channelService.setRemoveListener(networkService::invalidateChannel);
@@ -84,6 +85,7 @@ public final class McediaMtvPlugin extends JavaPlugin {
             currentManager.getChannelService().setChangeListener(null);
             currentManager.getChannelService().setPlaylistChangeListener(null);
             currentManager.getChannelService().setRemoveListener(null);
+            currentManager.setPlayerStateChangeListener(null);
         }
         if (audiencePruneTask != null) {
             audiencePruneTask.cancel();
