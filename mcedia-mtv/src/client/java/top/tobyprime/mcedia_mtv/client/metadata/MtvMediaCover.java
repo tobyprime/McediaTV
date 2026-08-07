@@ -14,6 +14,11 @@ public record MtvMediaCover(
         bytes = bytes == null ? new byte[0] : bytes.clone();
     }
 
+    @Override
+    public byte[] bytes() {
+        return bytes.clone();
+    }
+
     public static MtvMediaCover failed(String url, String reason) {
         return new MtvMediaCover(url == null ? "" : url, new byte[0], 0, 0, Status.FAILED,
                 reason == null || reason.isBlank() ? "cover unavailable" : reason);
