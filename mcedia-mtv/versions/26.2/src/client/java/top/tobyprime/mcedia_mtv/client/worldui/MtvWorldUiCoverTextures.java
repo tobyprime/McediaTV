@@ -39,6 +39,11 @@ final class MtvWorldUiCoverTextures {
     }
 
     static void clear() {
-        TEXTURES.clear();
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.isSameThread()) {
+            TEXTURES.clear();
+        } else {
+            minecraft.execute(TEXTURES::clear);
+        }
     }
 }
