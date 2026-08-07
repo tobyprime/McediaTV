@@ -3,6 +3,7 @@ package top.tobyprime.mcedia_mtv.client.worldui;
 import top.tobyprime.mcedia_mtv.client.channel.worldui.WorldUiControlArgument;
 import top.tobyprime.mcedia_mtv.client.channel.worldui.WorldUiControlOperation;
 import top.tobyprime.mcedia_mtv.client.channel.worldui.WorldUiControlRequest;
+import top.tobyprime.mcedia_mtv.client.channel.worldui.WorldUiControlResult;
 import top.tobyprime.mcedia_mtv.client.metadata.MtvMediaMetadata;
 import top.tobyprime.mcedia_mtv.client.metadata.MtvMediaMetadataCache;
 
@@ -18,6 +19,8 @@ public final class WorldUiAddMediaModel {
     private String input = "";
     private MtvMediaMetadata preview;
     private boolean resolving;
+    private long pendingRequestId;
+    private boolean accepted;
 
     public WorldUiAddMediaModel(MtvMediaMetadataCache cache) {
         this(cache::resolveAsync);
@@ -66,9 +69,25 @@ public final class WorldUiAddMediaModel {
         if (target == null || sender == null || mode == null || !canConfirm()) {
             return false;
         }
-        sender.send(new WorldUiControlRequest(target.mtvUuid(), target.screenId(), target.channelId(), requestIds.incrementAndGet(),
+        pendingRequestId = requestIds.incrementAndGet();
+        accepted = false;
+        sender.send(new WorldUiControlRequest(target.mtvUuid(), target.screenId(), target.channelId(), pendingRequestId,
                 target.revision(), 0.5F, 0.5F, mode.operation, new WorldUiControlArgument.MediaUrl(preview.normalizedUrl())));
         return true;
+    }
+
+    /** Applies the asynchronous server result without discarding a rejected local preview. */
+    public void onControlResult(WorldUiControlResult result) {
+        if (result != null && result.requestId() == pendingRequestId && result.accepted()) {
+            accepted = true;
+        }
+    }
+
+    /** Returns true exactly once after this model's add request was accepted. */
+    public boolean consumeAccepted() {
+        boolean result = accepted;
+        accepted = false;
+        return result;
     }
 
     public enum AddMode {

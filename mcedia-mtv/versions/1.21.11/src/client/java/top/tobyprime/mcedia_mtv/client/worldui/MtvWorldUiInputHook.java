@@ -30,6 +30,11 @@ public final class MtvWorldUiInputHook {
             var hit = presentation.hit();
             consumesAttack = hit.kind() != WorldUiHit.Kind.NONE && (hit.isToggle() || presentation.isExpanded(selection.target()));
             if (consumesAttack) {
+                if (hit.kind() == WorldUiHit.Kind.ADD_MEDIA) {
+                    MtvAddMediaScreen.open(client, selection.target());
+                    primaryDown = down;
+                    return;
+                }
                 boolean wasExpanded = presentation.isExpanded(selection.target());
                 INTERACTION.onPrimaryPress(selection.target(), hit, selection.u(), selection.v(), selection.durationUs());
                 if (hit.isToggle()) { if (wasExpanded) presentation.collapse(); else presentation.expand(selection.target()); }

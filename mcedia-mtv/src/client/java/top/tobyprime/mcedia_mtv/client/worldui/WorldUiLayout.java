@@ -34,6 +34,9 @@ public final class WorldUiLayout {
             if (u >= 0.30F && u <= 0.42F) {
                 return new WorldUiHit(WorldUiHit.Kind.PREVIOUS);
             }
+            if (u >= 0.76F && u <= 0.82F) {
+                return new WorldUiHit(WorldUiHit.Kind.ADD_MEDIA);
+            }
         }
         return WorldUiHit.NONE;
     }

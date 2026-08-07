@@ -22,6 +22,7 @@ public final class MtvMediaMetadataCache {
         thread.setDaemon(true);
         return thread;
     });
+    private static final MtvMediaMetadataCache INSTANCE = new MtvMediaMetadataCache();
 
     private final int capacity;
     private final Executor executor;
@@ -41,6 +42,10 @@ public final class MtvMediaMetadataCache {
         this.capacity = capacity;
         this.executor = Objects.requireNonNull(executor, "executor");
         this.resolver = Objects.requireNonNull(resolver, "resolver");
+    }
+
+    public static MtvMediaMetadataCache getInstance() {
+        return INSTANCE;
     }
 
     public CompletableFuture<MtvMediaMetadata> resolveAsync(String rawUrl) {

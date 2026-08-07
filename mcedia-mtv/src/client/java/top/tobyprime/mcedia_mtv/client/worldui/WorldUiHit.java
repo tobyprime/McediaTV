@@ -8,7 +8,8 @@ public record WorldUiHit(Kind kind) {
         VOLUME,
         TOGGLE_PAUSE,
         NEXT,
-        PREVIOUS
+        PREVIOUS,
+        ADD_MEDIA
     }
 
     public static final WorldUiHit NONE = new WorldUiHit(Kind.NONE);

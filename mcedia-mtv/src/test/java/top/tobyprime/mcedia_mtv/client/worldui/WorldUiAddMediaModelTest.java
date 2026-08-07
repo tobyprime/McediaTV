@@ -3,6 +3,8 @@ package top.tobyprime.mcedia_mtv.client.worldui;
 import org.junit.jupiter.api.Test;
 import top.tobyprime.mcedia_mtv.client.channel.worldui.WorldUiControlArgument;
 import top.tobyprime.mcedia_mtv.client.channel.worldui.WorldUiControlRequest;
+import top.tobyprime.mcedia_mtv.client.channel.worldui.WorldUiControlError;
+import top.tobyprime.mcedia_mtv.client.channel.worldui.WorldUiControlResult;
 import top.tobyprime.mcedia_mtv.client.metadata.MtvMediaMetadata;
 
 import java.util.ArrayList;
@@ -39,6 +41,21 @@ class WorldUiAddMediaModelTest {
         assertEquals(1, sender.requests.size());
         assertEquals("INSERT_NEXT", sender.requests.getFirst().operation().name());
         assertEquals("https://example.com/video", ((WorldUiControlArgument.MediaUrl) sender.requests.getFirst().argument()).value());
+    }
+
+    @Test
+    void closesOnlyAfterTheMatchingAddRequestIsAccepted() {
+        var sender = new RecordingSender();
+        var metadata = new MtvMediaMetadata("https://example.com/video", "title", "", "", "", "", MtvMediaMetadata.Status.RESOLVED, "");
+        var model = new WorldUiAddMediaModel(url -> CompletableFuture.completedFuture(metadata));
+        model.setInput("https://example.com/video");
+        model.confirm(new WorldUiInteractionState.Target(UUID.randomUUID(), "screen_0", "self:test", 4L), sender, WorldUiAddMediaModel.AddMode.APPEND);
+
+        model.onControlResult(new WorldUiControlResult(1L, false, WorldUiControlError.STALE_REVISION, 5L));
+        assertFalse(model.consumeAccepted());
+        model.onControlResult(new WorldUiControlResult(1L, true, WorldUiControlError.NONE, 5L));
+        assertTrue(model.consumeAccepted());
+        assertFalse(model.consumeAccepted());
     }
 
     private static final class RecordingSender implements WorldUiInteractionState.ControlSender {
