@@ -95,6 +95,7 @@ public final class MtvClientChannelPayloads {
         );
         lifecycle.onJoin();
         WorldUiCapabilityState.getInstance().clear();
+        WorldUiControlSender.getInstance().clearResult();
         WorldUiPlaylistCache.getInstance().clear();
         MtvWorldUiRenderResources.getInstance().clear();
         WorldUiControlStateCache.getInstance().clear();
@@ -111,6 +112,7 @@ public final class MtvClientChannelPayloads {
                 client.getCurrentServer() == null ? "singleplayer" : client.getCurrentServer().ip);
         lifecycle.onDisconnect();
         WorldUiCapabilityState.getInstance().clear();
+        WorldUiControlSender.getInstance().clearResult();
         WorldUiPlaylistCache.getInstance().clear();
         MtvWorldUiRenderResources.getInstance().clear();
         WorldUiControlStateCache.getInstance().clear();

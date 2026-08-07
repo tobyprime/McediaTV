@@ -33,6 +33,7 @@ public final class MtvWorldUiInputHook {
             if (controlState != null) INTERACTION.setMasterVolume(controlState.masterVolume());
             WorldUiPlaylistCache.getInstance().manifest(selection.target().channelId()).ifPresent(m -> INTERACTION.setPlayOrderMode(m.playOrderMode()));
         }
+        if (selection != null && MtvWorldUiRenderer.presentation().isPlaylistExpanded()) requestVisiblePage(selection.target());
         boolean down = client.options.keyAttack.isDown();
         if (down && !primaryDown && selection != null) {
             var presentation = MtvWorldUiRenderer.presentation();

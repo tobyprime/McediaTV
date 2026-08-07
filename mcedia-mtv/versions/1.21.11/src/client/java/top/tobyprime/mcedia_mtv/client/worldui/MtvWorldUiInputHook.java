@@ -27,6 +27,7 @@ public final class MtvWorldUiInputHook {
         var selection = select(client);
         if (selection == null) MtvWorldUiRenderer.presentation().clearHover();
         else { MtvWorldUiRenderer.presentation().update(selection.target(), selection.u(), selection.v()); INTERACTION.refreshTarget(selection.target()); var controlState = WorldUiControlStateCache.getInstance().state(selection.target().mtvUuid()); if (controlState != null) INTERACTION.setMasterVolume(controlState.masterVolume()); WorldUiPlaylistCache.getInstance().manifest(selection.target().channelId()).ifPresent(m -> INTERACTION.setPlayOrderMode(m.playOrderMode())); }
+        if (selection != null && MtvWorldUiRenderer.presentation().isPlaylistExpanded()) requestVisiblePage(selection.target());
         boolean down = client.options.keyAttack.isDown();
         if (down && !primaryDown && selection != null) {
             var presentation = MtvWorldUiRenderer.presentation();

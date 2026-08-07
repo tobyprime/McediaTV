@@ -17,6 +17,11 @@ public final class WorldUiLayout {
         return aspect >= MIN_DETAIL_ASPECT && aspect <= MAX_DETAIL_ASPECT;
     }
 
+    /** The outer hover area that makes the collapsed button visible. */
+    public boolean isToggleTrigger(float u, float v) {
+        return inScreen(u, v) && u >= TOGGLE_TRIGGER_START && v >= TOGGLE_TRIGGER_START;
+    }
+
     public WorldUiHit hit(float u, float v, boolean expanded) {
         return hit(u, v, expanded, false);
     }
@@ -26,7 +31,7 @@ public final class WorldUiLayout {
             return WorldUiHit.NONE;
         }
         if (!expanded) {
-            return u >= TOGGLE_TRIGGER_START && v >= TOGGLE_TRIGGER_START
+            return u >= TOGGLE_BUTTON_START && v >= TOGGLE_BUTTON_START
                     ? new WorldUiHit(WorldUiHit.Kind.TOGGLE) : WorldUiHit.NONE;
         }
         if (u >= TOGGLE_BUTTON_START && v >= TOGGLE_BUTTON_START) {

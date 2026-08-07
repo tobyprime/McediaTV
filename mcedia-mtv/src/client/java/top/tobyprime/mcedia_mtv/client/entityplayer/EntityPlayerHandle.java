@@ -223,7 +223,8 @@ public class EntityPlayerHandle {
         screen.setFillMode(config.fillMode());
         screen.setBackgroundTextureId(config.backgroundTextureId());
         screen.setDanmakuVisible(config.danmakuVisible());
-        screen.setProgressBarVisible(config.progressBarVisible());
+        // MTV renders its own interactive timeline, including for entities saved before the migration.
+        screen.setProgressBarVisible(false);
 
         float width = config.width() > 0.0F ? config.width() : DEFAULT_SCREEN_WIDTH;
         float height = config.height() > 0.0F ? config.height() : DEFAULT_SCREEN_HEIGHT;

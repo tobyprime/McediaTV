@@ -45,4 +45,8 @@ public final class WorldUiControlSender implements WorldUiInteractionState.Contr
     public WorldUiControlResult lastResult() {
         return lastResult;
     }
+
+    public void clearResult() {
+        lastResult = null;
+    }
 }

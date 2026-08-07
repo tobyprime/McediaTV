@@ -75,9 +75,8 @@ public class ScreenSettingsPage extends GuiPage {
             inv.setItem(26, item(danmakuIcon,
                     "§a💬 弹幕: " + (sc.isDanmakuVisible() ? "开" : "关"), "§7点击切换弹幕显示"));
 
-            var progressIcon = sc.isProgressBarVisible() ? Material.LIME_DYE : Material.GRAY_DYE;
-            inv.setItem(35, item(progressIcon,
-                    "§6📊 进度条: " + (sc.isProgressBarVisible() ? "开" : "关"), "§7点击切换进度条显示"));
+            inv.setItem(35, item(Material.GRAY_DYE,
+                    "§6📊 进度条: 世界 UI", "§7由 MTV 屏幕内播放器控制"));
 
             inv.setItem(44, item(Material.STRUCTURE_VOID,
                     "§e↺ 重置显示", "§7亮度/填充/纹理恢复默认"));
@@ -201,9 +200,6 @@ public class ScreenSettingsPage extends GuiPage {
                 case 26 -> context.updateAndRefresh(player, uuid,
                         done -> context.manager().setScreenDanmakuVisible(uuid, periphId,
                                 !sc.isDanmakuVisible(), done));
-                case 35 -> context.updateAndRefresh(player, uuid,
-                        done -> context.manager().setScreenProgressBarVisible(uuid, periphId,
-                                !sc.isProgressBarVisible(), done));
                 case 44 -> context.updateAndRefresh(player, uuid,
                         done -> context.manager().resetScreenBasic(uuid, periphId, done));
 

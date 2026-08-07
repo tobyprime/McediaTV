@@ -49,7 +49,7 @@ public final class WorldUiPresentationState {
         if (target == null) {
             return false;
         }
-        return isExpanded(target) || (sameScreen(target, hoveredTarget) && layout.hit(hoveredU, hoveredV, false).isToggle());
+        return isExpanded(target) || (sameScreen(target, hoveredTarget) && layout.isToggleTrigger(hoveredU, hoveredV));
     }
 
     public WorldUiHit hit() {

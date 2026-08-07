@@ -22,6 +22,17 @@ class WorldUiLayoutTest {
     }
 
     @Test
+    void triggerAreaShowsButtonButDoesNotConsumeClicksOutsideTheButton() {
+        var target = new WorldUiInteractionState.Target(UUID.randomUUID(), "screen_0", "self:test", 1L);
+        var presentation = new WorldUiPresentationState();
+
+        presentation.update(target, 0.91F, 0.91F);
+
+        assertTrue(presentation.shouldRender(target));
+        assertEquals(WorldUiHit.Kind.NONE, presentation.hit().kind());
+    }
+
+    @Test
     void seekSendsOnceOnRelease() {
         var sender = new RecordingSender();
         var target = new WorldUiInteractionState.Target(UUID.randomUUID(), "screen_0", "self:test", 9L);
