@@ -4,8 +4,10 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
 import top.tobyprime.mcedia_mtv.client.channel.worldui.WorldUiControlSender;
 import top.tobyprime.mcedia_mtv.client.metadata.MtvMediaMetadata;
 import top.tobyprime.mcedia_mtv.client.metadata.MtvMediaCoverCache;
@@ -40,8 +42,16 @@ public final class MtvAddMediaScreen extends Screen {
     @Override public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         renderBackground(graphics, mouseX, mouseY, partialTick);
         graphics.drawCenteredString(font, Component.literal("Add media to MTV playlist"), width / 2, height / 2 - 110, 0xFFFFFFFF);
+        drawPreviewCover(graphics);
         graphics.drawCenteredString(font, Component.literal(preview == null ? "Waiting for local preview" : preview), width / 2, height / 2 - 40, 0xFFD0D0D0);
         super.render(graphics, mouseX, mouseY, partialTick);
+    }
+    private void drawPreviewCover(GuiGraphics graphics) {
+        MtvMediaMetadata metadata = model.preview();
+        Identifier textureId = metadata == null ? null : MtvWorldUiCoverTextures.texture(metadata.coverUrl());
+        int x = width / 2 - 210, y = height / 2 - 45;
+        graphics.fill(x, y, x + 64, y + 64, 0xFF333333);
+        if (textureId != null) graphics.blit(RenderPipelines.GUI_TEXTURED, textureId, x, y, 0.0F, 0.0F, 64, 64, 64, 64, 64, 64, -1);
     }
     private String previewMessage(MtvMediaMetadata metadata) {
         String value;
