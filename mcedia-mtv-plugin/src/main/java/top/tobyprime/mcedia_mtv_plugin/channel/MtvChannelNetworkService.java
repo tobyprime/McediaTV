@@ -13,16 +13,22 @@ import org.slf4j.LoggerFactory;
 import java.util.UUID;
 import java.util.function.BiConsumer;
 
+import top.tobyprime.mcedia_mtv_plugin.channel.worldui.WorldUiCapabilities;
+import top.tobyprime.mcedia_mtv_plugin.channel.worldui.WorldUiPlaylistPageRequest;
+import top.tobyprime.mcedia_mtv_plugin.channel.worldui.WorldUiPlaylistPublisher;
+
 public final class MtvChannelNetworkService implements PluginMessageListener, Listener {
     private static final Logger LOGGER = LoggerFactory.getLogger(MtvChannelNetworkService.class);
 
     private final Plugin plugin;
     private final MtvChannelService channelService;
+    private final WorldUiPlaylistPublisher playlistPublisher;
     private volatile boolean closed;
 
     public MtvChannelNetworkService(Plugin plugin, MtvChannelService channelService) {
         this.plugin = plugin;
         this.channelService = channelService;
+        this.playlistPublisher = new WorldUiPlaylistPublisher(plugin, channelService);
         registerChannels();
     }
 
@@ -32,9 +38,13 @@ public final class MtvChannelNetworkService implements PluginMessageListener, Li
         messenger.registerOutgoingPluginChannel(plugin, MtvChannelProtocol.CHANNEL_SYNC);
         messenger.registerOutgoingPluginChannel(plugin, MtvChannelProtocol.CHANNEL_REMOVE);
         messenger.registerOutgoingPluginChannel(plugin, MtvChannelProtocol.CHANNEL_HUD_BINDING);
+        messenger.registerOutgoingPluginChannel(plugin, MtvChannelProtocol.WORLD_UI_CAPABILITIES);
+        messenger.registerOutgoingPluginChannel(plugin, MtvChannelProtocol.CHANNEL_PLAYLIST_MANIFEST);
+        messenger.registerOutgoingPluginChannel(plugin, MtvChannelProtocol.CHANNEL_PLAYLIST_PAGE);
         messenger.registerIncomingPluginChannel(plugin, MtvChannelProtocol.CHANNEL_SUBSCRIBE, this);
         messenger.registerIncomingPluginChannel(plugin, MtvChannelProtocol.CHANNEL_UNSUBSCRIBE, this);
         messenger.registerIncomingPluginChannel(plugin, MtvChannelProtocol.CHANNEL_HEARTBEAT, this);
+        messenger.registerIncomingPluginChannel(plugin, MtvChannelProtocol.CHANNEL_PLAYLIST_PAGE_REQUEST, this);
     }
 
     public void shutdown() {
@@ -46,10 +56,14 @@ public final class MtvChannelNetworkService implements PluginMessageListener, Li
         messenger.unregisterIncomingPluginChannel(plugin, MtvChannelProtocol.CHANNEL_SUBSCRIBE, this);
         messenger.unregisterIncomingPluginChannel(plugin, MtvChannelProtocol.CHANNEL_UNSUBSCRIBE, this);
         messenger.unregisterIncomingPluginChannel(plugin, MtvChannelProtocol.CHANNEL_HEARTBEAT, this);
+        messenger.unregisterIncomingPluginChannel(plugin, MtvChannelProtocol.CHANNEL_PLAYLIST_PAGE_REQUEST, this);
         messenger.unregisterOutgoingPluginChannel(plugin, MtvChannelProtocol.CHANNEL_SNAPSHOT);
         messenger.unregisterOutgoingPluginChannel(plugin, MtvChannelProtocol.CHANNEL_SYNC);
         messenger.unregisterOutgoingPluginChannel(plugin, MtvChannelProtocol.CHANNEL_REMOVE);
         messenger.unregisterOutgoingPluginChannel(plugin, MtvChannelProtocol.CHANNEL_HUD_BINDING);
+        messenger.unregisterOutgoingPluginChannel(plugin, MtvChannelProtocol.WORLD_UI_CAPABILITIES);
+        messenger.unregisterOutgoingPluginChannel(plugin, MtvChannelProtocol.CHANNEL_PLAYLIST_MANIFEST);
+        messenger.unregisterOutgoingPluginChannel(plugin, MtvChannelProtocol.CHANNEL_PLAYLIST_PAGE);
     }
 
     @Override
@@ -68,6 +82,10 @@ public final class MtvChannelNetworkService implements PluginMessageListener, Li
             }
             if (MtvChannelProtocol.CHANNEL_HEARTBEAT.equals(channel)) {
                 handleHeartbeat(player, message);
+                return;
+            }
+            if (MtvChannelProtocol.CHANNEL_PLAYLIST_PAGE_REQUEST.equals(channel)) {
+                handlePlaylistPageRequest(player, message);
             }
         });
     }
@@ -141,9 +159,38 @@ public final class MtvChannelNetworkService implements PluginMessageListener, Li
         }
         try {
             channelService.getAudienceSessionManager().subscribe(player.getUniqueId(), request.channelId(), System.currentTimeMillis());
+            sendCapabilities(player);
             publishSnapshotTo(player, request.channelId());
+            playlistPublisher.publishManifest(request.channelId());
         } catch (Exception e) {
             LOGGER.warn("Failed to handle MTV subscribe: player={}, channel={}", player.getName(), request.channelId(), e);
+        }
+    }
+
+    public void publishPlaylistManifest(String channelId) {
+        playlistPublisher.publishManifest(channelId);
+    }
+
+    private void handlePlaylistPageRequest(Player player, byte[] message) {
+        WorldUiPlaylistPageRequest request;
+        try {
+            request = MtvChannelProtocol.decodePlaylistPageRequest(message);
+        } catch (Exception e) {
+            LOGGER.warn("Failed to decode MTV playlist page request from {}", player.getName(), e);
+            return;
+        }
+        if (!channelService.getAudienceSessionManager().isSubscribed(player.getUniqueId(), request.channelId())) {
+            return;
+        }
+        var state = channelService.ensureChannelState(request.channelId());
+        if (state == null || state.getRevision() != request.knownRevision()) {
+            playlistPublisher.publishManifest(request.channelId());
+            return;
+        }
+        try {
+            playlistPublisher.publishPage(player, request.channelId(), request.offset());
+        } catch (Exception e) {
+            LOGGER.warn("Failed to send MTV playlist page: player={}, channel={}, offset={}", player.getName(), request.channelId(), request.offset(), e);
         }
     }
 
@@ -307,6 +354,11 @@ public final class MtvChannelNetworkService implements PluginMessageListener, Li
 
     private void sendRemove(Player player, String channelId) {
         runOnPlayer(player, "send remove", () -> player.sendPluginMessage(plugin, MtvChannelProtocol.CHANNEL_REMOVE, MtvChannelProtocol.encodeRemove(channelId)));
+    }
+
+    private void sendCapabilities(Player player) {
+        var capabilities = new WorldUiCapabilities(MtvChannelProtocol.WORLD_UI_PROTOCOL_VERSION, MtvChannelProtocol.MAX_PLAYLIST_PAGE_ITEMS, 0L);
+        runOnPlayer(player, "send world UI capabilities", () -> player.sendPluginMessage(plugin, MtvChannelProtocol.WORLD_UI_CAPABILITIES, MtvChannelProtocol.encodeCapabilities(capabilities)));
     }
 
     private void runOnPlayer(Player player, String actionName, Runnable action) {

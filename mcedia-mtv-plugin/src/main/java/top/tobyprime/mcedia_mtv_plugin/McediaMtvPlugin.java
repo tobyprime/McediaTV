@@ -44,6 +44,7 @@ public final class McediaMtvPlugin extends JavaPlugin {
         channelService.getAudienceSessionManager().setActiveTimeoutMs(AUDIENCE_TIMEOUT_MS);
         this.networkService = new MtvChannelNetworkService(this, channelService);
         channelService.setChangeListener(networkService::publishSnapshot);
+        channelService.setPlaylistChangeListener(networkService::publishPlaylistManifest);
         channelService.setRemoveListener(networkService::invalidateChannel);
 
         this.hudBindingService = new HudBindingService(this);
@@ -81,6 +82,7 @@ public final class McediaMtvPlugin extends JavaPlugin {
         var currentManager = this.manager;
         if (currentManager != null) {
             currentManager.getChannelService().setChangeListener(null);
+            currentManager.getChannelService().setPlaylistChangeListener(null);
             currentManager.getChannelService().setRemoveListener(null);
         }
         if (audiencePruneTask != null) {

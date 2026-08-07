@@ -26,6 +26,7 @@ public final class MtvChannelService {
     private final AudienceSessionManager audienceSessionManager = new AudienceSessionManager();
     private final ChannelRepository repository;
     private volatile Consumer<String> changeListener = channelId -> {};
+    private volatile Consumer<String> playlistChangeListener = channelId -> {};
     private volatile Consumer<String> removeListener = channelId -> {};
 
     public MtvChannelService(MtvPlayerManager manager) {
@@ -58,6 +59,10 @@ public final class MtvChannelService {
         this.removeListener = removeListener == null ? channelId -> {} : removeListener;
     }
 
+    public void setPlaylistChangeListener(Consumer<String> playlistChangeListener) {
+        this.playlistChangeListener = playlistChangeListener == null ? channelId -> {} : playlistChangeListener;
+    }
+
     public MtvChannelBinding resolveBinding(ManagedMtvPlayer player) {
         var binding = player.getChannelBinding();
         if (binding == null) {
@@ -73,6 +78,9 @@ public final class MtvChannelService {
         if (state == null) {
             return false;
         }
+        var previousPlaylist = List.copyOf(state.getPlaylist());
+        int previousCursor = state.getNormalizedPlaylistCursor();
+        ChannelPlayOrderMode previousPlayOrder = state.getPlayOrderMode();
         boolean changed = Boolean.TRUE.equals(mutation.apply(state));
         if (!changed) {
             return false;
@@ -83,7 +91,19 @@ public final class MtvChannelService {
                 channelId, state.getRevision(), state.getPlayState().getMediaUrl(),
                 state.getPlayState().getSpeed(), state.getPlayState().getMediaTimeMs(), state.getPlayState().getPlayTimeMs(), state.getPlayState().getState());
         onChannelChanged(channelId);
+        if (playlistMetadataChanged(state, previousPlaylist, previousCursor, previousPlayOrder)) {
+            playlistChangeListener.accept(channelId);
+        }
         return true;
+    }
+
+    static boolean playlistMetadataChanged(ChannelRuntimeState state,
+                                           List<ChannelPlaylistItem> previousPlaylist,
+                                           int previousCursor,
+                                           ChannelPlayOrderMode previousPlayOrder) {
+        return !state.getPlaylist().equals(previousPlaylist)
+                || state.getNormalizedPlaylistCursor() != previousCursor
+                || state.getPlayOrderMode() != previousPlayOrder;
     }
 
     public boolean updateMediaUrl(String channelId, String mediaUrl) {
@@ -598,6 +618,7 @@ public final class MtvChannelService {
 
     public void shutdown() {
         setChangeListener(null);
+        setPlaylistChangeListener(null);
         setRemoveListener(null);
         audienceSessionManager.clear();
         entityBindings.clear();

@@ -3,6 +3,14 @@ package top.tobyprime.mcedia_mtv_plugin.channel;
 import io.netty.buffer.Unpooled;
 import net.minecraft.network.FriendlyByteBuf;
 
+import top.tobyprime.mcedia_mtv_plugin.channel.worldui.WorldUiPlaylistManifest;
+import top.tobyprime.mcedia_mtv_plugin.channel.worldui.WorldUiPlaylistPage;
+import top.tobyprime.mcedia_mtv_plugin.channel.worldui.WorldUiPlaylistPageRequest;
+import top.tobyprime.mcedia_mtv_plugin.channel.worldui.WorldUiCapabilities;
+
+import java.util.List;
+import java.util.Set;
+
 public final class MtvChannelProtocol {
     public static final String CHANNEL_SUBSCRIBE = "mcedia_mtv:channel_subscribe";
     public static final String CHANNEL_UNSUBSCRIBE = "mcedia_mtv:channel_unsubscribe";
@@ -11,6 +19,18 @@ public final class MtvChannelProtocol {
     public static final String CHANNEL_REMOVE = "mcedia_mtv:channel_remove";
     public static final String CHANNEL_HEARTBEAT = "mcedia_mtv:channel_heartbeat";
     public static final String CHANNEL_HUD_BINDING = "mcedia_mtv:hud_binding";
+    public static final String WORLD_UI_CAPABILITIES = "mcedia_mtv:world_ui_capabilities";
+    public static final String CHANNEL_PLAYLIST_MANIFEST = "mcedia_mtv:channel_playlist_manifest";
+    public static final String CHANNEL_PLAYLIST_PAGE_REQUEST = "mcedia_mtv:channel_playlist_page_request";
+    public static final String CHANNEL_PLAYLIST_PAGE = "mcedia_mtv:channel_playlist_page";
+    public static final int WORLD_UI_PROTOCOL_VERSION = 1;
+    public static final int MAX_PLAYLIST_PAGE_ITEMS = 32;
+    public static final int MAX_PLAYLIST_PAGE_BYTES = 24 * 1024;
+    public static final int MAX_MEDIA_URL_LENGTH = 2_048;
+
+    private static final int MAX_CHANNEL_ID_LENGTH = 256;
+    private static final int MAX_PLAY_ORDER_MODE_LENGTH = 32;
+    private static final Set<String> PLAY_ORDER_MODES = Set.of("SEQUENTIAL", "SHUFFLE", "LOOP_ALL", "LOOP_ONE", "CURRENT_ONLY");
 
     private MtvChannelProtocol() {
     }
@@ -67,6 +87,149 @@ public final class MtvChannelProtocol {
     public static MtvAudienceHeartbeat decodeHeartbeat(byte[] message) {
         var buffer = new FriendlyByteBuf(Unpooled.wrappedBuffer(message));
         return readHeartbeat(buffer);
+    }
+
+    public static byte[] encodePlaylistManifest(WorldUiPlaylistManifest manifest) {
+        var buffer = new FriendlyByteBuf(Unpooled.buffer());
+        writePlaylistManifest(buffer, manifest);
+        return toBytes(buffer);
+    }
+
+    public static WorldUiPlaylistManifest decodePlaylistManifest(byte[] message) {
+        return readPlaylistManifest(new FriendlyByteBuf(Unpooled.wrappedBuffer(message)));
+    }
+
+    public static byte[] encodeCapabilities(WorldUiCapabilities capabilities) {
+        var buffer = new FriendlyByteBuf(Unpooled.buffer());
+        writeCapabilities(buffer, capabilities);
+        return toBytes(buffer);
+    }
+
+    public static WorldUiCapabilities decodeCapabilities(byte[] message) {
+        return readCapabilities(new FriendlyByteBuf(Unpooled.wrappedBuffer(message)));
+    }
+
+    public static void writeCapabilities(FriendlyByteBuf buffer, WorldUiCapabilities capabilities) {
+        validateCapabilities(capabilities);
+        buffer.writeVarInt(capabilities.protocolVersion());
+        buffer.writeVarInt(capabilities.maxPageItems());
+        buffer.writeLong(capabilities.featureFlags());
+    }
+
+    public static WorldUiCapabilities readCapabilities(FriendlyByteBuf buffer) {
+        var capabilities = new WorldUiCapabilities(
+                readNonNegativeInt(buffer, "protocolVersion"),
+                readNonNegativeInt(buffer, "maxPageItems"),
+                readNonNegativeLong(buffer, "featureFlags")
+        );
+        validateCapabilities(capabilities);
+        ensureFullyRead(buffer, "world UI capabilities");
+        return capabilities;
+    }
+
+    public static void writePlaylistManifest(FriendlyByteBuf buffer, WorldUiPlaylistManifest manifest) {
+        validateManifest(manifest);
+        buffer.writeUtf(manifest.channelId(), MAX_CHANNEL_ID_LENGTH);
+        buffer.writeLong(manifest.revision());
+        buffer.writeVarInt(manifest.itemCount());
+        buffer.writeVarInt(manifest.cursor());
+        buffer.writeUtf(manifest.playOrderMode(), MAX_PLAY_ORDER_MODE_LENGTH);
+    }
+
+    public static WorldUiPlaylistManifest readPlaylistManifest(FriendlyByteBuf buffer) {
+        var manifest = new WorldUiPlaylistManifest(
+                readNonBlankUtf(buffer, MAX_CHANNEL_ID_LENGTH, "channelId"),
+                readNonNegativeLong(buffer, "revision"),
+                readNonNegativeInt(buffer, "itemCount"),
+                readNonNegativeInt(buffer, "cursor"),
+                readPlayOrderMode(buffer)
+        );
+        validateManifest(manifest);
+        ensureFullyRead(buffer, "playlist manifest");
+        return manifest;
+    }
+
+    public static byte[] encodePlaylistPageRequest(WorldUiPlaylistPageRequest request) {
+        var buffer = new FriendlyByteBuf(Unpooled.buffer());
+        writePlaylistPageRequest(buffer, request);
+        return toBytes(buffer);
+    }
+
+    public static WorldUiPlaylistPageRequest decodePlaylistPageRequest(byte[] message) {
+        return readPlaylistPageRequest(new FriendlyByteBuf(Unpooled.wrappedBuffer(message)));
+    }
+
+    public static void writePlaylistPageRequest(FriendlyByteBuf buffer, WorldUiPlaylistPageRequest request) {
+        validatePageRequest(request);
+        buffer.writeUtf(request.channelId(), MAX_CHANNEL_ID_LENGTH);
+        buffer.writeLong(request.knownRevision());
+        buffer.writeVarInt(request.offset());
+    }
+
+    public static WorldUiPlaylistPageRequest readPlaylistPageRequest(FriendlyByteBuf buffer) {
+        var request = new WorldUiPlaylistPageRequest(
+                readNonBlankUtf(buffer, MAX_CHANNEL_ID_LENGTH, "channelId"),
+                readNonNegativeLong(buffer, "knownRevision"),
+                readNonNegativeInt(buffer, "offset")
+        );
+        validatePageRequest(request);
+        ensureFullyRead(buffer, "playlist page request");
+        return request;
+    }
+
+    public static byte[] encodePlaylistPage(WorldUiPlaylistPage page) {
+        var buffer = new FriendlyByteBuf(Unpooled.buffer());
+        writePlaylistPage(buffer, page);
+        byte[] encoded = toBytes(buffer);
+        if (encoded.length > MAX_PLAYLIST_PAGE_BYTES) {
+            throw invalidPacket("playlist page", "encoded length exceeds " + MAX_PLAYLIST_PAGE_BYTES + " bytes");
+        }
+        return encoded;
+    }
+
+    public static WorldUiPlaylistPage decodePlaylistPage(byte[] message) {
+        if (message.length > MAX_PLAYLIST_PAGE_BYTES) {
+            throw invalidPacket("playlist page", "encoded length exceeds " + MAX_PLAYLIST_PAGE_BYTES + " bytes");
+        }
+        return readPlaylistPage(new FriendlyByteBuf(Unpooled.wrappedBuffer(message)));
+    }
+
+    public static void writePlaylistPage(FriendlyByteBuf buffer, WorldUiPlaylistPage page) {
+        validatePage(page);
+        buffer.writeUtf(page.channelId(), MAX_CHANNEL_ID_LENGTH);
+        buffer.writeLong(page.revision());
+        buffer.writeVarInt(page.itemCount());
+        buffer.writeVarInt(page.cursor());
+        buffer.writeUtf(page.playOrderMode(), MAX_PLAY_ORDER_MODE_LENGTH);
+        buffer.writeVarInt(page.offset());
+        buffer.writeVarInt(page.mediaUrls().size());
+        for (String mediaUrl : page.mediaUrls()) {
+            buffer.writeUtf(mediaUrl, MAX_MEDIA_URL_LENGTH);
+        }
+    }
+
+    public static WorldUiPlaylistPage readPlaylistPage(FriendlyByteBuf buffer) {
+        if (buffer.readableBytes() > MAX_PLAYLIST_PAGE_BYTES) {
+            throw invalidPacket("playlist page", "encoded length exceeds " + MAX_PLAYLIST_PAGE_BYTES + " bytes");
+        }
+        String channelId = readNonBlankUtf(buffer, MAX_CHANNEL_ID_LENGTH, "channelId");
+        long revision = readNonNegativeLong(buffer, "revision");
+        int itemCount = readNonNegativeInt(buffer, "itemCount");
+        int cursor = readNonNegativeInt(buffer, "cursor");
+        String playOrderMode = readPlayOrderMode(buffer);
+        int offset = readNonNegativeInt(buffer, "offset");
+        int pageSize = readNonNegativeInt(buffer, "pageSize");
+        if (pageSize > MAX_PLAYLIST_PAGE_ITEMS) {
+            throw invalidPacket("playlist page", "contains more than " + MAX_PLAYLIST_PAGE_ITEMS + " entries");
+        }
+        var mediaUrls = new java.util.ArrayList<String>(pageSize);
+        for (int index = 0; index < pageSize; index++) {
+            mediaUrls.add(readNonBlankUtf(buffer, MAX_MEDIA_URL_LENGTH, "mediaUrl"));
+        }
+        var page = new WorldUiPlaylistPage(channelId, revision, itemCount, cursor, playOrderMode, offset, mediaUrls);
+        validatePage(page);
+        ensureFullyRead(buffer, "playlist page");
+        return page;
     }
 
 
@@ -161,6 +324,83 @@ public final class MtvChannelProtocol {
         boolean suspended = buffer.isReadable() && buffer.readBoolean();
         ensureFullyRead(buffer, "heartbeat");
         return new MtvAudienceHeartbeat(channelId, revision, loaded, completed, durationUs, error, suspended);
+    }
+
+    private static void validatePage(WorldUiPlaylistPage page) {
+        if (page == null || page.channelId() == null || page.channelId().isBlank() || page.channelId().length() > MAX_CHANNEL_ID_LENGTH
+                || page.revision() < 0L || page.itemCount() < 0 || page.cursor() < 0
+                || (page.itemCount() == 0 && page.cursor() != 0)
+                || (page.itemCount() > 0 && page.cursor() >= page.itemCount())
+                || page.playOrderMode() == null || !PLAY_ORDER_MODES.contains(page.playOrderMode())
+                || page.offset() < 0 || page.offset() > page.itemCount()
+                || page.mediaUrls() == null || page.mediaUrls().size() > MAX_PLAYLIST_PAGE_ITEMS
+                || page.offset() + page.mediaUrls().size() > page.itemCount()) {
+            throw invalidPacket("playlist page", "field is invalid");
+        }
+        for (String mediaUrl : page.mediaUrls()) {
+            if (mediaUrl == null || mediaUrl.isBlank() || mediaUrl.length() > MAX_MEDIA_URL_LENGTH) {
+                throw invalidPacket("playlist page", "mediaUrl is invalid");
+            }
+        }
+    }
+
+    private static void validateManifest(WorldUiPlaylistManifest manifest) {
+        if (manifest == null || manifest.channelId() == null || manifest.channelId().isBlank()
+                || manifest.channelId().length() > MAX_CHANNEL_ID_LENGTH || manifest.revision() < 0L
+                || manifest.itemCount() < 0 || manifest.cursor() < 0
+                || (manifest.itemCount() == 0 && manifest.cursor() != 0)
+                || (manifest.itemCount() > 0 && manifest.cursor() >= manifest.itemCount())
+                || manifest.playOrderMode() == null || !PLAY_ORDER_MODES.contains(manifest.playOrderMode())) {
+            throw invalidPacket("playlist manifest", "field is invalid");
+        }
+    }
+
+    private static void validateCapabilities(WorldUiCapabilities capabilities) {
+        if (capabilities == null || capabilities.protocolVersion() != WORLD_UI_PROTOCOL_VERSION
+                || capabilities.maxPageItems() <= 0 || capabilities.maxPageItems() > MAX_PLAYLIST_PAGE_ITEMS
+                || capabilities.featureFlags() < 0L) {
+            throw invalidPacket("world UI capabilities", "field is invalid");
+        }
+    }
+
+    private static void validatePageRequest(WorldUiPlaylistPageRequest request) {
+        if (request == null || request.channelId() == null || request.channelId().isBlank()
+                || request.channelId().length() > MAX_CHANNEL_ID_LENGTH || request.knownRevision() < 0L
+                || request.offset() < 0 || request.offset() % MAX_PLAYLIST_PAGE_ITEMS != 0) {
+            throw invalidPacket("playlist page request", "field is invalid");
+        }
+    }
+
+    private static String readNonBlankUtf(FriendlyByteBuf buffer, int maxLength, String field) {
+        String value = buffer.readUtf(maxLength);
+        if (value.isBlank()) {
+            throw invalidPacket("playlist page", field + " is blank");
+        }
+        return value;
+    }
+
+    private static String readPlayOrderMode(FriendlyByteBuf buffer) {
+        String value = buffer.readUtf(MAX_PLAY_ORDER_MODE_LENGTH);
+        if (!PLAY_ORDER_MODES.contains(value)) {
+            throw invalidPacket("playlist page", "playOrderMode is invalid");
+        }
+        return value;
+    }
+
+    private static long readNonNegativeLong(FriendlyByteBuf buffer, String field) {
+        long value = buffer.readLong();
+        if (value < 0L) {
+            throw invalidPacket("playlist page", field + " is negative");
+        }
+        return value;
+    }
+
+    private static int readNonNegativeInt(FriendlyByteBuf buffer, String field) {
+        int value = buffer.readVarInt();
+        if (value < 0) {
+            throw invalidPacket("playlist page", field + " is negative");
+        }
+        return value;
     }
 
 
