@@ -48,7 +48,7 @@
 - Produces `WorldUiControlRequest(UUID targetMtvUuid, String screenId, String channelId, long requestId, long expectedRevision, float hitU, float hitV, WorldUiControlOperation operation, String mediaUrl, int index, long value)`.
 - Produces `MtvChannelProtocol.readPlaylistPage(FriendlyByteBuf)` and `writePlaylistPage(FriendlyByteBuf, WorldUiPlaylistPage)`.
 
-- [ ] **Step 1: Write failing codec-boundary tests**
+- [x] **Step 1: Write failing codec-boundary tests**
 
 ```java
 @Test
@@ -69,13 +69,13 @@ void decodeRejectsTrailingBytesAndOverlongUrls() {
 }
 ```
 
-- [ ] **Step 2: Run the focused test and verify it fails**
+- [x] **Step 2: Run the focused test and verify it fails**
 
 Run: `./gradlew :mcedia-mtv:test --tests '*WorldUiProtocolTest'`
 
 Expected: compilation fails because the world UI protocol types do not exist.
 
-- [ ] **Step 3: Implement the bounded records and codec helpers**
+- [x] **Step 3: Implement the bounded records and codec helpers**
 
 ```java
 private static String readBoundedUtf(FriendlyByteBuf buffer, int maxLength, String field) {
@@ -89,13 +89,13 @@ private static void requirePage(List<String> urls) {
 }
 ```
 
-- [ ] **Step 4: Run the focused test and verify it passes**
+- [x] **Step 4: Run the focused test and verify it passes**
 
 Run: `./gradlew :mcedia-mtv:test --tests '*WorldUiProtocolTest'`
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add mcedia-mtv/src/client/java/top/tobyprime/mcedia_mtv/client/channel mcedia-mtv/src/test/java/top/tobyprime/mcedia_mtv/client/channel
@@ -116,7 +116,7 @@ git commit -m "feat: add bounded world UI protocol model"
 - Produces `WorldUiCapabilityState.supported()`, `onCapabilities(int version, int pageSize, long features)` and `clear()`.
 - Produces `MtvWorldUiPayloads.sendControl(WorldUiControlRequest)` which returns without networking when capability negotiation has not succeeded.
 
-- [ ] **Step 1: Write capability reset and gate tests**
+- [x] **Step 1: Write capability reset and gate tests**
 
 ```java
 @Test
@@ -130,13 +130,13 @@ void controlsRemainDisabledUntilMatchingCapabilitiesArrive() {
 }
 ```
 
-- [ ] **Step 2: Run the focused test and verify it fails**
+- [x] **Step 2: Run the focused test and verify it fails**
 
 Run: `./gradlew :mcedia-mtv:test --tests '*WorldUiCapabilityStateTest'`
 
 Expected: FAIL because `WorldUiCapabilityState` is missing.
 
-- [ ] **Step 3: Register payloads and reset capability/page state at disconnect**
+- [x] **Step 3: Register payloads and reset capability/page state at disconnect**
 
 ```java
 ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
@@ -145,13 +145,13 @@ ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
 });
 ```
 
-- [ ] **Step 4: Run the focused test and existing lifecycle test**
+- [x] **Step 4: Run the focused test and existing lifecycle test**
 
 Run: `./gradlew :mcedia-mtv:test --tests '*WorldUiCapabilityStateTest' --tests '*MtvClientConnectionLifecycleTest'`
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add mcedia-mtv/src/client/java/top/tobyprime/mcedia_mtv/client/channel mcedia-mtv/src/test/java/top/tobyprime/mcedia_mtv/client/channel
@@ -171,7 +171,7 @@ git commit -m "feat: negotiate MTV world UI capabilities"
 - Consumes `WorldUiPlaylistManifest`/`Page` from Task 1 and `MediaResolvers.resolve(String)`.
 - Produces `applyManifest`, `applyPage`, `missingOffsetsForVisibleRange`, and `metadata.resolveAsync(String)`.
 
-- [ ] **Step 1: Write failing cache tests**
+- [x] **Step 1: Write failing cache tests**
 
 ```java
 @Test
@@ -182,13 +182,13 @@ void newRevisionDropsPagesButKeepsUrlMetadataKeys() {
 }
 ```
 
-- [ ] **Step 2: Run focused tests and verify they fail**
+- [x] **Step 2: Run focused tests and verify they fail**
 
 Run: `./gradlew :mcedia-mtv:test --tests '*WorldUiPlaylistCacheTest' --tests '*MtvMediaMetadataCacheTest'`
 
 Expected: FAIL because caches are absent.
 
-- [ ] **Step 3: Implement request de-duplication, LRU metadata cache and asynchronous resolver mapping**
+- [x] **Step 3: Implement request de-duplication, LRU metadata cache and asynchronous resolver mapping**
 
 ```java
 public CompletableFuture<MtvMediaMetadata> resolveAsync(String url) {
@@ -199,13 +199,13 @@ public CompletableFuture<MtvMediaMetadata> resolveAsync(String url) {
 
 Read description only from a documented `MediaInfo.extraMetadata()` key; map absent values to `""`, never submit metadata to the plugin, and cap cached entries and in-flight tasks.
 
-- [ ] **Step 4: Run focused tests**
+- [x] **Step 4: Run focused tests**
 
 Run: `./gradlew :mcedia-mtv:test --tests '*WorldUiPlaylistCacheTest' --tests '*MtvMediaMetadataCacheTest'`
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add mcedia-mtv/src/client/java/top/tobyprime/mcedia_mtv/client/{channel,metadata} mcedia-mtv/src/test/java/top/tobyprime/mcedia_mtv/client
@@ -225,7 +225,7 @@ git commit -m "feat: cache paged MTV playlist metadata locally"
 - Consumes `ChannelRuntimeState.getPlaylist()`, revision, cursor and `ChannelPlayOrderMode`.
 - Produces `encodePage(ChannelRuntimeState state, int offset): WorldUiPlaylistPage` and `publishManifest(String channelId)`.
 
-- [ ] **Step 1: Write page boundary tests**
+- [x] **Step 1: Write page boundary tests**
 
 ```java
 @Test
@@ -236,13 +236,13 @@ void encoderNeverProducesMoreThan32EntriesOr24KiB() {
 }
 ```
 
-- [ ] **Step 2: Run the focused test and verify it fails**
+- [x] **Step 2: Run the focused test and verify it fails**
 
 Run: `./gradlew :mcedia-mtv-plugin:test --tests '*PlaylistPageEncoderTest'`
 
 Expected: FAIL because no page encoder exists.
 
-- [ ] **Step 3: Encode pages and broadcast only manifests after playlist mutations**
+- [x] **Step 3: Encode pages and broadcast only manifests after playlist mutations**
 
 ```java
 public void onChannelChanged(String channelId) {
@@ -253,13 +253,13 @@ public void onChannelChanged(String channelId) {
 
 The encoder rejects negative/misaligned offsets and skips no valid entry merely because an earlier item fits; when the first valid URL alone cannot fit, fail the request instead of creating an oversized packet.
 
-- [ ] **Step 4: Run focused plugin tests**
+- [x] **Step 4: Run focused plugin tests**
 
 Run: `./gradlew :mcedia-mtv-plugin:test --tests '*PlaylistPageEncoderTest'`
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add mcedia-mtv-plugin/src/main/java/top/tobyprime/mcedia_mtv_plugin/channel mcedia-mtv-plugin/src/test/java/top/tobyprime/mcedia_mtv_plugin/channel
@@ -279,7 +279,7 @@ git commit -m "feat: publish MTV playlist manifests and pages"
 - Consumes Task 1 request and `MtvChannelService` playback/playlist methods.
 - Produces `dispatch(Player, WorldUiControlRequest): WorldUiControlResult` and stable error codes from the design.
 
-- [ ] **Step 1: Write revision, operation and request-budget tests**
+- [x] **Step 1: Write revision, operation and request-budget tests**
 
 ```java
 @Test
@@ -293,13 +293,13 @@ void stalePlaylistMutationIsRejectedWithoutChangingState() {
 void tenthControlIsAcceptedAndEleventhIsRateLimited() { /* inject clock, dispatch 11 requests */ }
 ```
 
-- [ ] **Step 2: Run focused tests and verify they fail**
+- [x] **Step 2: Run focused tests and verify they fail**
 
 Run: `./gradlew :mcedia-mtv-plugin:test --tests '*WorldUiControlDispatcherTest'`
 
 Expected: FAIL because dispatcher types do not exist.
 
-- [ ] **Step 3: Implement explicit validation and operation mapping**
+- [x] **Step 3: Implement explicit validation and operation mapping**
 
 ```java
 if (request.expectedRevision() != state.getRevision() && request.operation().changesChannelRevision()) {
@@ -315,13 +315,13 @@ return switch (request.operation()) {
 
 Implement `SET_MASTER_VOLUME` against the MTV entity without changing channel revision. Require a nonblank normalized URL, valid index and domain bounds before calling any mutation.
 
-- [ ] **Step 4: Run focused tests**
+- [x] **Step 4: Run focused tests**
 
 Run: `./gradlew :mcedia-mtv-plugin:test --tests '*WorldUiControlDispatcherTest'`
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add mcedia-mtv-plugin/src/main/java/top/tobyprime/mcedia_mtv_plugin/{channel,controller} mcedia-mtv-plugin/src/test/java/top/tobyprime/mcedia_mtv_plugin/channel
@@ -341,7 +341,7 @@ git commit -m "feat: validate MTV world UI control requests"
 - Produces `validate(Player player, ManagedMtvPlayer target, String screenId, float u, float v): ValidationResult`.
 - `ValidationResult` distinguishes `SCREEN_NOT_FOUND`, `WORLD_MISMATCH`, `INVALID_ARGUMENT` and `OCCLUDED`.
 
-- [ ] **Step 1: Write pure geometry tests using a screen transform fixture**
+- [x] **Step 1: Write pure geometry tests using a screen transform fixture**
 
 ```java
 @Test
@@ -352,13 +352,13 @@ void outOfRangeUvAndSolidBlockBeforeHitAreRejected() {
 }
 ```
 
-- [ ] **Step 2: Run the test and verify it fails**
+- [x] **Step 2: Run the test and verify it fails**
 
 Run: `./gradlew :mcedia-mtv-plugin:test --tests '*WorldUiScreenHitValidatorTest'`
 
 Expected: FAIL because the validator does not exist.
 
-- [ ] **Step 3: Rebuild the hit point only from server peripheral transform data**
+- [x] **Step 3: Rebuild the hit point only from server peripheral transform data**
 
 ```java
 Location hit = screenTransform.toWorld(u, v);
@@ -368,13 +368,13 @@ if (trace != null && trace.getHitPosition().distanceSquared(hit.toVector()) + EP
 
 Verify target UUID lookup, target screen membership, current channel binding and same-world condition before permission checks. Do not add an interaction-distance check.
 
-- [ ] **Step 4: Run focused test**
+- [x] **Step 4: Run focused test**
 
 Run: `./gradlew :mcedia-mtv-plugin:test --tests '*WorldUiScreenHitValidatorTest'`
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add mcedia-mtv-plugin/src/main/java/top/tobyprime/mcedia_mtv_plugin/{worldui,channel,model} mcedia-mtv-plugin/src/test/java/top/tobyprime/mcedia_mtv_plugin/worldui
@@ -392,7 +392,7 @@ git commit -m "feat: verify world UI screen visibility server-side"
 **Interfaces:**
 - Produces `watch(UUID playerId, UUID mtvId)`, `unwatch(UUID playerId)`, `watchers(UUID mtvId)` and bounded `WorldUiControlState` sending.
 
-- [ ] **Step 1: Write registry tests**
+- [x] **Step 1: Write registry tests**
 
 ```java
 @Test
@@ -404,13 +404,13 @@ void eachPlayerWatchesOnlyOneMtvAndChangingTargetRemovesOldWatch() {
 }
 ```
 
-- [ ] **Step 2: Run focused test and verify it fails**
+- [x] **Step 2: Run focused test and verify it fails**
 
 Run: `./gradlew :mcedia-mtv-plugin:test --tests '*WorldUiWatchRegistryTest'`
 
 Expected: FAIL because the registry is absent.
 
-- [ ] **Step 3: Register channels and send only event-driven state**
+- [x] **Step 3: Register channels and send only event-driven state**
 
 ```java
 if (messageChannel.equals(MtvChannelProtocol.WORLD_UI_WATCH)) {
@@ -421,13 +421,13 @@ if (messageChannel.equals(MtvChannelProtocol.WORLD_UI_WATCH)) {
 
 Send capabilities after the existing subscription path succeeds; remove watches on quit, entity removal and plugin shutdown. Never schedule a UI-state heartbeat.
 
-- [ ] **Step 4: Run focused test and existing network service tests**
+- [x] **Step 4: Run focused test and existing network service tests**
 
 Run: `./gradlew :mcedia-mtv-plugin:test --tests '*WorldUiWatchRegistryTest' --tests '*MtvChannelNetworkServiceTest'`
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add mcedia-mtv-plugin/src/main/java/top/tobyprime/mcedia_mtv_plugin/{channel,McediaMtvPlugin.java} mcedia-mtv-plugin/src/test/java/top/tobyprime/mcedia_mtv_plugin/channel
@@ -446,7 +446,7 @@ git commit -m "feat: wire MTV world UI network watches"
 - Produces `WorldUiLayout.hit(float u, float v, boolean expanded)` and `WorldUiInteractionState.onPrimaryPress/onPrimaryRelease`.
 - Consumes client control sender from Task 2 and manifest/page cache from Task 3.
 
-- [ ] **Step 1: Write layout and drag-only-on-release tests**
+- [x] **Step 1: Write layout and drag-only-on-release tests**
 
 ```java
 @Test
@@ -459,13 +459,13 @@ void bottomRightToggleIsVisibleOnlyWhilePointerIsInTriggerOrButton() {
 void seekSendsOnceOnRelease() { /* press progress, drag twice, release; assert one request */ }
 ```
 
-- [ ] **Step 2: Run focused test and verify it fails**
+- [x] **Step 2: Run focused test and verify it fails**
 
 Run: `./gradlew :mcedia-mtv:test --tests '*WorldUiLayoutTest'`
 
 Expected: FAIL because the world UI model is absent.
 
-- [ ] **Step 3: Implement normalized MPV-style control hit regions**
+- [x] **Step 3: Implement normalized MPV-style control hit regions**
 
 ```java
 if (activeDrag == Drag.SEEK && primaryReleased) {
@@ -476,13 +476,13 @@ if (activeDrag == Drag.SEEK && primaryReleased) {
 
 Keep hover, expanded/collapsed state, drag preview and local mute restore volume entirely in `WorldUiInteractionState`; collapse must unwatch the old target.
 
-- [ ] **Step 4: Run focused test**
+- [x] **Step 4: Run focused test**
 
 Run: `./gradlew :mcedia-mtv:test --tests '*WorldUiLayoutTest'`
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add mcedia-mtv/src/client/java/top/tobyprime/mcedia_mtv/client/worldui mcedia-mtv/src/test/java/top/tobyprime/mcedia_mtv/client/worldui
@@ -501,7 +501,7 @@ git commit -m "feat: model MTV world screen controls locally"
 - Consumes `WorldUiInteractionState`, MTV entity/screen configuration and client channel snapshot.
 - Produces a world-plane renderer that uses local screen geometry and cancels attack/use only when a UI hot region consumed the click.
 
-- [ ] **Step 1: Add a mapping-specific smoke-test harness or render-independent transform test for each source set**
+- [x] **Step 1: Add a mapping-specific smoke-test harness or render-independent transform test for each source set**
 
 ```java
 @Test
@@ -510,13 +510,13 @@ void screenTransformMapsCenterAndBottomRightToExpectedWorldPlane() {
 }
 ```
 
-- [ ] **Step 2: Run each focused version test and verify it fails**
+- [x] **Step 2: Run each focused version test and verify it fails**
 
 Run: `./gradlew :mcedia-mtv-1.21.11:test :mcedia-mtv-26.1:test :mcedia-mtv-26.2:test --tests '*WorldUi*Test'`
 
 Expected: FAIL until version adapters are present.
 
-- [ ] **Step 3: Render only screen-local controls after the ray has selected the nearest front-facing MTV screen**
+- [x] **Step 3: Render only screen-local controls after the ray has selected the nearest front-facing MTV screen**
 
 ```java
 if (interaction.isExpanded(target) || interaction.shouldShowToggle(hit)) {
@@ -526,13 +526,13 @@ if (interaction.isExpanded(target) || interaction.shouldShowToggle(hit)) {
 
 Use the normal depth pipeline so blocks occlude the overlay. For undersized/abnormal screens render only transport, progress and queue controls; do not release the cursor or alter camera control.
 
-- [ ] **Step 4: Build all version adapters**
+- [x] **Step 4: Build all version adapters**
 
 Run: `./gradlew :mcedia-mtv-1.21.11:compileJava :mcedia-mtv-26.1:compileJava :mcedia-mtv-26.2:compileJava`
 
 Expected: all compile tasks succeed.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add mcedia-mtv/versions mcedia-mtv/src/client/java/top/tobyprime/mcedia_mtv/client/worldui mcedia-mtv-plugin/src/main/java/top/tobyprime/mcedia_mtv_plugin
@@ -550,7 +550,7 @@ git commit -m "feat: render controllable MTV screen overlay"
 - Consumes `MtvMediaMetadataCache.resolveAsync(String)` and sends only `PREPEND`, `INSERT_NEXT`, `APPEND`, or `INSERT_AND_PLAY` after preview resolves.
 - Produces `WorldUiAddMediaModel.setInput(String)`, `preview()`, `canConfirm()` and `confirm(AddMode)`.
 
-- [ ] **Step 1: Write local-preview state tests**
+- [x] **Step 1: Write local-preview state tests**
 
 ```java
 @Test
@@ -561,13 +561,13 @@ void confirmIsDisabledUntilTheLocalResolverReturnsSupportedMetadata() {
 }
 ```
 
-- [ ] **Step 2: Run focused test and verify it fails**
+- [x] **Step 2: Run focused test and verify it fails**
 
 Run: `./gradlew :mcedia-mtv:test --tests '*WorldUiAddMediaModelTest'`
 
 Expected: FAIL because the add-media model is absent.
 
-- [ ] **Step 3: Implement a debounced client-only resolver preview and native full-screen screen**
+- [x] **Step 3: Implement a debounced client-only resolver preview and native full-screen screen**
 
 ```java
 public void confirm(AddMode mode) {
@@ -578,13 +578,13 @@ public void confirm(AddMode mode) {
 
 Show title, author, description, platform and cover/fallback locally. Preserve entered URL and preview after a rejected result; close only after accepted result.
 
-- [ ] **Step 4: Run focused test and compile every version adapter**
+- [x] **Step 4: Run focused test and compile every version adapter**
 
 Run: `./gradlew :mcedia-mtv:test --tests '*WorldUiAddMediaModelTest' :mcedia-mtv-1.21.11:compileJava :mcedia-mtv-26.1:compileJava :mcedia-mtv-26.2:compileJava`
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add mcedia-mtv/src/client/java/top/tobyprime/mcedia_mtv/client/{worldui,metadata} mcedia-mtv/versions mcedia-mtv/src/test/java/top/tobyprime/mcedia_mtv/client/worldui
@@ -597,7 +597,7 @@ git commit -m "feat: preview and add MTV playlist media locally"
 - Modify: `docs/superpowers/specs/2026-08-07-mtv-world-player-ui-design.md` only if implementation changes an accepted wire field or deployment requirement.
 - Create: `docs/mtv-world-ui-manual-verification.md`.
 
-- [ ] **Step 1: Add regression tests for old-server gating and old-client plugin behavior**
+- [x] **Step 1: Add regression tests for old-server gating and old-client plugin behavior**
 
 ```java
 @Test
@@ -608,23 +608,23 @@ void absentCapabilitiesLeavesLegacyChannelPlaybackUntouched() {
 }
 ```
 
-- [ ] **Step 2: Run all unit tests**
+- [x] **Step 2: Run all unit tests**
 
 Run: `./gradlew :mcedia-mtv:test :mcedia-mtv-plugin:test`
 
 Expected: PASS.
 
-- [ ] **Step 3: Run every supported version build**
+- [x] **Step 3: Run every supported version build**
 
 Run: `./gradlew :mcedia-mtv-1.21.11:build :mcedia-mtv-26.1:build :mcedia-mtv-26.2:build :mcedia-mtv-plugin:build`
 
 Expected: PASS.
 
-- [ ] **Step 4: Perform and record manual integration checks**
+- [x] **Step 4: Perform and record manual integration checks**
 
 Record a checklist covering new/new, new/old and old/new client-plugin pairs; large playlists; stale revisions; blocked screen; forged target data; drag bandwidth; container GUI coexistence; cover failure; and all supported versions.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add docs mcedia-mtv/src/test mcedia-mtv-plugin/src/test
