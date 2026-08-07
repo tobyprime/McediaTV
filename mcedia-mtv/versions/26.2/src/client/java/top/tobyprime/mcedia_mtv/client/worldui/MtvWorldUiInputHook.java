@@ -87,7 +87,7 @@ public final class MtvWorldUiInputHook {
         return null;
     }
     private static boolean blockedByBlock(Minecraft client, net.minecraft.world.phys.Vec3 origin, float screenDistance) { return client.hitResult != null && client.hitResult.getType() == HitResult.Type.BLOCK && client.hitResult.getLocation().distanceToSqr(origin) + 1.0E-4D < screenDistance * screenDistance; }
-    private static void reset() { MtvWorldUiRenderer.presentation().clearHover(); MtvWorldUiRenderer.presentation().collapse(); if (primaryDown && consumesAttack) INTERACTION.collapse(); primaryDown = false; consumesAttack = false; }
+    private static void reset() { MtvWorldUiRenderer.presentation().clearHover(); MtvWorldUiRenderer.presentation().collapse(); INTERACTION.collapse(); primaryDown = false; consumesAttack = false; }
     private static void requestVisiblePage(WorldUiInteractionState.Target target) {
         WorldUiPlaylistCache.getInstance().manifest(target.channelId()).ifPresent(manifest -> {
             int start = MtvWorldUiRenderer.presentation().playlistStart();

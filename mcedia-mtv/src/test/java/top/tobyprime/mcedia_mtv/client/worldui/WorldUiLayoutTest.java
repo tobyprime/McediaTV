@@ -82,6 +82,15 @@ class WorldUiLayoutTest {
         assertEquals(new WorldUiControlArgument.Scalar(0.0F), sender.requests.get(1).argument());
     }
 
+    @Test
+    void detailsAreHiddenForSmallOrExtremeAspectScreens() {
+        assertTrue(WorldUiLayout.showsDetails(1.6F, 0.9F));
+        assertFalse(WorldUiLayout.showsDetails(0.79F, 0.9F));
+        assertFalse(WorldUiLayout.showsDetails(1.6F, 0.44F));
+        assertFalse(WorldUiLayout.showsDetails(3.2F, 0.5F));
+        assertFalse(WorldUiLayout.showsDetails(0.4F, 0.9F));
+    }
+
     private static final class RecordingSender implements WorldUiInteractionState.ControlSender {
         private final List<WorldUiControlRequest> requests = new ArrayList<>();
 

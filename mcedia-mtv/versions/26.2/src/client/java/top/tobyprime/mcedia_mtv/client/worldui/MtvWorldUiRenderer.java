@@ -51,6 +51,7 @@ public final class MtvWorldUiRenderer {
         if (!PRESENTATION.isExpanded(target)) {
             quad(collector, pose, camera, screen.plane(), .93F, .93F, .99F, .99F, 0xD9242828);
             quad(collector, pose, camera, screen.plane(), .955F, .945F, .975F, .975F, 0xFFF0F0F0);
+            drawText(collector, pose, camera, screen.plane(), "+", .958F, .954F, .0014F, 0xFFFFFFFF);
             return;
         }
         quad(collector, pose, camera, screen.plane(), .02F, .65F, .98F, .98F, 0xD0101010);
@@ -58,9 +59,12 @@ public final class MtvWorldUiRenderer {
         drawTransport(collector, pose, camera, screen.plane());
         float volume = WorldUiControlStateCache.getInstance().state(screen.mtvUuid()) == null ? 1.0F : WorldUiControlStateCache.getInstance().state(screen.mtvUuid()).masterVolume();
         drawVolume(collector, pose, camera, screen.plane(), volume);
-        drawCover(collector, pose, camera, screen.plane(), snapshot);
-        drawMediaInfo(collector, pose, camera, screen.plane(), snapshot);
-        if (PRESENTATION.isPlaylistExpanded()) drawPlaylist(collector, pose, camera, screen.plane(), snapshot);
+        drawControlLabels(collector, pose, camera, screen.plane(), snapshot);
+        if (WorldUiLayout.showsDetails(screen.plane().width(), screen.plane().height())) {
+            drawCover(collector, pose, camera, screen.plane(), snapshot);
+            drawMediaInfo(collector, pose, camera, screen.plane(), snapshot);
+            if (PRESENTATION.isPlaylistExpanded()) drawPlaylist(collector, pose, camera, screen.plane(), snapshot);
+        }
         quad(collector, pose, camera, screen.plane(), .93F, .93F, .99F, .99F, 0xD9242828);
     }
 
@@ -88,6 +92,20 @@ public final class MtvWorldUiRenderer {
         quad(collector, pose, camera, screen, .84F, .72F, .84F + .12F * Math.max(0.0F, Math.min(1.0F, volume)), .76F, 0xFFE0E0E0);
     }
 
+    private static void drawControlLabels(SubmitNodeCollector collector, PoseStack pose, Vec3 camera,
+                                          WorldUiScreenRaycast.Screen screen, ClientChannelPlaybackSnapshot snapshot) {
+        long positionUs = snapshot.anchorMediaTimeUs();
+        if (!snapshot.paused()) positionUs += Math.max(0L, snapshot.elapsedTimeMs()) * 1000L;
+        drawText(collector, pose, camera, screen, WorldUiPlaybackPresentation.timeLabel(positionUs, snapshot.resolvedDurationUs()), .06F, .81F, .0012F, 0xFFD0D0D0);
+        drawText(collector, pose, camera, screen, Math.round(snapshot.speed() * 10.0F) / 10.0F + "x", .215F, .73F, .0016F, 0xFFE0E0E0);
+        drawText(collector, pose, camera, screen, "<", .34F, .73F, .0020F, 0xFFE0E0E0);
+        drawText(collector, pose, camera, screen, snapshot.paused() ? ">" : "||", .48F, .73F, .0020F, 0xFF101010);
+        drawText(collector, pose, camera, screen, ">", .62F, .73F, .0020F, 0xFFE0E0E0);
+        drawText(collector, pose, camera, screen, "Q", .775F, .73F, .0016F, 0xFFE0E0E0);
+        drawText(collector, pose, camera, screen, "+", .855F, .73F, .0018F, 0xFFE0E0E0);
+        drawText(collector, pose, camera, screen, "M", .915F, .73F, .0016F, 0xFFE0E0E0);
+    }
+
     private static void drawPlaylist(SubmitNodeCollector collector, PoseStack pose, Vec3 camera, WorldUiScreenRaycast.Screen screen, ClientChannelPlaybackSnapshot snapshot) {
         quad(collector, pose, camera, screen, .68F, .04F, .98F, .64F, 0xE0161616);
         quad(collector, pose, camera, screen, .70F, .05F, .82F, .09F, 0xFF3A3A3A);
@@ -105,7 +123,11 @@ public final class MtvWorldUiRenderer {
                 boolean current = present && index == manifest.cursor();
                 quad(collector, pose, camera, screen, .70F, top, .98F, bottom, current ? 0xFF666666 : 0xFF292929);
                 if (present) {
-                    if (page != null) drawMetadataText(collector, pose, camera, screen, page.mediaUrls().get(pageIndex), .71F, top + .02F, .0016F, 0xFFE8E8E8, 18);
+                    if (page != null) {
+                        String mediaUrl = page.mediaUrls().get(pageIndex);
+                        drawPlaylistCover(collector, pose, camera, screen, mediaUrl, .71F, top + .01F, .735F, bottom - .01F);
+                        drawMetadataText(collector, pose, camera, screen, mediaUrl, .74F, top + .02F, .0016F, 0xFFE8E8E8, 10);
+                    }
                     quad(collector, pose, camera, screen, .80F, top + .01F, .84F, bottom - .01F, 0xFF515151);
                     quad(collector, pose, camera, screen, .85F, top + .01F, .89F, bottom - .01F, 0xFF515151);
                     quad(collector, pose, camera, screen, .90F, top + .01F, .94F, bottom - .01F, 0xFF515151);
@@ -132,6 +154,17 @@ public final class MtvWorldUiRenderer {
             return;
         }
         texturedQuad(collector, pose, camera, screen, textureId, .04F, .08F, .07F, .24F);
+    }
+
+    private static void drawPlaylistCover(SubmitNodeCollector collector, PoseStack pose, Vec3 camera, WorldUiScreenRaycast.Screen screen,
+                                          String mediaUrl, float left, float top, float right, float bottom) {
+        MtvMediaMetadata metadata = MtvMediaMetadataCache.getInstance().cached(mediaUrl);
+        Identifier textureId = metadata == null ? null : MtvWorldUiCoverTextures.texture(metadata.coverUrl());
+        if (textureId == null) {
+            quad(collector, pose, camera, screen, left, top, right, bottom, 0xFF414141);
+            return;
+        }
+        texturedQuad(collector, pose, camera, screen, textureId, left, top, right, bottom);
     }
 
     private static void drawMetadataText(SubmitNodeCollector collector, PoseStack pose, Vec3 camera, WorldUiScreenRaycast.Screen screen,

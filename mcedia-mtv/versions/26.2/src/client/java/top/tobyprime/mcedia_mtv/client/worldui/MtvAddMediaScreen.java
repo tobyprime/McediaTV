@@ -27,13 +27,22 @@ public final class MtvAddMediaScreen extends Screen {
         prepend = addButton(left, height / 2 + 50, "Prepend", WorldUiAddMediaModel.AddMode.PREPEND);
         insertNext = addButton(left + 112, height / 2 + 50, "Insert next", WorldUiAddMediaModel.AddMode.INSERT_NEXT);
         append = addButton(left + 224, height / 2 + 50, "Append", WorldUiAddMediaModel.AddMode.APPEND);
-        playNow = addButton(left + 336, height / 2 + 50, "Play now", WorldUiAddMediaModel.AddMode.INSERT_AND_PLAY); input.setFocused(true);
+        playNow = addButton(left + 336, height / 2 + 50, "Play now", WorldUiAddMediaModel.AddMode.INSERT_AND_PLAY);
+        addRenderableWidget(Button.builder(Component.literal("Cancel"), button -> minecraft.gui.setScreen(null)).bounds(width / 2 - 52, height / 2 + 78, 104, 20).build());
+        input.setFocused(true);
     }
     private Button addButton(int x, int y, String label, WorldUiAddMediaModel.AddMode mode) { return addRenderableWidget(Button.builder(Component.literal(label), button -> model.confirm(target, WorldUiControlSender.getInstance(), mode)).bounds(x, y, 104, 20).build()); }
     @Override public void tick() {
         super.tick(); boolean enabled = model.canConfirm(); if (prepend != null) { prepend.active = enabled; insertNext.active = enabled; append.active = enabled; playNow.active = enabled; }
         model.onControlResult(WorldUiControlSender.getInstance().lastResult());
-        MtvMediaMetadata metadata = model.preview(); previewText.setMessage(Component.literal(metadata == null ? (model.resolving() ? "Resolving locally..." : "Waiting for local preview") : "Title: " + metadata.title() + " | Author: " + metadata.author() + " | Platform: " + metadata.platform() + " | Description: " + metadata.description() + " | Cover: " + MtvMediaCoverCache.getInstance().statusLabel(metadata.coverUrl())));
+        MtvMediaMetadata metadata = model.preview(); previewText.setMessage(Component.literal(previewMessage(metadata)));
         if (model.consumeAccepted()) minecraft.gui.setScreen(null);
+    }
+    private String previewMessage(MtvMediaMetadata metadata) {
+        String value;
+        if (metadata == null) value = model.resolving() ? "Resolving locally..." : "Waiting for local preview";
+        else if (metadata.status() == MtvMediaMetadata.Status.FAILED) value = "Local resolver: " + metadata.errorReason();
+        else value = "Title: " + metadata.title() + " | Author: " + metadata.author() + " | Platform: " + metadata.platform() + " | Description: " + metadata.description() + " | Cover: " + MtvMediaCoverCache.getInstance().statusLabel(metadata.coverUrl());
+        return model.lastError().name().equals("NONE") ? value : value + " | Server: " + model.lastError().name();
     }
 }

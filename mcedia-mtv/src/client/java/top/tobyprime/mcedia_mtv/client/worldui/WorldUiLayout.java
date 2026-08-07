@@ -4,6 +4,18 @@ package top.tobyprime.mcedia_mtv.client.worldui;
 public final class WorldUiLayout {
     private static final float TOGGLE_TRIGGER_START = 0.90F;
     private static final float TOGGLE_BUTTON_START = 0.93F;
+    private static final float MIN_DETAIL_WIDTH = 0.80F;
+    private static final float MIN_DETAIL_HEIGHT = 0.45F;
+    private static final float MIN_DETAIL_ASPECT = 0.75F;
+    private static final float MAX_DETAIL_ASPECT = 3.00F;
+
+    public static boolean showsDetails(float width, float height) {
+        if (!Float.isFinite(width) || !Float.isFinite(height) || width < MIN_DETAIL_WIDTH || height < MIN_DETAIL_HEIGHT) {
+            return false;
+        }
+        float aspect = width / height;
+        return aspect >= MIN_DETAIL_ASPECT && aspect <= MAX_DETAIL_ASPECT;
+    }
 
     public WorldUiHit hit(float u, float v, boolean expanded) {
         return hit(u, v, expanded, false);

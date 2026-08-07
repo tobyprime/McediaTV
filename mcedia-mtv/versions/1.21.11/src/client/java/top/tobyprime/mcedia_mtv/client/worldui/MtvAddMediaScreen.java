@@ -26,13 +26,15 @@ public final class MtvAddMediaScreen extends Screen {
         prepend = addButton(left, height / 2 + 50, "Prepend", WorldUiAddMediaModel.AddMode.PREPEND);
         insertNext = addButton(left + 112, height / 2 + 50, "Insert next", WorldUiAddMediaModel.AddMode.INSERT_NEXT);
         append = addButton(left + 224, height / 2 + 50, "Append", WorldUiAddMediaModel.AddMode.APPEND);
-        playNow = addButton(left + 336, height / 2 + 50, "Play now", WorldUiAddMediaModel.AddMode.INSERT_AND_PLAY); input.setFocused(true);
+        playNow = addButton(left + 336, height / 2 + 50, "Play now", WorldUiAddMediaModel.AddMode.INSERT_AND_PLAY);
+        addRenderableWidget(Button.builder(Component.literal("Cancel"), button -> minecraft.setScreen(null)).bounds(width / 2 - 52, height / 2 + 78, 104, 20).build());
+        input.setFocused(true);
     }
     private Button addButton(int x, int y, String label, WorldUiAddMediaModel.AddMode mode) { return addRenderableWidget(Button.builder(Component.literal(label), button -> model.confirm(target, WorldUiControlSender.getInstance(), mode)).bounds(x, y, 104, 20).build()); }
     @Override public void tick() {
         super.tick(); boolean enabled = model.canConfirm(); if (prepend != null) { prepend.active = enabled; insertNext.active = enabled; append.active = enabled; playNow.active = enabled; }
         model.onControlResult(WorldUiControlSender.getInstance().lastResult()); MtvMediaMetadata metadata = model.preview();
-        preview = metadata == null ? (model.resolving() ? "Resolving locally..." : "Waiting for local preview") : "Title: " + metadata.title() + " | Author: " + metadata.author() + " | Platform: " + metadata.platform() + " | Description: " + metadata.description() + " | Cover: " + MtvMediaCoverCache.getInstance().statusLabel(metadata.coverUrl());
+        preview = previewMessage(metadata);
         if (model.consumeAccepted()) minecraft.setScreen(null);
     }
     @Override public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
@@ -40,5 +42,12 @@ public final class MtvAddMediaScreen extends Screen {
         graphics.drawCenteredString(font, Component.literal("Add media to MTV playlist"), width / 2, height / 2 - 110, 0xFFFFFFFF);
         graphics.drawCenteredString(font, Component.literal(preview == null ? "Waiting for local preview" : preview), width / 2, height / 2 - 40, 0xFFD0D0D0);
         super.render(graphics, mouseX, mouseY, partialTick);
+    }
+    private String previewMessage(MtvMediaMetadata metadata) {
+        String value;
+        if (metadata == null) value = model.resolving() ? "Resolving locally..." : "Waiting for local preview";
+        else if (metadata.status() == MtvMediaMetadata.Status.FAILED) value = "Local resolver: " + metadata.errorReason();
+        else value = "Title: " + metadata.title() + " | Author: " + metadata.author() + " | Platform: " + metadata.platform() + " | Description: " + metadata.description() + " | Cover: " + MtvMediaCoverCache.getInstance().statusLabel(metadata.coverUrl());
+        return model.lastError().name().equals("NONE") ? value : value + " | Server: " + model.lastError().name();
     }
 }

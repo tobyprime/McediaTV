@@ -125,7 +125,7 @@ public final class MtvWorldUiInputHook {
     private static void reset() {
         MtvWorldUiRenderer.presentation().clearHover();
         MtvWorldUiRenderer.presentation().collapse();
-        if (primaryDown && consumesAttack) INTERACTION.collapse();
+        INTERACTION.collapse();
         primaryDown = false;
         consumesAttack = false;
     }

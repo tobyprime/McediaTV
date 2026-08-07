@@ -11,6 +11,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -58,6 +59,38 @@ class WorldUiAddMediaModelTest {
         assertFalse(model.consumeAccepted());
     }
 
+    @Test
+    void rejectedAddKeepsPreviewAndExposesTheStableErrorCode() {
+        var sender = new RecordingSender();
+        var metadata = new MtvMediaMetadata("https://example.com/video", "title", "", "", "", "", MtvMediaMetadata.Status.RESOLVED, "");
+        var model = new WorldUiAddMediaModel(url -> CompletableFuture.completedFuture(metadata));
+        model.setInput("https://example.com/video");
+        model.confirm(new WorldUiInteractionState.Target(UUID.randomUUID(), "screen_0", "self:test", 4L), sender, WorldUiAddMediaModel.AddMode.APPEND);
+
+        model.onControlResult(new WorldUiControlResult(1L, false, WorldUiControlError.PERMISSION_DENIED, 4L));
+
+        assertEquals(WorldUiControlError.PERMISSION_DENIED, model.lastError());
+        assertEquals(metadata, model.preview());
+        assertFalse(model.consumeAccepted());
+    }
+
+    @Test
+    void rapidInputOnlyResolvesTheLatestUrlAfterDebounce() {
+        var scheduler = new RecordingScheduler();
+        var resolveCount = new AtomicInteger();
+        var model = new WorldUiAddMediaModel(url -> {
+            resolveCount.incrementAndGet();
+            return CompletableFuture.completedFuture(new MtvMediaMetadata(url, "title", "", "", "", "", MtvMediaMetadata.Status.RESOLVED, ""));
+        }, scheduler);
+
+        model.setInput("https://example.test/first");
+        model.setInput("https://example.test/final");
+        scheduler.runScheduled();
+
+        assertEquals(1, resolveCount.get());
+        assertEquals("https://example.test/final", model.preview().normalizedUrl());
+    }
+
     private static final class RecordingSender implements WorldUiInteractionState.ControlSender {
         private final List<WorldUiControlRequest> requests = new ArrayList<>();
 
@@ -72,6 +105,22 @@ class WorldUiAddMediaModelTest {
 
         @Override
         public void unwatch(WorldUiInteractionState.Target target) {
+        }
+    }
+
+    private static final class RecordingScheduler implements WorldUiAddMediaModel.ResolutionScheduler {
+        private Runnable task;
+
+        @Override
+        public WorldUiAddMediaModel.Cancellable schedule(Runnable next) {
+            task = next;
+            return () -> task = null;
+        }
+
+        void runScheduled() {
+            Runnable next = task;
+            task = null;
+            if (next != null) next.run();
         }
     }
 }
