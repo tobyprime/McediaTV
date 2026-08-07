@@ -14,6 +14,7 @@ import top.tobyprime.mcedia_mtv.client.channel.worldui.WorldUiControlError;
 import top.tobyprime.mcedia_mtv.client.channel.worldui.WorldUiControlOperation;
 import top.tobyprime.mcedia_mtv.client.channel.worldui.WorldUiControlRequest;
 import top.tobyprime.mcedia_mtv.client.channel.worldui.WorldUiControlResult;
+import top.tobyprime.mcedia_mtv.client.channel.worldui.WorldUiCapabilities;
 
 public final class MtvChannelProtocol {
     public static final String CHANNEL_SUBSCRIBE = "mcedia_mtv:channel_subscribe";
@@ -28,6 +29,7 @@ public final class MtvChannelProtocol {
     public static final String CHANNEL_PLAYLIST_PAGE = "mcedia_mtv:channel_playlist_page";
     public static final String CHANNEL_CONTROL_REQUEST = "mcedia_mtv:channel_control_request";
     public static final String CHANNEL_CONTROL_RESULT = "mcedia_mtv:channel_control_result";
+    public static final int WORLD_UI_PROTOCOL_VERSION = 1;
     public static final int MAX_PLAYLIST_PAGE_ITEMS = 32;
     public static final int MAX_PLAYLIST_PAGE_BYTES = 24 * 1024;
     public static final int MAX_MEDIA_URL_LENGTH = 2_048;
@@ -323,6 +325,34 @@ public final class MtvChannelProtocol {
         return result;
     }
 
+    public static byte[] encodeCapabilities(WorldUiCapabilities capabilities) {
+        var buffer = new FriendlyByteBuf(Unpooled.buffer());
+        writeCapabilities(buffer, capabilities);
+        return toBytes(buffer);
+    }
+
+    public static WorldUiCapabilities decodeCapabilities(byte[] message) {
+        return readCapabilities(new FriendlyByteBuf(Unpooled.wrappedBuffer(message)));
+    }
+
+    public static void writeCapabilities(FriendlyByteBuf buffer, WorldUiCapabilities capabilities) {
+        validateCapabilities(capabilities);
+        buffer.writeVarInt(capabilities.protocolVersion());
+        buffer.writeVarInt(capabilities.maxPageItems());
+        buffer.writeLong(capabilities.featureFlags());
+    }
+
+    public static WorldUiCapabilities readCapabilities(FriendlyByteBuf buffer) {
+        var capabilities = new WorldUiCapabilities(
+                readNonNegativeInt(buffer, "protocolVersion"),
+                readNonNegativeInt(buffer, "maxPageItems"),
+                readNonNegativeLong(buffer, "featureFlags")
+        );
+        validateCapabilities(capabilities);
+        ensureFullyRead(buffer, "world UI capabilities");
+        return capabilities;
+    }
+
     private static void validateControlRequest(WorldUiControlRequest request) {
         if (request == null || request.targetMtvUuid() == null || request.operation() == null || request.argument() == null) {
             throw invalidPacket("control request", "required field is missing");
@@ -344,6 +374,16 @@ public final class MtvChannelProtocol {
         }
         if (result.accepted() != (result.error() == WorldUiControlError.NONE)) {
             throw invalidPacket("control result", "accepted and error are inconsistent");
+        }
+    }
+
+    private static void validateCapabilities(WorldUiCapabilities capabilities) {
+        if (capabilities == null
+                || capabilities.protocolVersion() != WORLD_UI_PROTOCOL_VERSION
+                || capabilities.maxPageItems() <= 0
+                || capabilities.maxPageItems() > MAX_PLAYLIST_PAGE_ITEMS
+                || capabilities.featureFlags() < 0L) {
+            throw invalidPacket("world UI capabilities", "field is invalid");
         }
     }
 

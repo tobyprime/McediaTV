@@ -116,4 +116,11 @@ class WorldUiProtocolTest {
 
         assertEquals(result, MtvChannelProtocol.decodeControlResult(encoded));
     }
+
+    @Test
+    void capabilitiesRoundTrip() {
+        var capabilities = new WorldUiCapabilities(1, 32, 7L);
+
+        assertEquals(capabilities, MtvChannelProtocol.decodeCapabilities(MtvChannelProtocol.encodeCapabilities(capabilities)));
+    }
 }

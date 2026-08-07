@@ -7,6 +7,8 @@ import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import top.tobyprime.mcedia_mtv.client.HudChannelPlayer;
+import top.tobyprime.mcedia_mtv.client.channel.worldui.MtvWorldUiCapabilitiesPayload;
+import top.tobyprime.mcedia_mtv.client.channel.worldui.WorldUiCapabilityState;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -21,6 +23,7 @@ public final class MtvClientChannelPayloads {
         PayloadTypeRegistry.playS2C().register(MtvChannelClientSnapshotPayload.TYPE, MtvChannelClientSnapshotPayload.CODEC);
         PayloadTypeRegistry.playS2C().register(MtvChannelClientSyncPayload.TYPE, MtvChannelClientSyncPayload.CODEC);
         PayloadTypeRegistry.playS2C().register(MtvChannelRemovePayload.TYPE, MtvChannelRemovePayload.CODEC);
+        PayloadTypeRegistry.playS2C().register(MtvWorldUiCapabilitiesPayload.TYPE, MtvWorldUiCapabilitiesPayload.CODEC);
         PayloadTypeRegistry.playC2S().register(MtvChannelClientSubscribePayload.TYPE, MtvChannelClientSubscribePayload.CODEC);
         PayloadTypeRegistry.playC2S().register(MtvChannelClientUnsubscribePayload.TYPE, MtvChannelClientUnsubscribePayload.CODEC);
         PayloadTypeRegistry.playC2S().register(MtvChannelClientHeartbeatPayload.TYPE, MtvChannelClientHeartbeatPayload.CODEC);
@@ -36,6 +39,9 @@ public final class MtvClientChannelPayloads {
         ClientPlayNetworking.registerGlobalReceiver(MtvHudBindingPayload.TYPE, (payload, context) ->
                 safeHandle("hud_binding", payload.channelId(), null, () ->
                         HudChannelPlayer.getInstance().onBinding(payload.channelId())));
+        ClientPlayNetworking.registerGlobalReceiver(MtvWorldUiCapabilitiesPayload.TYPE, (payload, context) ->
+                safeHandle("world_ui_capabilities", "", null, () ->
+                        WorldUiCapabilityState.getInstance().onCapabilities(payload.capabilities())));
         ClientPlayConnectionEvents.JOIN.register(MtvClientChannelPayloads::onJoin);
         ClientPlayConnectionEvents.DISCONNECT.register(MtvClientChannelPayloads::onDisconnect);
         LOGGER.debug("Registered MTV client channel payloads and connection listeners");
@@ -68,5 +74,6 @@ public final class MtvClientChannelPayloads {
         LOGGER.info("Close MTV client channel state: server={}",
                 client.getCurrentServer() == null ? "singleplayer" : client.getCurrentServer().ip);
         lifecycle.onDisconnect();
+        WorldUiCapabilityState.getInstance().clear();
     }
 }
