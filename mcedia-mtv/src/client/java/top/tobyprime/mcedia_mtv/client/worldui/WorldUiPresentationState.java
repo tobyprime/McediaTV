@@ -13,6 +13,7 @@ public final class WorldUiPresentationState {
     private float hoveredU;
     private float hoveredV;
     private WorldUiInteractionState.Target expandedTarget;
+    private boolean playlistExpanded;
 
     public void update(WorldUiInteractionState.Target target, float u, float v) {
         hoveredTarget = target;
@@ -33,6 +34,7 @@ public final class WorldUiPresentationState {
 
     public void collapse() {
         expandedTarget = null;
+        playlistExpanded = false;
     }
 
     public boolean isExpanded(WorldUiInteractionState.Target target) {
@@ -50,7 +52,7 @@ public final class WorldUiPresentationState {
         if (hoveredTarget == null) {
             return WorldUiHit.NONE;
         }
-        return layout.hit(hoveredU, hoveredV, isExpanded(hoveredTarget));
+        return layout.hit(hoveredU, hoveredV, isExpanded(hoveredTarget), playlistExpanded);
     }
 
     public WorldUiInteractionState.Target hoveredTarget() {
@@ -63,6 +65,14 @@ public final class WorldUiPresentationState {
 
     public float hoveredV() {
         return hoveredV;
+    }
+
+    public boolean isPlaylistExpanded() {
+        return playlistExpanded;
+    }
+
+    public void togglePlaylist() {
+        playlistExpanded = !playlistExpanded;
     }
 
     private static boolean sameScreen(WorldUiInteractionState.Target first, WorldUiInteractionState.Target second) {

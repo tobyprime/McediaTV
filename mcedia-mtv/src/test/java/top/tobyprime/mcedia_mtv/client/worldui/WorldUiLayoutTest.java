@@ -57,6 +57,30 @@ class WorldUiLayoutTest {
         assertEquals(10L, sender.requests.getFirst().expectedRevision());
     }
 
+    @Test
+    void playlistPanelProvidesStableIndexedRowsAndSeparateAddButton() {
+        var layout = new WorldUiLayout();
+
+        assertEquals(WorldUiHit.Kind.QUEUE, layout.hit(0.79F, 0.74F, true, true).kind());
+        assertEquals(WorldUiHit.Kind.PLAYLIST_ITEM, layout.hit(0.75F, 0.20F, true, true).kind());
+        assertEquals(1, layout.hit(0.75F, 0.20F, true, true).index());
+        assertEquals(WorldUiHit.Kind.ADD_MEDIA, layout.hit(0.86F, 0.74F, true, true).kind());
+    }
+
+    @Test
+    void speedAndMuteUseImmediateControls() {
+        var sender = new RecordingSender();
+        var target = new WorldUiInteractionState.Target(UUID.randomUUID(), "screen_0", "self:test", 2L);
+        var state = new WorldUiInteractionState(sender);
+        var layout = new WorldUiLayout();
+        state.onPrimaryPress(target, layout.hit(0.98F, 0.98F, false), .98F, .98F, 1L);
+        state.onPrimaryPress(target, layout.hit(.22F, .72F, true), .22F, .72F, 1L);
+        state.onPrimaryPress(target, layout.hit(.92F, .72F, true), .92F, .72F, 1L);
+        assertEquals("SET_SPEED", sender.requests.get(0).operation().name());
+        assertEquals(new WorldUiControlArgument.Scalar(.5F), sender.requests.get(0).argument());
+        assertEquals("TOGGLE_MUTE", sender.requests.get(1).operation().name());
+    }
+
     private static final class RecordingSender implements WorldUiInteractionState.ControlSender {
         private final List<WorldUiControlRequest> requests = new ArrayList<>();
 

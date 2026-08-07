@@ -17,6 +17,8 @@ public final class WorldUiInteractionState {
     private Drag activeDrag = Drag.NONE;
     private float dragU;
     private float dragV;
+    private int speedIndex;
+    private String playOrderMode = "SEQUENTIAL";
 
     public WorldUiInteractionState(ControlSender sender) {
         this.sender = Objects.requireNonNull(sender, "sender");
@@ -31,6 +33,10 @@ public final class WorldUiInteractionState {
         if (sameScreen(target, expandedTarget)) {
             expandedTarget = target;
         }
+    }
+
+    public void setPlayOrderMode(String mode) {
+        if (mode != null && !mode.isBlank()) playOrderMode = mode;
     }
 
     public void onPrimaryPress(Target target, WorldUiHit hit, float u, float v, long durationUs) {
@@ -103,11 +109,44 @@ public final class WorldUiInteractionState {
             case TOGGLE_PAUSE -> WorldUiControlOperation.TOGGLE_PAUSE;
             case NEXT -> WorldUiControlOperation.NEXT;
             case PREVIOUS -> WorldUiControlOperation.PREVIOUS;
+            case SPEED -> WorldUiControlOperation.SET_SPEED;
+            case MUTE -> WorldUiControlOperation.TOGGLE_MUTE;
+            case PLAYLIST_ITEM -> WorldUiControlOperation.PLAY_INDEX;
+            case REMOVE_ITEM -> WorldUiControlOperation.REMOVE;
+            case MOVE_FRONT -> WorldUiControlOperation.MOVE_FRONT;
+            case MOVE_BACK -> WorldUiControlOperation.MOVE_BACK;
+            case CLEAR_PLAYLIST -> WorldUiControlOperation.CLEAR;
+            case SET_PLAY_ORDER -> WorldUiControlOperation.SET_PLAY_ORDER;
             default -> null;
         };
         if (operation != null) {
-            send(target, dragU, dragV, operation, WorldUiControlArgument.None.INSTANCE);
+            WorldUiControlArgument argument = switch (hit.kind()) {
+                case PLAYLIST_ITEM, REMOVE_ITEM, MOVE_FRONT, MOVE_BACK -> new WorldUiControlArgument.PlaylistIndex(hit.index());
+                case SET_PLAY_ORDER -> new WorldUiControlArgument.PlayOrderMode(nextPlayOrderMode());
+                case SPEED -> new WorldUiControlArgument.Scalar(nextSpeed());
+                default -> WorldUiControlArgument.None.INSTANCE;
+            };
+            send(target, dragU, dragV, operation, argument);
         }
+    }
+
+    private float nextSpeed() {
+        float[] speeds = {0.5F, 1.0F, 1.5F, 2.0F};
+        float value = speeds[speedIndex % speeds.length];
+        speedIndex++;
+        return value;
+    }
+
+    private String nextPlayOrderMode() {
+        String next = switch (playOrderMode) {
+            case "SEQUENTIAL" -> "SHUFFLE";
+            case "SHUFFLE" -> "LOOP_ALL";
+            case "LOOP_ALL" -> "LOOP_ONE";
+            case "LOOP_ONE" -> "CURRENT_ONLY";
+            default -> "SEQUENTIAL";
+        };
+        playOrderMode = next;
+        return next;
     }
 
     private void send(Target target, float u, float v, WorldUiControlOperation operation, WorldUiControlArgument argument) {

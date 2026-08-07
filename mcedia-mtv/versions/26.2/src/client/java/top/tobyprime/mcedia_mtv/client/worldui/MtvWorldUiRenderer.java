@@ -9,6 +9,7 @@ import net.minecraft.world.phys.Vec3;
 import org.joml.Vector3f;
 import top.tobyprime.mcedia_mtv.client.channel.ClientChannelPlaybackManager;
 import top.tobyprime.mcedia_mtv.client.channel.ClientChannelPlaybackSnapshot;
+import top.tobyprime.mcedia_mtv.client.channel.worldui.WorldUiPlaylistCache;
 import top.tobyprime.mcedia_mtv.client.entityplayer.EntityPlayerHandle;
 import top.tobyprime.mcedia_mtv.client.entityplayer.EntityPlayerManager;
 
@@ -47,6 +48,7 @@ public final class MtvWorldUiRenderer {
         drawProgress(collector, pose, camera, screen.plane(), snapshot);
         drawTransport(collector, pose, camera, screen.plane());
         drawVolume(collector, pose, camera, screen.plane());
+        if (PRESENTATION.isPlaylistExpanded()) drawPlaylist(collector, pose, camera, screen.plane(), snapshot);
         quad(collector, pose, camera, screen.plane(), .93F, .93F, .99F, .99F, 0xD9242828);
     }
 
@@ -70,6 +72,27 @@ public final class MtvWorldUiRenderer {
     private static void drawVolume(SubmitNodeCollector collector, PoseStack pose, Vec3 camera, WorldUiScreenRaycast.Screen screen) {
         quad(collector, pose, camera, screen, .84F, .72F, .96F, .76F, 0xFF373737);
         quad(collector, pose, camera, screen, .84F, .72F, .93F, .76F, 0xFFE0E0E0);
+    }
+
+    private static void drawPlaylist(SubmitNodeCollector collector, PoseStack pose, Vec3 camera, WorldUiScreenRaycast.Screen screen, ClientChannelPlaybackSnapshot snapshot) {
+        quad(collector, pose, camera, screen, .68F, .04F, .98F, .64F, 0xE0161616);
+        quad(collector, pose, camera, screen, .70F, .05F, .82F, .09F, 0xFF3A3A3A);
+        quad(collector, pose, camera, screen, .88F, .05F, .98F, .09F, 0xFF3A3A3A);
+        WorldUiPlaylistCache.getInstance().manifest(snapshot.channelId()).ifPresent(manifest -> {
+            var page = WorldUiPlaylistCache.getInstance().pageAt(snapshot.channelId(), 0).orElse(null);
+            for (int row = 0; row < 7; row++) {
+                float top = .10F + row * .08F, bottom = top + .065F;
+                boolean present = page != null && row < page.mediaUrls().size();
+                boolean current = present && row == manifest.cursor();
+                quad(collector, pose, camera, screen, .70F, top, .98F, bottom, current ? 0xFF666666 : 0xFF292929);
+                if (present) {
+                    quad(collector, pose, camera, screen, .80F, top + .01F, .84F, bottom - .01F, 0xFF515151);
+                    quad(collector, pose, camera, screen, .85F, top + .01F, .89F, bottom - .01F, 0xFF515151);
+                    quad(collector, pose, camera, screen, .90F, top + .01F, .94F, bottom - .01F, 0xFF515151);
+                    quad(collector, pose, camera, screen, .95F, top + .01F, .97F, bottom - .01F, 0xFF8A4040);
+                }
+            }
+        });
     }
 
     private static float progress(ClientChannelPlaybackSnapshot snapshot) {

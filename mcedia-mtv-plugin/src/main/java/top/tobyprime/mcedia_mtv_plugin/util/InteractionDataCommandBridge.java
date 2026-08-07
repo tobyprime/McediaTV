@@ -93,7 +93,8 @@ public final class InteractionDataCommandBridge {
         tag.putString("fill_mode", screen.getFillMode());
         tag.putString("background_texture", screen.getBackgroundTexture());
         tag.putBoolean("danmaku_visible", screen.isDanmakuVisible());
-        tag.putBoolean("progress_bar_visible", screen.isProgressBarVisible());
+        // MTV world UI owns the in-screen progress bar; keep Core's passive bar hidden.
+        tag.putBoolean("progress_bar_visible", false);
         return tag;
     }
 

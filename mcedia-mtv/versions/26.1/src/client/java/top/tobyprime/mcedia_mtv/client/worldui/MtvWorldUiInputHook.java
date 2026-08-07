@@ -7,6 +7,8 @@ import org.joml.Vector3f;
 import top.tobyprime.mcedia_mtv.client.channel.ClientChannelPlaybackManager;
 import top.tobyprime.mcedia_mtv.client.channel.worldui.WorldUiCapabilityState;
 import top.tobyprime.mcedia_mtv.client.channel.worldui.WorldUiControlSender;
+import top.tobyprime.mcedia_mtv.client.channel.worldui.WorldUiPlaylistCache;
+import top.tobyprime.mcedia_mtv.client.channel.worldui.WorldUiPlaylistPageSender;
 import top.tobyprime.mcedia_mtv.client.entityplayer.EntityPlayerHandle;
 import top.tobyprime.mcedia_mtv.client.entityplayer.EntityPlayerManager;
 
@@ -41,6 +43,7 @@ public final class MtvWorldUiInputHook {
         } else {
             MtvWorldUiRenderer.presentation().update(selection.target(), selection.u(), selection.v());
             INTERACTION.refreshTarget(selection.target());
+            WorldUiPlaylistCache.getInstance().manifest(selection.target().channelId()).ifPresent(m -> INTERACTION.setPlayOrderMode(m.playOrderMode()));
         }
 
         boolean down = client.options.keyAttack.isDown();
@@ -51,6 +54,17 @@ public final class MtvWorldUiInputHook {
             if (consumesAttack) {
                 if (hit.kind() == WorldUiHit.Kind.ADD_MEDIA) {
                     MtvAddMediaScreen.open(client, selection.target());
+                    primaryDown = down;
+                    return;
+                }
+                if (hit.kind() == WorldUiHit.Kind.QUEUE) {
+                    presentation.togglePlaylist();
+                    if (presentation.isPlaylistExpanded()) requestVisiblePage(selection.target());
+                    primaryDown = down;
+                    return;
+                }
+                if (isPlaylistOperation(hit.kind()) && !hasCachedItem(selection.target().channelId(), hit.index())) {
+                    requestVisiblePage(selection.target());
                     primaryDown = down;
                     return;
                 }
@@ -102,6 +116,28 @@ public final class MtvWorldUiInputHook {
         if (primaryDown && consumesAttack) INTERACTION.collapse();
         primaryDown = false;
         consumesAttack = false;
+    }
+
+    private static void requestVisiblePage(WorldUiInteractionState.Target target) {
+        WorldUiPlaylistCache.getInstance().manifest(target.channelId()).ifPresent(manifest -> {
+            int end = Math.min(7, Math.max(0, manifest.itemCount() - 1));
+            for (int offset : WorldUiPlaylistCache.getInstance().missingOffsetsForVisibleRange(target.channelId(), 0, end)) {
+                WorldUiPlaylistPageSender.request(target.channelId(), manifest.revision(), offset);
+            }
+        });
+    }
+
+    private static boolean hasCachedItem(String channelId, int index) {
+        if (index < 0) return false;
+        int offset = (index / 32) * 32;
+        return WorldUiPlaylistCache.getInstance().pageAt(channelId, offset)
+                .map(page -> index - page.offset() >= 0 && index - page.offset() < page.mediaUrls().size())
+                .orElse(false);
+    }
+
+    private static boolean isPlaylistOperation(WorldUiHit.Kind kind) {
+        return kind == WorldUiHit.Kind.PLAYLIST_ITEM || kind == WorldUiHit.Kind.REMOVE_ITEM
+                || kind == WorldUiHit.Kind.MOVE_FRONT || kind == WorldUiHit.Kind.MOVE_BACK;
     }
 
     private record Selection(WorldUiInteractionState.Target target, float u, float v, long durationUs) { }
