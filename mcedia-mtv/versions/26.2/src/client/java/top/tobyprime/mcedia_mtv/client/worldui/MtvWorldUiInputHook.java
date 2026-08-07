@@ -71,7 +71,7 @@ public final class MtvWorldUiInputHook {
             }
         }
         if (down && consumesAttack && selection != null) INTERACTION.onPointerMove(selection.u(), selection.v());
-        if (!down && primaryDown) { if (consumesAttack && selection != null) INTERACTION.onPrimaryRelease(selection.u(), selection.v(), selection.durationUs()); consumesAttack = false; }
+        if (!down && primaryDown) { if (consumesAttack) INTERACTION.onPrimaryRelease(selection == null ? 0L : selection.durationUs()); consumesAttack = false; }
         primaryDown = down;
     }
     private static Selection select(Minecraft client) {

@@ -17,6 +17,7 @@ public final class WorldUiInteractionState {
     private Drag activeDrag = Drag.NONE;
     private float dragU;
     private float dragV;
+    private long dragDurationUs;
     private int speedIndex;
     private String playOrderMode = "SEQUENTIAL";
     private float masterVolume = 1.0F;
@@ -60,6 +61,7 @@ public final class WorldUiInteractionState {
         }
         dragU = clamp(u);
         dragV = clamp(v);
+        dragDurationUs = Math.max(0L, durationUs);
         activeDrag = switch (hit.kind()) {
             case SEEK -> Drag.SEEK;
             case VOLUME -> Drag.VOLUME;
@@ -92,6 +94,15 @@ public final class WorldUiInteractionState {
                     new WorldUiControlArgument.Scalar(dragU));
         }
         activeDrag = Drag.NONE;
+    }
+
+    /**
+     * Finalizes a drag when the pointer left the screen before mouse release.
+     * The last local preview is still authoritative for this client gesture;
+     * no additional hover or network update is required.
+     */
+    public void onPrimaryRelease(long durationUs) {
+        onPrimaryRelease(dragU, dragV, dragDurationUs);
     }
 
     public void collapse() {

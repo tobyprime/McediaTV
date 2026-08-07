@@ -36,7 +36,11 @@ public final class WorldUiScreenHitValidator {
         }
         RayTraceResult trace = player.getWorld().rayTraceBlocks(
                 eye, direction.clone().multiply(1.0D / distance), distance, FluidCollisionMode.NEVER, true);
-        if (trace != null && trace.getHitPosition().distanceSquared(point) + OCCLUSION_EPSILON_SQUARED < distance * distance) {
+        // Compare both points from the eye. Comparing the block hit to the
+        // screen point would make every block before the screen look farther
+        // away when the screen is more than one block from the player.
+        if (trace != null && trace.getHitPosition().distanceSquared(eye.toVector())
+                + OCCLUSION_EPSILON_SQUARED < distance * distance) {
             return new ValidationResult(WorldUiControlError.OCCLUDED, point);
         }
         return new ValidationResult(WorldUiControlError.NONE, point);

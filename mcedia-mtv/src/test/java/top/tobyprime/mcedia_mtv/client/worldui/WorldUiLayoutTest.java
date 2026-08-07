@@ -54,6 +54,23 @@ class WorldUiLayoutTest {
     }
 
     @Test
+    void seekReleaseAfterLeavingScreenUsesLastPreviewAndClearsDrag() {
+        var sender = new RecordingSender();
+        var target = new WorldUiInteractionState.Target(UUID.randomUUID(), "screen_0", "self:test", 9L);
+        var state = new WorldUiInteractionState(sender);
+        var layout = new WorldUiLayout();
+
+        state.onPrimaryPress(target, layout.hit(0.98F, 0.98F, false), 0.98F, 0.98F, 100_000_000L);
+        state.onPrimaryPress(target, layout.hit(0.25F, 0.88F, true), 0.25F, 0.88F, 100_000_000L);
+        state.onPointerMove(0.75F, 0.88F);
+        state.onPrimaryRelease(100_000_000L);
+        state.onPrimaryRelease(100_000_000L);
+
+        assertEquals(1, sender.requests.size());
+        assertEquals(new WorldUiControlArgument.PositionUs(75_000_000L), sender.requests.getFirst().argument());
+    }
+
+    @Test
     void expandedControlsUseTheNewestChannelRevision() {
         var sender = new RecordingSender();
         var first = new WorldUiInteractionState.Target(UUID.randomUUID(), "screen_0", "self:test", 9L);

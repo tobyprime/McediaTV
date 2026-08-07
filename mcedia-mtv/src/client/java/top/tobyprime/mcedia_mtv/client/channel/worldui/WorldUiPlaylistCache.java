@@ -2,19 +2,29 @@ package top.tobyprime.mcedia_mtv.client.channel.worldui;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
+import java.util.Objects;
+import java.util.function.LongSupplier;
 import top.tobyprime.mcedia_mtv.client.metadata.MtvMediaMetadataCache;
 
 public final class WorldUiPlaylistCache {
     private static final int PAGE_SIZE = 32;
     private static final int MAX_PENDING_REQUESTS = 4;
+    private static final long PENDING_TIMEOUT_NANOS = 3_000_000_000L;
     private static final WorldUiPlaylistCache INSTANCE = new WorldUiPlaylistCache();
 
+    private final LongSupplier clockNanos;
     private final Map<String, ChannelPages> channels = new HashMap<>();
+
+    public WorldUiPlaylistCache() {
+        this(System::nanoTime);
+    }
+
+    WorldUiPlaylistCache(LongSupplier clockNanos) {
+        this.clockNanos = Objects.requireNonNull(clockNanos, "clockNanos");
+    }
 
     public static WorldUiPlaylistCache getInstance() {
         return INSTANCE;
@@ -62,11 +72,17 @@ public final class WorldUiPlaylistCache {
         if (state == null || state.manifest == null || state.manifest.itemCount() == 0) {
             return List.of();
         }
+        long now = clockNanos.getAsLong();
+        state.pendingOffsets.entrySet().removeIf(entry -> {
+            long age = now - entry.getValue();
+            return age >= PENDING_TIMEOUT_NANOS || age < 0L;
+        });
         int first = (visibleStart / PAGE_SIZE) * PAGE_SIZE;
         int last = (Math.min(visibleEnd, state.manifest.itemCount() - 1) / PAGE_SIZE) * PAGE_SIZE;
         var missing = new ArrayList<Integer>();
         for (int offset = first; offset <= last; offset += PAGE_SIZE) {
-            if (!state.pages.containsKey(offset) && state.pendingOffsets.size() < MAX_PENDING_REQUESTS && state.pendingOffsets.add(offset)) {
+            if (!state.pages.containsKey(offset) && state.pendingOffsets.size() < MAX_PENDING_REQUESTS
+                    && state.pendingOffsets.putIfAbsent(offset, now) == null) {
                 missing.add(offset);
             }
         }
@@ -87,6 +103,6 @@ public final class WorldUiPlaylistCache {
     private static final class ChannelPages {
         private WorldUiPlaylistManifest manifest;
         private final Map<Integer, WorldUiPlaylistPage> pages = new HashMap<>();
-        private final Set<Integer> pendingOffsets = new HashSet<>();
+        private final Map<Integer, Long> pendingOffsets = new HashMap<>();
     }
 }

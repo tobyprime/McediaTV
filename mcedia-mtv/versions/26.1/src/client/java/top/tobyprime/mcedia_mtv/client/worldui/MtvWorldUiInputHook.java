@@ -94,8 +94,8 @@ public final class MtvWorldUiInputHook {
             INTERACTION.onPointerMove(selection.u(), selection.v());
         }
         if (!down && primaryDown) {
-            if (consumesAttack && selection != null) {
-                INTERACTION.onPrimaryRelease(selection.u(), selection.v(), selection.durationUs());
+            if (consumesAttack) {
+                INTERACTION.onPrimaryRelease(selection == null ? 0L : selection.durationUs());
             }
             consumesAttack = false;
         }

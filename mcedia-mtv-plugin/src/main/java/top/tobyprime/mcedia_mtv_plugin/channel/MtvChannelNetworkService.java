@@ -270,9 +270,7 @@ public final class MtvChannelNetworkService implements PluginMessageListener, Li
         }
         if (!watch) {
             worldUiWatchRegistry.unwatch(player.getUniqueId());
-            if (worldUiWatchRegistry.watchers(request.targetMtvUuid()).isEmpty()) {
-                watchedChannelsByMtv.remove(request.targetMtvUuid());
-            }
+            removeEmptyWatchedChannels();
             return;
         }
         if (!worldUiRateLimiter.tryAcquire(player.getUniqueId(), WorldUiRateLimiter.RequestType.WATCH)) {
@@ -280,6 +278,7 @@ public final class MtvChannelNetworkService implements PluginMessageListener, Li
         }
         channelService.getManager().withManagedPlayer(request.targetMtvUuid(), target -> {
             worldUiWatchRegistry.watch(player.getUniqueId(), request.targetMtvUuid());
+            removeEmptyWatchedChannels();
             watchedChannelsByMtv.put(request.targetMtvUuid(), channelService.resolveBinding(target).channelId());
             sendControlState(player, target, true);
             return Boolean.TRUE;
@@ -510,7 +509,7 @@ public final class MtvChannelNetworkService implements PluginMessageListener, Li
         channelService.getAudienceSessionManager().unregisterClient(player.getUniqueId());
         worldUiRateLimiter.clear(player.getUniqueId());
         worldUiWatchRegistry.unwatch(player.getUniqueId());
-        watchedChannelsByMtv.entrySet().removeIf(entry -> worldUiWatchRegistry.watchers(entry.getKey()).isEmpty());
+        removeEmptyWatchedChannels();
         lastControlStates.keySet().removeIf(key -> key.startsWith(player.getUniqueId() + ":"));
         LOGGER.debug("Unregistered MTV client: player={}", player.getName());
     }
@@ -520,5 +519,9 @@ public final class MtvChannelNetworkService implements PluginMessageListener, Li
         worldUiWatchRegistry.unwatchMtv(mtvUuid);
         watchedChannelsByMtv.remove(mtvUuid);
         lastControlStates.keySet().removeIf(key -> key.endsWith(":" + mtvUuid));
+    }
+
+    private void removeEmptyWatchedChannels() {
+        watchedChannelsByMtv.entrySet().removeIf(entry -> worldUiWatchRegistry.watchers(entry.getKey()).isEmpty());
     }
 }
