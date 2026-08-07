@@ -277,6 +277,9 @@ public final class MtvChannelNetworkService implements PluginMessageListener, Li
             return;
         }
         channelService.getManager().withManagedPlayer(request.targetMtvUuid(), target -> {
+            if (!target.isPowered()) {
+                return Boolean.FALSE;
+            }
             worldUiWatchRegistry.watch(player.getUniqueId(), request.targetMtvUuid());
             removeEmptyWatchedChannels();
             watchedChannelsByMtv.put(request.targetMtvUuid(), channelService.resolveBinding(target).channelId());
@@ -292,6 +295,9 @@ public final class MtvChannelNetworkService implements PluginMessageListener, Li
             Player player = Bukkit.getPlayer(playerId);
             if (player == null) continue;
             channelService.getManager().withManagedPlayer(mtvUuid, target -> {
+                if (!target.isPowered()) {
+                    return Boolean.FALSE;
+                }
                 sendControlState(player, target, false);
                 return Boolean.TRUE;
             }, ignored -> clearMtvWatch(mtvUuid));

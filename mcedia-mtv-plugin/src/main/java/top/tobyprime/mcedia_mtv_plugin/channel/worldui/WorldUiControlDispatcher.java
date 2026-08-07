@@ -181,6 +181,9 @@ public final class WorldUiControlDispatcher {
         if (target == null || target.getUuid() == null || !request.targetMtvUuid().equals(target.getUuid())) {
             return WorldUiControlError.TARGET_NOT_FOUND;
         }
+        if (!target.isPowered()) {
+            return WorldUiControlError.TARGET_NOT_FOUND;
+        }
         if (target.findScreen(request.screenId()) == null) {
             return WorldUiControlError.SCREEN_NOT_FOUND;
         }
