@@ -19,12 +19,14 @@ import top.tobyprime.mcedia_core.client.player.ScreenPeripheral.ScreenFillMode;
 import top.tobyprime.mcedia_core.client.player.SpeakerPeripheral;
 import top.tobyprime.mcedia_mtv.client.channel.ClientChannelPlaybackManager;
 import top.tobyprime.mcedia_mtv.client.channel.ClientChannelSession;
+import top.tobyprime.mcedia_mtv.client.worldui.WorldUiScreenRaycast;
 
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 
 public class EntityPlayerHandle {
     private static final Logger LOGGER = LoggerFactory.getLogger(EntityPlayerHandle.class);
@@ -465,6 +467,27 @@ public class EntityPlayerHandle {
         return channelId;
     }
 
+    /** A render/input snapshot derived from the same peripheral transform used by the media screen. */
+    public List<WorldUiScreen> worldUiScreens() {
+        if (!powered || channelId == null || channelId.isBlank()) {
+            return List.of();
+        }
+        var screens = new java.util.ArrayList<WorldUiScreen>();
+        for (var peripheral : readConfig().peripherals()) {
+            if (!(peripheral instanceof ScreenPeripheralConfig screen)) {
+                continue;
+            }
+            var transform = computeTransform(screen);
+            float width = screen.width() > 0.0F ? screen.width() : DEFAULT_SCREEN_WIDTH;
+            float height = screen.height() > 0.0F ? screen.height() : DEFAULT_SCREEN_HEIGHT;
+            var right = transform.rotation().transform(new Vector3f(1.0F, 0.0F, 0.0F));
+            var up = transform.rotation().transform(new Vector3f(0.0F, 1.0F, 0.0F));
+            screens.add(new WorldUiScreen(display.getUUID(), screen.id(), channelId,
+                    new WorldUiScreenRaycast.Screen(screen.id(), transform.position(), right, up, width, height)));
+        }
+        return List.copyOf(screens);
+    }
+
     private void destroyRuntimePeripheral(RuntimePeripheralHandle runtime) {
         switch (runtime) {
             case ScreenRuntimeHandle screenRuntime -> {
@@ -611,5 +634,8 @@ public class EntityPlayerHandle {
     }
 
     private record TransformState(Vector3f position, Quaternionf rotation) {
+    }
+
+    public record WorldUiScreen(UUID mtvUuid, String screenId, String channelId, WorldUiScreenRaycast.Screen plane) {
     }
 }

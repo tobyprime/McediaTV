@@ -11,6 +11,7 @@ import top.tobyprime.mcedia_mtv.client.channel.ClientChannelPlaybackManager;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.List;
 
 public final class EntityPlayerManager {
     private static final Logger LOGGER = LoggerFactory.getLogger(EntityPlayerManager.class);
@@ -43,6 +44,12 @@ public final class EntityPlayerManager {
             ClientChannelPlaybackManager.getInstance().clear();
             currentLevel = null;
         });
+    }
+
+    public List<EntityPlayerHandle.WorldUiScreen> worldUiScreens() {
+        return activePlayers.values().stream()
+                .flatMap(handle -> handle.worldUiScreens().stream())
+                .toList();
     }
 
     private void onClientTick(Minecraft client) {
