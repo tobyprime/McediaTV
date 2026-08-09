@@ -40,17 +40,17 @@ class WorldUiLayoutTest {
         var layout = new WorldUiLayout();
 
         state.onPrimaryPress(target, layout.hit(0.98F, 0.98F, false), 0.98F, 0.98F, 100_000_000L);
-        state.onPrimaryPress(target, layout.hit(0.25F, 0.88F, true), 0.25F, 0.88F, 100_000_000L);
-        state.onPointerMove(0.45F, 0.88F);
-        state.onPointerMove(0.75F, 0.88F);
+        state.onPrimaryPress(target, layout.hit(0.25F, 0.94F, true), 0.25F, 0.94F, 100_000_000L);
+        state.onPointerMove(0.45F, 0.94F);
+        state.onPointerMove(0.75F, 0.94F);
         assertTrue(sender.requests.isEmpty());
 
-        state.onPrimaryRelease(0.75F, 0.88F, 100_000_000L);
+        state.onPrimaryRelease(0.75F, 0.94F, 100_000_000L);
 
         assertEquals(1, sender.requests.size());
         WorldUiControlRequest request = sender.requests.getFirst();
         assertEquals("SEEK_ABSOLUTE", request.operation().name());
-        assertEquals(new WorldUiControlArgument.PositionUs(93_243_240L), request.argument());
+        assertEquals(new WorldUiControlArgument.PositionUs(73_750_008L), request.argument());
     }
 
     @Test
@@ -61,13 +61,13 @@ class WorldUiLayoutTest {
         var layout = new WorldUiLayout();
 
         state.onPrimaryPress(target, layout.hit(0.98F, 0.98F, false), 0.98F, 0.98F, 100_000_000L);
-        state.onPrimaryPress(target, layout.hit(0.25F, 0.88F, true), 0.25F, 0.88F, 100_000_000L);
-        state.onPointerMove(0.75F, 0.88F);
-        state.onPrimaryRelease(100_000_000L);
-        state.onPrimaryRelease(100_000_000L);
+        state.onPrimaryPress(target, layout.hit(0.25F, 0.94F, true), 0.25F, 0.94F, 100_000_000L);
+        state.onPointerMove(0.75F, 0.94F);
+        state.onPrimaryRelease();
+        state.onPrimaryRelease();
 
         assertEquals(1, sender.requests.size());
-        assertEquals(new WorldUiControlArgument.PositionUs(93_243_240L), sender.requests.getFirst().argument());
+        assertEquals(new WorldUiControlArgument.PositionUs(73_750_008L), sender.requests.getFirst().argument());
     }
 
     @Test
@@ -78,30 +78,49 @@ class WorldUiLayoutTest {
         var layout = new WorldUiLayout();
         state.onPrimaryPress(target, layout.hit(0.98F, 0.98F, false), 0.98F, 0.98F, 1_000_000L);
 
-        state.onPrimaryPress(target, layout.hit(0.06F, 0.88F, true), 0.06F, 0.88F, 1_000_000L);
-        state.onPrimaryRelease(0.06F, 0.88F, 1_000_000L);
-        state.onPrimaryPress(target, layout.hit(0.80F, 0.88F, true), 0.80F, 0.88F, 1_000_000L);
-        state.onPrimaryRelease(0.80F, 0.88F, 1_000_000L);
+        state.onPrimaryPress(target, layout.hit(0.16F, 0.94F, true), 0.16F, 0.94F, 1_000_000L);
+        state.onPrimaryRelease(0.16F, 0.94F, 1_000_000L);
+        state.onPrimaryPress(target, layout.hit(0.96F, 0.94F, true), 0.96F, 0.94F, 1_000_000L);
+        state.onPrimaryRelease(0.96F, 0.94F, 1_000_000L);
 
         assertEquals(new WorldUiControlArgument.PositionUs(0L), sender.requests.get(0).argument());
         assertEquals(new WorldUiControlArgument.PositionUs(1_000_000L), sender.requests.get(1).argument());
     }
 
     @Test
-    void volumeTrackMapsItsVisualEdgesToZeroAndFullVolume() {
+    void volumeBarMapsItsVerticalEdgesToZeroAndFullVolume() {
         var sender = new RecordingSender();
         var target = new WorldUiInteractionState.Target(UUID.randomUUID(), "screen_0", "self:test", 9L);
         var state = new WorldUiInteractionState(sender);
         var layout = new WorldUiLayout();
         state.onPrimaryPress(target, layout.hit(0.98F, 0.98F, false), 0.98F, 0.98F, 1L);
 
-        state.onPrimaryPress(target, layout.hit(0.84F, 0.88F, true), 0.84F, 0.88F, 1L);
-        state.onPrimaryRelease(0.84F, 0.88F, 1L);
-        state.onPrimaryPress(target, layout.hit(0.96F, 0.88F, true), 0.96F, 0.88F, 1L);
-        state.onPrimaryRelease(0.96F, 0.88F, 1L);
+        state.onPrimaryPress(target, layout.hit(0.09F, 0.58F, true), 0.09F, 0.58F, 1L);
+        state.onPrimaryRelease(0.09F, 0.58F, 1L);
+        state.onPrimaryPress(target, layout.hit(0.09F, 0.30F, true), 0.09F, 0.30F, 1L);
+        state.onPrimaryRelease(0.09F, 0.30F, 1L);
 
         assertEquals(new WorldUiControlArgument.Scalar(0.0F), sender.requests.get(0).argument());
         assertEquals(new WorldUiControlArgument.Scalar(1.0F), sender.requests.get(1).argument());
+    }
+
+    @Test
+    void brightnessBarMapsItsVerticalEdgesToZeroAndFullBrightness() {
+        var sender = new RecordingSender();
+        var target = new WorldUiInteractionState.Target(UUID.randomUUID(), "screen_0", "self:test", 9L);
+        var state = new WorldUiInteractionState(sender);
+        var layout = new WorldUiLayout();
+        state.onPrimaryPress(target, layout.hit(0.98F, 0.98F, false), 0.98F, 0.98F, 1L);
+
+        state.onPrimaryPress(target, layout.hit(0.05F, 0.58F, true), 0.05F, 0.58F, 1L);
+        state.onPrimaryRelease(0.05F, 0.58F, 1L);
+        state.onPrimaryPress(target, layout.hit(0.05F, 0.30F, true), 0.05F, 0.30F, 1L);
+        state.onPrimaryRelease(0.05F, 0.30F, 1L);
+
+        assertEquals("SET_BRIGHTNESS", sender.requests.get(0).operation().name());
+        assertEquals(new WorldUiControlArgument.Scalar(0.0F), sender.requests.get(0).argument());
+        assertEquals("SET_BRIGHTNESS", sender.requests.get(1).operation().name());
+        assertEquals(new WorldUiControlArgument.Scalar(15.0F), sender.requests.get(1).argument());
     }
 
     @Test
@@ -113,7 +132,7 @@ class WorldUiLayoutTest {
         var layout = new WorldUiLayout();
 
         state.onPrimaryPress(first, layout.hit(0.98F, 0.98F, false), 0.98F, 0.98F, 100_000_000L);
-        state.onPrimaryPress(refreshed, layout.hit(0.50F, 0.72F, true), 0.50F, 0.72F, 100_000_000L);
+        state.onPrimaryPress(refreshed, layout.hit(0.38F, 0.86F, true), 0.38F, 0.86F, 100_000_000L);
 
         assertEquals(1, sender.requests.size());
         assertEquals(10L, sender.requests.getFirst().expectedRevision());
@@ -123,10 +142,10 @@ class WorldUiLayoutTest {
     void playlistPanelProvidesStableIndexedRowsAndSeparateAddButton() {
         var layout = new WorldUiLayout();
 
-        assertEquals(WorldUiHit.Kind.QUEUE, layout.hit(0.79F, 0.74F, true, true).kind());
+        assertEquals(WorldUiHit.Kind.QUEUE, layout.hit(0.58F, 0.86F, true, true).kind());
         assertEquals(WorldUiHit.Kind.PLAYLIST_ITEM, layout.hit(0.75F, 0.20F, true, true).kind());
         assertEquals(1, layout.hit(0.75F, 0.20F, true, true).index());
-        assertEquals(WorldUiHit.Kind.ADD_MEDIA, layout.hit(0.86F, 0.74F, true, true).kind());
+        assertEquals(WorldUiHit.Kind.ADD_MEDIA, layout.hit(0.89F, 0.07F, true, true).kind());
     }
 
     @Test
@@ -136,8 +155,8 @@ class WorldUiLayoutTest {
         var state = new WorldUiInteractionState(sender);
         var layout = new WorldUiLayout();
         state.onPrimaryPress(target, layout.hit(0.98F, 0.98F, false), .98F, .98F, 1L);
-        state.onPrimaryPress(target, layout.hit(.22F, .72F, true), .22F, .72F, 1L);
-        state.onPrimaryPress(target, layout.hit(.92F, .72F, true), .92F, .72F, 1L);
+        state.onPrimaryPress(target, layout.hit(.18F, .86F, true), .18F, .86F, 1L);
+        state.onPrimaryPress(target, layout.hit(.70F, .86F, true), .70F, .86F, 1L);
         assertEquals("SET_SPEED", sender.requests.get(0).operation().name());
         assertEquals(new WorldUiControlArgument.Scalar(.5F), sender.requests.get(0).argument());
         assertEquals("SET_MASTER_VOLUME", sender.requests.get(1).operation().name());

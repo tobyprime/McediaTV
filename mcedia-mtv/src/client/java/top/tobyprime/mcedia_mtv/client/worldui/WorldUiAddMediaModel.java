@@ -1,5 +1,6 @@
 package top.tobyprime.mcedia_mtv.client.worldui;
 
+import net.minecraft.network.chat.Component;
 import top.tobyprime.mcedia_mtv.client.channel.worldui.WorldUiControlArgument;
 import top.tobyprime.mcedia_mtv.client.channel.worldui.WorldUiControlOperation;
 import top.tobyprime.mcedia_mtv.client.channel.worldui.WorldUiControlRequest;
@@ -134,6 +135,16 @@ public final class WorldUiAddMediaModel {
 
     public WorldUiControlError lastError() {
         return lastError;
+    }
+
+    /** Localized preview status line for the add-media view, shared by all MC versions. */
+    public String previewMessage() {
+        String value;
+        if (preview == null) value = Component.translatable(resolving ? "mcedia_mtv.add_media.resolving" : "mcedia_mtv.add_media.waiting").getString();
+        else if (preview.status() == MtvMediaMetadata.Status.FAILED) value = Component.translatable("mcedia_mtv.add_media.failed", preview.errorReason()).getString();
+        else value = Component.translatable("mcedia_mtv.add_media.preview", preview.title(), preview.author(), preview.platform(), preview.description()).getString()
+                + " | Cover: " + MtvMediaCoverCache.getInstance().statusLabel(preview.coverUrl());
+        return lastError.name().equals("NONE") ? value : value + " | " + Component.translatable("mcedia_mtv.add_media.server_error", lastError.name()).getString();
     }
 
     /** Returns true exactly once after this model's add request was accepted. */

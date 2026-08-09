@@ -18,5 +18,9 @@ public enum WorldUiControlOperation {
     CLEAR,
     SET_PLAY_ORDER,
     SET_MASTER_VOLUME,
-    TOGGLE_MUTE
+    TOGGLE_MUTE,
+    SET_BRIGHTNESS,
+    SET_DANMAKU_VISIBLE,
+    MOVE_UP,
+    MOVE_DOWN
 }

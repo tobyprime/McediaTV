@@ -87,9 +87,6 @@ public final class MtvChannelService {
         }
         state.touch();
         persistState(state);
-        LOGGER.debug("Mutated MTV channel playback: channel={}, revision={}, mediaUrl={}, speed={}, mediaTimeMs={}, playTimeMs={}, state={}",
-                channelId, state.getRevision(), state.getPlayState().getMediaUrl(),
-                state.getPlayState().getSpeed(), state.getPlayState().getMediaTimeMs(), state.getPlayState().getPlayTimeMs(), state.getPlayState().getState());
         onChannelChanged(channelId);
         if (playlistMetadataChanged(state, previousPlaylist, previousCursor, previousPlayOrder)) {
             playlistChangeListener.accept(channelId);
@@ -295,6 +292,14 @@ public final class MtvChannelService {
 
     public boolean movePlaylistItemToBack(String channelId, int index) {
         return mutatePlayback(channelId, state -> movePlaylistItem(state, index, state.getPlaylist().size() - 1));
+    }
+
+    public boolean movePlaylistItemUp(String channelId, int index) {
+        return mutatePlayback(channelId, state -> movePlaylistItem(state, index, index - 1));
+    }
+
+    public boolean movePlaylistItemDown(String channelId, int index) {
+        return mutatePlayback(channelId, state -> movePlaylistItem(state, index, index + 1));
     }
 
     public boolean cyclePlayOrderMode(String channelId) {
@@ -636,9 +641,5 @@ public final class MtvChannelService {
         audienceSessionManager.clear();
         entityBindings.clear();
         channelStates.clear();
-    }
-
-    public void debugDump() {
-        LOGGER.debug("MTV channel states={}", channelStates.size());
     }
 }

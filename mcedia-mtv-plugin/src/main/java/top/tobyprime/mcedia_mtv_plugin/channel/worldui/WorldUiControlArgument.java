@@ -3,7 +3,7 @@ package top.tobyprime.mcedia_mtv_plugin.channel.worldui;
 public sealed interface WorldUiControlArgument permits WorldUiControlArgument.None,
         WorldUiControlArgument.PositionUs, WorldUiControlArgument.Scalar,
         WorldUiControlArgument.PlaylistIndex, WorldUiControlArgument.MediaUrl,
-        WorldUiControlArgument.PlayOrderMode {
+        WorldUiControlArgument.PlayOrderMode, WorldUiControlArgument.BooleanValue {
     enum None implements WorldUiControlArgument {
         INSTANCE
     }
@@ -17,4 +17,6 @@ public sealed interface WorldUiControlArgument permits WorldUiControlArgument.No
     record MediaUrl(String value) implements WorldUiControlArgument { }
 
     record PlayOrderMode(String value) implements WorldUiControlArgument { }
+
+    record BooleanValue(boolean value) implements WorldUiControlArgument { }
 }

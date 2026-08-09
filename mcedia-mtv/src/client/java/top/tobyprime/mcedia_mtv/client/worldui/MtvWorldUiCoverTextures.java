@@ -11,7 +11,7 @@ import top.tobyprime.mcedia_mtv.client.metadata.MtvMediaCoverCache;
 import java.io.ByteArrayInputStream;
 import java.util.concurrent.atomic.AtomicLong;
 
-/** 26.2 render-thread bridge from the bounded Cover byte cache to dynamic textures. */
+/** Render-thread bridge from the bounded Cover byte cache to dynamic textures. */
 final class MtvWorldUiCoverTextures {
     private static final AtomicLong NEXT_ID = new AtomicLong();
     private static final MtvCoverTextureRegistry<Identifier> TEXTURES = new MtvCoverTextureRegistry<>(64,

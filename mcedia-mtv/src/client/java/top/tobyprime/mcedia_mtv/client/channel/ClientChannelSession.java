@@ -73,8 +73,6 @@ public final class ClientChannelSession {
         }
         forceResyncRequested = forceResyncRequested || forceResync;
         this.snapshot = snapshot;
-        LOGGER.debug("Updated MTV channel snapshot: channel={}, revision={}, hasMedia={}, forceResync={}",
-                channelId, snapshot.revision(), snapshot.hasMedia(), forceResyncRequested);
     }
 
     public void tick() {

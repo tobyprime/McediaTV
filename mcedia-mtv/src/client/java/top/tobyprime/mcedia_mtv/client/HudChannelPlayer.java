@@ -106,7 +106,6 @@ public final class HudChannelPlayer {
         if (snapshot != null && snapshot.isPlaying()) {
             if (nonPlayingSinceMs < 0) {
                 setScreenOnHost(true);
-                LOGGER.debug("HUD shown: channel {} started playing", currentChannelId);
             }
             nonPlayingSinceMs = 0;
         } else {
@@ -116,7 +115,6 @@ public final class HudChannelPlayer {
                     && System.currentTimeMillis() - nonPlayingSinceMs >= HIDE_DELAY_MS) {
                 nonPlayingSinceMs = -1;
                 setScreenOnHost(false);
-                LOGGER.debug("HUD hidden: channel {} not playing for {}ms", currentChannelId, HIDE_DELAY_MS);
             }
         }
     }
@@ -250,13 +248,10 @@ public final class HudChannelPlayer {
         if (channelSession == null || hudScreen == null) return;
         if (attached) {
             if (cachedHostId != null) {
-                boolean assigned = MediaPlayerHostManager.get().assignPeripheralToHost(cachedHostId, hudScreen);
-                LOGGER.debug("HUD screen visibility attachment: channel={}, hostId={}, attached={}",
-                        currentChannelId, cachedHostId, assigned);
+                MediaPlayerHostManager.get().assignPeripheralToHost(cachedHostId, hudScreen);
             }
         } else {
             channelSession.getHost().removePeripheral(hudScreen);
-            LOGGER.debug("HUD screen detached while channel is not playing: channel={}", currentChannelId);
         }
     }
 

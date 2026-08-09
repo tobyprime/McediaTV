@@ -87,6 +87,19 @@ class WorldUiProtocolTest {
     }
 
     @Test
+    void moveUpAndMoveDownControlRequestsRoundTripTheirPlaylistIndex() {
+        for (WorldUiControlOperation operation : List.of(WorldUiControlOperation.MOVE_UP, WorldUiControlOperation.MOVE_DOWN)) {
+            var request = new WorldUiControlRequest(
+                    UUID.fromString("44444444-4444-4444-4444-444444444444"),
+                    "screen-main", "channel:alpha", 22L, 17L, 0.90F, 0.15F,
+                    operation, new WorldUiControlArgument.PlaylistIndex(3)
+            );
+
+            assertEquals(request, MtvChannelProtocol.decodeControlRequest(MtvChannelProtocol.encodeControlRequest(request)));
+        }
+    }
+
+    @Test
     void controlRequestRejectsAParameterThatDoesNotBelongToItsOperation() {
         var request = new WorldUiControlRequest(
                 UUID.randomUUID(), "screen-main", "channel", 1L, 1L, 0.5F, 0.5F,
@@ -140,12 +153,34 @@ class WorldUiProtocolTest {
 
     @Test
     void controlStateRoundTripsAndRejectsTrailingBytes() {
-        var state = new WorldUiControlState(UUID.randomUUID(), "channel", .35F, true, 19L);
+        var state = new WorldUiControlState(UUID.randomUUID(), "channel", .35F, true, 19L, "screen_0", 8, true);
         assertEquals(state, MtvChannelProtocol.decodeWorldUiControlState(MtvChannelProtocol.encodeWorldUiControlState(state)));
 
         var buffer = new FriendlyByteBuf(Unpooled.buffer());
         MtvChannelProtocol.writeWorldUiControlState(buffer, state);
         buffer.writeByte(1);
         assertThrows(IllegalArgumentException.class, () -> MtvChannelProtocol.readWorldUiControlState(buffer));
+    }
+
+    @Test
+    void brightnessRequestRoundTripsItsScalarArgument() {
+        var request = new WorldUiControlRequest(
+                UUID.randomUUID(), "screen_0", "channel", 1L, 1L, 0.5F, 0.5F,
+                WorldUiControlOperation.SET_BRIGHTNESS,
+                new WorldUiControlArgument.Scalar(12.0F)
+        );
+
+        assertEquals(request, MtvChannelProtocol.decodeControlRequest(MtvChannelProtocol.encodeControlRequest(request)));
+    }
+
+    @Test
+    void danmakuRequestRoundTripsItsBooleanArgument() {
+        var request = new WorldUiControlRequest(
+                UUID.randomUUID(), "screen_0", "channel", 1L, 1L, 0.5F, 0.5F,
+                WorldUiControlOperation.SET_DANMAKU_VISIBLE,
+                new WorldUiControlArgument.BooleanValue(false)
+        );
+
+        assertEquals(request, MtvChannelProtocol.decodeControlRequest(MtvChannelProtocol.encodeControlRequest(request)));
     }
 }

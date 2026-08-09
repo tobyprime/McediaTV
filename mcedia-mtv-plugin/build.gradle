@@ -32,15 +32,11 @@ def versionConfig = [
         javaVersion : 25,
         apiLevel    : '26.1',
         javaFlags   : [
+            // Microsoft OpenJDK 25.0.3's G1 crashes (g1HeapRegionManager.cpp free-list
+            // safepoint bug), so the 26.x servers run the stable Parallel collector.
             '-XX:+AlwaysPreTouch', '-XX:+DisableExplicitGC',
             '-XX:+ParallelRefProcEnabled', '-XX:+PerfDisableSharedMem',
-            '-XX:+UnlockExperimentalVMOptions', '-XX:+UseG1GC',
-            '-XX:G1HeapRegionSize=8M', '-XX:G1HeapWastePercent=5',
-            '-XX:G1MaxNewSizePercent=40', '-XX:G1MixedGCCountTarget=4',
-            '-XX:G1MixedGCLiveThresholdPercent=90', '-XX:G1NewSizePercent=30',
-            '-XX:G1RSetUpdatingPauseTimePercent=5', '-XX:G1ReservePercent=20',
-            '-XX:InitiatingHeapOccupancyPercent=15', '-XX:MaxGCPauseMillis=200',
-            '-XX:MaxTenuringThreshold=1', '-XX:SurvivorRatio=32'
+            '-XX:+UseParallelGC'
         ]
     ],
     '26.2': [
@@ -52,13 +48,7 @@ def versionConfig = [
         javaFlags   : [
             '-XX:+AlwaysPreTouch', '-XX:+DisableExplicitGC',
             '-XX:+ParallelRefProcEnabled', '-XX:+PerfDisableSharedMem',
-            '-XX:+UnlockExperimentalVMOptions', '-XX:+UseG1GC',
-            '-XX:G1HeapRegionSize=8M', '-XX:G1HeapWastePercent=5',
-            '-XX:G1MaxNewSizePercent=40', '-XX:G1MixedGCCountTarget=4',
-            '-XX:G1MixedGCLiveThresholdPercent=90', '-XX:G1NewSizePercent=30',
-            '-XX:G1RSetUpdatingPauseTimePercent=5', '-XX:G1ReservePercent=20',
-            '-XX:InitiatingHeapOccupancyPercent=15', '-XX:MaxGCPauseMillis=200',
-            '-XX:MaxTenuringThreshold=1', '-XX:SurvivorRatio=32'
+            '-XX:+UseParallelGC'
         ]
     ]
 ]
@@ -108,6 +98,10 @@ if (hasVersionedSrc) {
 tasks {
     runServer {
         minecraftVersion(cfg.paperVersion)
+        // The JVM args declared per version (see javaFlags) are applied to the
+        // spawned server process; without this the 26.x servers run the default G1
+        // collector that crashes Microsoft OpenJDK 25.0.3.
+        jvmArgs(cfg.javaFlags)
     }
 }
 

@@ -128,6 +128,16 @@ public final class WorldUiControlDispatcher {
             setMasterVolume(target, request, volume, revision, done);
             return;
         }
+        if (request.operation() == WorldUiControlOperation.SET_BRIGHTNESS) {
+            int value = Math.round(((WorldUiControlArgument.Scalar) request.argument()).value());
+            setScreenBrightness(target, request, value, revision, done);
+            return;
+        }
+        if (request.operation() == WorldUiControlOperation.SET_DANMAKU_VISIBLE) {
+            boolean visible = ((WorldUiControlArgument.BooleanValue) request.argument()).value();
+            setScreenDanmakuVisible(target, request, visible, revision, done);
+            return;
+        }
 
         boolean changed = executeChannelOperation(player, request, binding.channelId());
         long latestRevision = channelService.ensureChannelState(binding.channelId()).getRevision();
@@ -145,6 +155,32 @@ public final class WorldUiControlDispatcher {
         manager.setMasterVolume(request.targetMtvUuid(), volume, updated -> done.accept(Boolean.TRUE.equals(updated)
                 ? WorldUiControlResult.accepted(request.requestId(), revision)
                 : rejected(request, WorldUiControlError.INTERNAL_ERROR, revision)));
+    }
+
+    private void setScreenBrightness(ManagedMtvPlayer target, WorldUiControlRequest request, int value,
+                                     long revision, Consumer<WorldUiControlResult> done) {
+        var screen = target.findScreen(request.screenId());
+        if (screen == null || screen.getMinBrightness() == value) {
+            done.accept(WorldUiControlResult.accepted(request.requestId(), revision));
+            return;
+        }
+        manager.setScreenBrightness(request.targetMtvUuid(), request.screenId(), value,
+                updated -> done.accept(Boolean.TRUE.equals(updated)
+                        ? WorldUiControlResult.accepted(request.requestId(), revision)
+                        : rejected(request, WorldUiControlError.INTERNAL_ERROR, revision)));
+    }
+
+    private void setScreenDanmakuVisible(ManagedMtvPlayer target, WorldUiControlRequest request, boolean visible,
+                                         long revision, Consumer<WorldUiControlResult> done) {
+        var screen = target.findScreen(request.screenId());
+        if (screen == null || screen.isDanmakuVisible() == visible) {
+            done.accept(WorldUiControlResult.accepted(request.requestId(), revision));
+            return;
+        }
+        manager.setScreenDanmakuVisible(request.targetMtvUuid(), request.screenId(), visible,
+                updated -> done.accept(Boolean.TRUE.equals(updated)
+                        ? WorldUiControlResult.accepted(request.requestId(), revision)
+                        : rejected(request, WorldUiControlError.INTERNAL_ERROR, revision)));
     }
 
     private boolean executeChannelOperation(Player player, WorldUiControlRequest request, String channelId) {
@@ -174,10 +210,14 @@ public final class WorldUiControlDispatcher {
                     ((WorldUiControlArgument.PlaylistIndex) request.argument()).value());
             case MOVE_BACK -> channelService.movePlaylistItemToBack(channelId,
                     ((WorldUiControlArgument.PlaylistIndex) request.argument()).value());
+            case MOVE_UP -> channelService.movePlaylistItemUp(channelId,
+                    ((WorldUiControlArgument.PlaylistIndex) request.argument()).value());
+            case MOVE_DOWN -> channelService.movePlaylistItemDown(channelId,
+                    ((WorldUiControlArgument.PlaylistIndex) request.argument()).value());
             case CLEAR -> channelService.clearPlaylist(player, channelId);
             case SET_PLAY_ORDER -> channelService.setPlayOrderMode(channelId,
                     parsePlayOrderMode(((WorldUiControlArgument.PlayOrderMode) request.argument()).value()));
-            case SET_MASTER_VOLUME, TOGGLE_MUTE -> throw new IllegalStateException("entity volume operation was not handled");
+            case SET_MASTER_VOLUME, TOGGLE_MUTE, SET_BRIGHTNESS, SET_DANMAKU_VISIBLE -> throw new IllegalStateException("entity volume operation was not handled");
         };
     }
 
@@ -206,7 +246,10 @@ public final class WorldUiControlDispatcher {
             case SEEK_RELATIVE -> validateRelativeSeek(request.argument());
             case SET_SPEED -> validateRange(request.argument(), 0.25F, 4.0F);
             case SET_MASTER_VOLUME -> validateRange(request.argument(), 0.0F, 1.0F);
-            case PLAY_INDEX, REMOVE, MOVE_FRONT, MOVE_BACK -> validatePlaylistIndex(request.argument(), state);
+            case SET_BRIGHTNESS -> validateRange(request.argument(), 0.0F, 15.0F);
+            case SET_DANMAKU_VISIBLE -> request.argument() instanceof WorldUiControlArgument.BooleanValue
+                    ? WorldUiControlError.NONE : WorldUiControlError.INVALID_ARGUMENT;
+            case PLAY_INDEX, REMOVE, MOVE_FRONT, MOVE_BACK, MOVE_UP, MOVE_DOWN -> validatePlaylistIndex(request.argument(), state);
             case PREPEND, APPEND, INSERT_NEXT, INSERT_AND_PLAY -> validMediaUrl(request.argument())
                     ? WorldUiControlError.NONE : WorldUiControlError.INVALID_ARGUMENT;
             case SET_PLAY_ORDER -> playOrderMode(request.argument()) == null

@@ -31,6 +31,5 @@ public final class MtvChannelClientPacketSender {
             return;
         }
         ClientPlayNetworking.send(payload);
-        LOGGER.debug("Sent MTV client packet: type={}", payload.getClass().getSimpleName());
     }
 }

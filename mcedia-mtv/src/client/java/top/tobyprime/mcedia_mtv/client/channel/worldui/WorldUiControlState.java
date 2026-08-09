@@ -8,12 +8,16 @@ public record WorldUiControlState(
         String channelId,
         float masterVolume,
         boolean canControl,
-        long channelRevision
+        long channelRevision,
+        String screenId,
+        int brightness,
+        boolean danmakuVisible
 ) {
     public WorldUiControlState {
         if (mtvUuid == null || channelId == null || channelId.isBlank()
                 || !Float.isFinite(masterVolume) || masterVolume < 0.0F || masterVolume > 1.0F
-                || channelRevision < 0L) {
+                || channelRevision < 0L || screenId == null || screenId.isBlank()
+                || brightness < 0 || brightness > 15) {
             throw new IllegalArgumentException("world UI control state is invalid");
         }
     }

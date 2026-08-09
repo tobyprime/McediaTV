@@ -14,7 +14,6 @@ import org.slf4j.LoggerFactory;
 import top.tobyprime.mcedia_core.client.audio.SpeakerAudioChannelMode;
 import top.tobyprime.mcedia_core.client.player.MediaPlayerHostManager;
 import top.tobyprime.mcedia_core.client.player.PlayerHost;
-import top.tobyprime.mcedia_core.client.player.ScreenPeripheral;
 import top.tobyprime.mcedia_core.client.player.ScreenPeripheral.ScreenFillMode;
 import top.tobyprime.mcedia_core.client.player.SpeakerPeripheral;
 import top.tobyprime.mcedia_mtv.client.channel.ClientChannelPlaybackManager;
@@ -191,7 +190,7 @@ public class EntityPlayerHandle {
 
         return switch (config.kind()) {
             case SCREEN -> {
-                var screen = new ScreenPeripheral(level);
+                var screen = new MtvScreenPeripheral(level);
                 LOGGER.info("Create MTV screen runtime: hostEntityId={}, hostUuid={}, runtimeId={}", display.getId(), display.getUUID(), config.id());
                 yield new ScreenRuntimeHandle(config.id(), screen);
             }
@@ -215,7 +214,7 @@ public class EntityPlayerHandle {
         }
     }
 
-    private void applyScreenConfig(ScreenPeripheral screen, ScreenPeripheralConfig config) {
+    private void applyScreenConfig(MtvScreenPeripheral screen, ScreenPeripheralConfig config) {
         var transform = computeTransform(config);
         screen.setPos(transform.position().x(), transform.position().y(), transform.position().z());
         screen.setWorldRotation(transform.rotation());
@@ -290,7 +289,6 @@ public class EntityPlayerHandle {
         }
 
         var tag = customData.copyTag();
-        LOGGER.debug("Item display {} custom data root: {}", display.getId(), tag);
         var configTag = tag.getCompoundOrEmpty(EntityPlayerManager.ENTITY_CONFIG_KEY);
         if (configTag.isEmpty()) {
             configTag = tag.getCompoundOrEmpty(EntityPlayerManager.CONFIG_KEY);
@@ -468,23 +466,33 @@ public class EntityPlayerHandle {
         return channelId;
     }
 
-    /** A render/input snapshot derived from the same peripheral transform used by the media screen. */
+    /**
+     * A render/input snapshot derived from the runtime screen peripheral itself,
+     * so raycast, video layer and control overlay share one geometry.  The plane
+     * is centred on the video quad (peripheral anchor plus half its height), not
+     * on the anchor, because the core renderer draws the quad hanging upward
+     * from the anchor.  Unpowered screens stay in the list so the MTV renderer
+     * can keep drawing the idle background; interaction filters them out.
+     */
     public List<WorldUiScreen> worldUiScreens() {
-        if (!powered || channelId == null || channelId.isBlank()) {
-            return List.of();
-        }
         var screens = new java.util.ArrayList<WorldUiScreen>();
-        for (var peripheral : readConfig().peripherals()) {
-            if (!(peripheral instanceof ScreenPeripheralConfig screen)) {
+        for (var runtime : runtimePeripherals.values()) {
+            if (!(runtime instanceof ScreenRuntimeHandle screenRuntime)) {
                 continue;
             }
-            var transform = computeTransform(screen);
-            float width = screen.width() > 0.0F ? screen.width() : DEFAULT_SCREEN_WIDTH;
-            float height = screen.height() > 0.0F ? screen.height() : DEFAULT_SCREEN_HEIGHT;
-            var right = transform.rotation().transform(new Vector3f(1.0F, 0.0F, 0.0F));
-            var up = transform.rotation().transform(new Vector3f(0.0F, 1.0F, 0.0F));
-            screens.add(new WorldUiScreen(display.getUUID(), screen.id(), channelId,
-                    new WorldUiScreenRaycast.Screen(screen.id(), transform.position(), right, up, width, height)));
+            var screen = screenRuntime.screen();
+            float width = screen.getScreenWidth();
+            float height = screen.getScreenHeight();
+            var rotation = screen.getWorldRotation();
+            var right = rotation.transform(new Vector3f(1.0F, 0.0F, 0.0F));
+            var up = rotation.transform(new Vector3f(0.0F, 1.0F, 0.0F));
+            var center = new Vector3f(
+                    (float) screen.getPosition().x,
+                    (float) screen.getPosition().y,
+                    (float) screen.getPosition().z
+            ).fma(height * 0.5F, up);
+            screens.add(new WorldUiScreen(display.getUUID(), screenRuntime.id(), channelId, powered, screen,
+                    new WorldUiScreenRaycast.Screen(screenRuntime.id(), center, right, up, width, height)));
         }
         return List.copyOf(screens);
     }
@@ -620,7 +628,7 @@ public class EntityPlayerHandle {
         PeripheralKind kind();
     }
 
-    private record ScreenRuntimeHandle(String id, ScreenPeripheral screen) implements RuntimePeripheralHandle {
+    private record ScreenRuntimeHandle(String id, MtvScreenPeripheral screen) implements RuntimePeripheralHandle {
         @Override
         public PeripheralKind kind() {
             return PeripheralKind.SCREEN;
@@ -637,6 +645,7 @@ public class EntityPlayerHandle {
     private record TransformState(Vector3f position, Quaternionf rotation) {
     }
 
-    public record WorldUiScreen(UUID mtvUuid, String screenId, String channelId, WorldUiScreenRaycast.Screen plane) {
+    public record WorldUiScreen(UUID mtvUuid, String screenId, String channelId, boolean powered,
+                                MtvScreenPeripheral peripheral, WorldUiScreenRaycast.Screen plane) {
     }
 }

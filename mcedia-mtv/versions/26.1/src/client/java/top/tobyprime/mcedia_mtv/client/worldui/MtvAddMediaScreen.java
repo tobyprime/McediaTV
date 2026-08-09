@@ -25,7 +25,7 @@ public final class MtvAddMediaScreen extends Screen {
     private Button playNow;
 
     private MtvAddMediaScreen(WorldUiInteractionState.Target target) {
-        super(Component.literal("MTV / Add media"));
+        super(Component.translatable("mcedia_mtv.add_media.title"));
         this.target = target;
         this.model = new WorldUiAddMediaModel(top.tobyprime.mcedia_mtv.client.metadata.MtvMediaMetadataCache.getInstance());
     }
@@ -39,19 +39,19 @@ public final class MtvAddMediaScreen extends Screen {
         int left = width / 2 - 220;
         input = addRenderableWidget(new EditBox(font, left, height / 2 - 80, 440, 24, Component.literal("URL")));
         input.setMaxLength(2048);
-        input.setHint(Component.literal("Paste a supported media URL"));
+        input.setHint(Component.translatable("mcedia_mtv.add_media.url_hint"));
         input.setResponder(model::setInput);
-        previewText = addRenderableWidget(new StringWidget(left + 76, height / 2 - 45, 364, 80, Component.literal("Waiting for local preview"), font));
-        prepend = addButton(left, height / 2 + 50, "Prepend", WorldUiAddMediaModel.AddMode.PREPEND);
-        insertNext = addButton(left + 112, height / 2 + 50, "Insert next", WorldUiAddMediaModel.AddMode.INSERT_NEXT);
-        append = addButton(left + 224, height / 2 + 50, "Append", WorldUiAddMediaModel.AddMode.APPEND);
-        playNow = addButton(left + 336, height / 2 + 50, "Play now", WorldUiAddMediaModel.AddMode.INSERT_AND_PLAY);
-        addRenderableWidget(Button.builder(Component.literal("Cancel"), button -> minecraft.setScreen(null)).bounds(width / 2 - 52, height / 2 + 78, 104, 20).build());
+        previewText = addRenderableWidget(new StringWidget(left + 76, height / 2 - 45, 364, 80, Component.translatable("mcedia_mtv.add_media.waiting"), font));
+        prepend = addButton(left, height / 2 + 50, "mcedia_mtv.add_media.prepend", WorldUiAddMediaModel.AddMode.PREPEND);
+        insertNext = addButton(left + 112, height / 2 + 50, "mcedia_mtv.add_media.insert_next", WorldUiAddMediaModel.AddMode.INSERT_NEXT);
+        append = addButton(left + 224, height / 2 + 50, "mcedia_mtv.add_media.append", WorldUiAddMediaModel.AddMode.APPEND);
+        playNow = addButton(left + 336, height / 2 + 50, "mcedia_mtv.add_media.play_now", WorldUiAddMediaModel.AddMode.INSERT_AND_PLAY);
+        addRenderableWidget(Button.builder(Component.translatable("mcedia_mtv.add_media.cancel"), button -> minecraft.setScreen(null)).bounds(width / 2 - 52, height / 2 + 78, 104, 20).build());
         input.setFocused(true);
     }
 
-    private Button addButton(int x, int y, String label, WorldUiAddMediaModel.AddMode mode) {
-        return addRenderableWidget(Button.builder(Component.literal(label), button -> model.confirm(target, WorldUiControlSender.getInstance(), mode)).bounds(x, y, 104, 20).build());
+    private Button addButton(int x, int y, String labelKey, WorldUiAddMediaModel.AddMode mode) {
+        return addRenderableWidget(Button.builder(Component.translatable(labelKey), button -> model.confirm(target, WorldUiControlSender.getInstance(), mode)).bounds(x, y, 104, 20).build());
     }
 
     @Override
@@ -59,19 +59,9 @@ public final class MtvAddMediaScreen extends Screen {
         super.tick();
         boolean enabled = model.canConfirm();
         if (prepend != null) { prepend.active = enabled; insertNext.active = enabled; append.active = enabled; playNow.active = enabled; }
-        MtvMediaMetadata metadata = model.preview();
         model.onControlResult(WorldUiControlSender.getInstance().consumeLastResult());
-        previewText.setMessage(Component.literal(previewMessage(metadata)));
+        previewText.setMessage(Component.literal(model.previewMessage()));
         if (model.consumeAccepted()) minecraft.setScreen(null);
-    }
-
-    private String previewMessage(MtvMediaMetadata metadata) {
-        String value;
-        if (metadata == null) value = model.resolving() ? "Resolving locally..." : "Waiting for local preview";
-        else if (metadata.status() == MtvMediaMetadata.Status.FAILED) value = "Local resolver: " + metadata.errorReason();
-        else value = "Title: " + metadata.title() + " | Author: " + metadata.author() + " | Platform: " + metadata.platform()
-                + " | Description: " + metadata.description() + " | Cover: " + MtvMediaCoverCache.getInstance().statusLabel(metadata.coverUrl());
-        return model.lastError().name().equals("NONE") ? value : value + " | Server: " + model.lastError().name();
     }
 
     @Override

@@ -23,10 +23,11 @@ public final class MtvWorldUiInputHook {
     public static void initialize() { if (!initialized) { initialized = true; ClientTickEvents.START_CLIENT_TICK.register(MtvWorldUiInputHook::tick); } }
     public static boolean consumesAttack() { return consumesAttack; }
     private static void tick(Minecraft client) {
-        if (!WorldUiCapabilityState.getInstance().supported() || client.screen != null || client.player == null) { reset(); return; }
+        if (!WorldUiCapabilityState.getInstance().supported() || client.player == null) { reset(); return; }
+        if (client.screen != null) { resetInput(); return; }
         var selection = select(client);
         if (selection == null) MtvWorldUiRenderer.presentation().clearHover();
-        else { MtvWorldUiRenderer.presentation().update(selection.target(), selection.u(), selection.v()); INTERACTION.refreshTarget(selection.target()); var controlState = WorldUiControlStateCache.getInstance().state(selection.target().mtvUuid()); if (controlState != null) INTERACTION.setMasterVolume(controlState.masterVolume()); WorldUiPlaylistCache.getInstance().manifest(selection.target().channelId()).ifPresent(m -> INTERACTION.setPlayOrderMode(m.playOrderMode())); }
+        else { MtvWorldUiRenderer.presentation().update(selection.target(), selection.u(), selection.v()); INTERACTION.refreshTarget(selection.target()); var controlState = WorldUiControlStateCache.getInstance().state(selection.target().mtvUuid(), selection.target().screenId()); if (controlState != null) { INTERACTION.setMasterVolume(controlState.masterVolume()); INTERACTION.setDanmakuVisible(controlState.danmakuVisible()); } WorldUiPlaylistCache.getInstance().manifest(selection.target().channelId()).ifPresent(m -> INTERACTION.setPlayOrderMode(m.playOrderMode())); }
                 MtvWorldUiRenderer.presentation().tickHoverFade(selection != null && MtvWorldUiRenderer.presentation().hoveringToggleTrigger());
 if (selection != null && MtvWorldUiRenderer.presentation().isPlaylistExpanded()) requestVisiblePage(selection.target());
         boolean down = client.options.keyAttack.isDown();
@@ -66,14 +67,17 @@ if (selection != null && MtvWorldUiRenderer.presentation().isPlaylistExpanded())
             }
         }
         if (down && consumesAttack && selection != null) INTERACTION.onPointerMove(selection.u(), selection.v());
-        if (!down && primaryDown) { if (consumesAttack) INTERACTION.onPrimaryRelease(selection == null ? 0L : selection.durationUs()); consumesAttack = false; }
+        if (!down && primaryDown) { if (consumesAttack) INTERACTION.onPrimaryRelease(); consumesAttack = false; }
         primaryDown = down;
     }
     private static Selection select(Minecraft client) {
         var camera = client.gameRenderer.getMainCamera();
         if (camera == null) return null;
         var origin = camera.position();
-        var screens = EntityPlayerManager.getInstance().worldUiScreens();
+        var screens = EntityPlayerManager.getInstance().worldUiScreens().stream()
+                .filter(EntityPlayerHandle.WorldUiScreen::powered)
+                .filter(s -> s.channelId() != null && !s.channelId().isBlank())
+                .toList();
         var hit = WorldUiScreenRaycast.select(new Vector3f((float) origin.x, (float) origin.y, (float) origin.z), new Vector3f(camera.forwardVector()), screens.stream().map(EntityPlayerHandle.WorldUiScreen::plane).toList()).orElse(null);
         if (hit == null || blockedByBlock(client, origin, hit.distance())) return null;
         for (var screen : screens) if (screen.plane() == hit.screen()) {
@@ -83,14 +87,15 @@ if (selection != null && MtvWorldUiRenderer.presentation().isPlaylistExpanded())
         return null;
     }
     private static boolean blockedByBlock(Minecraft client, net.minecraft.world.phys.Vec3 origin, float screenDistance) { return client.hitResult != null && client.hitResult.getType() == HitResult.Type.BLOCK && client.hitResult.getLocation().distanceToSqr(origin) + 1.0E-4D < screenDistance * screenDistance; }
-    private static void reset() { MtvWorldUiRenderer.presentation().clearHover(); MtvWorldUiRenderer.presentation().collapse(); INTERACTION.collapse(); primaryDown = false; consumesAttack = false; }
+    private static void resetInput() { MtvWorldUiRenderer.presentation().clearHover(); primaryDown = false; consumesAttack = false; }
+    private static void reset() { resetInput(); MtvWorldUiRenderer.presentation().collapse(); INTERACTION.collapse(); }
     private static void requestVisiblePage(WorldUiInteractionState.Target target) {
         WorldUiPlaylistCache.getInstance().manifest(target.channelId()).ifPresent(manifest -> {
             int start = MtvWorldUiRenderer.presentation().playlistStart();
             int last = Math.max(0, manifest.itemCount() - 1);
-            WorldUiPlaylistCache.getInstance().prefetchRange(target.channelId(), start, Math.min(last, start + 7));
+            WorldUiPlaylistCache.getInstance().prefetchRange(target.channelId(), start, Math.min(last, start + 6));
             WorldUiPlaylistCache.getInstance().prefetchRange(target.channelId(), Math.max(0, manifest.cursor() - 1), Math.min(last, manifest.cursor() + 1));
-            requestRange(target.channelId(), manifest.revision(), start, Math.min(last, start + 7));
+            requestRange(target.channelId(), manifest.revision(), start, Math.min(last, start + 6));
             requestRange(target.channelId(), manifest.revision(), Math.max(0, manifest.cursor() - 1), Math.min(last, manifest.cursor() + 1));
             requestRange(target.channelId(), manifest.revision(), Math.max(0, start - 32), Math.min(last, start + 31));
             requestRange(target.channelId(), manifest.revision(), start + 32, Math.min(last, start + 63));
@@ -111,7 +116,8 @@ if (selection != null && MtvWorldUiRenderer.presentation().isPlaylistExpanded())
     }
     private static boolean isPlaylistOperation(WorldUiHit.Kind kind) {
         return kind == WorldUiHit.Kind.PLAYLIST_ITEM || kind == WorldUiHit.Kind.REMOVE_ITEM
-                || kind == WorldUiHit.Kind.MOVE_FRONT || kind == WorldUiHit.Kind.MOVE_BACK;
+                || kind == WorldUiHit.Kind.MOVE_FRONT || kind == WorldUiHit.Kind.MOVE_BACK
+                || kind == WorldUiHit.Kind.MOVE_UP || kind == WorldUiHit.Kind.MOVE_DOWN;
     }
     private record Selection(WorldUiInteractionState.Target target, float u, float v, long durationUs) { }
 }

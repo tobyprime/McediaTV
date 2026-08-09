@@ -32,7 +32,9 @@ public final class WorldUiScreenRaycast {
     }
 
     private static Hit intersect(Vector3f origin, Vector3f direction, Screen screen) {
-        Vector3f normal = new Vector3f(screen.up()).cross(screen.right()).normalize();
+        // right × up is the screen's visible (video) face; rays arriving from that
+        // side have a negative dot product and are the ones a player can interact with.
+        Vector3f normal = new Vector3f(screen.right()).cross(screen.up()).normalize();
         float denominator = normal.dot(direction);
         if (denominator >= -EPSILON) {
             return null;

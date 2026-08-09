@@ -79,8 +79,15 @@ public final class WorldUiPresentationState {
         if (target == null) {
             return false;
         }
-        return isExpanded(target)
-                || (sameScreen(target, hoveredTarget) && layout.isToggleTrigger(hoveredU, hoveredV))
+        if (isExpanded(target)) {
+            return true;
+        }
+        // At most one screen shows any control UI at a time: while some screen is
+        // expanded, collapsed screens render nothing, not even the hover hint.
+        if (expandedTarget != null) {
+            return false;
+        }
+        return (sameScreen(target, hoveredTarget) && layout.isToggleTrigger(hoveredU, hoveredV))
                 || (sameScreen(target, fadeTarget) && hoverFade > 0.0F);
     }
 
@@ -90,7 +97,7 @@ public final class WorldUiPresentationState {
         }
         WorldUiHit hit = layout.hit(hoveredU, hoveredV, isExpanded(hoveredTarget), playlistExpanded);
         return switch (hit.kind()) {
-            case PLAYLIST_ITEM, REMOVE_ITEM, MOVE_FRONT, MOVE_BACK -> new WorldUiHit(hit.kind(), playlistStart + hit.index());
+            case PLAYLIST_ITEM, REMOVE_ITEM, MOVE_FRONT, MOVE_BACK, MOVE_UP, MOVE_DOWN -> new WorldUiHit(hit.kind(), playlistStart + hit.index());
             default -> hit;
         };
     }
@@ -121,12 +128,12 @@ public final class WorldUiPresentationState {
     }
 
     public void previousPlaylistPage() {
-        playlistStart = Math.max(0, playlistStart - 8);
+        playlistStart = Math.max(0, playlistStart - 7);
     }
 
     public void nextPlaylistPage(int itemCount) {
-        int lastStart = Math.max(0, ((Math.max(0, itemCount) - 1) / 8) * 8);
-        playlistStart = Math.min(lastStart, playlistStart + 8);
+        int lastStart = Math.max(0, ((Math.max(0, itemCount) - 1) / 7) * 7);
+        playlistStart = Math.min(lastStart, playlistStart + 7);
     }
 
     private static boolean sameScreen(WorldUiInteractionState.Target first, WorldUiInteractionState.Target second) {

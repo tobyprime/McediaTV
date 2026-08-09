@@ -330,6 +330,9 @@ public final class MtvChannelProtocol {
         buffer.writeFloat(state.masterVolume());
         buffer.writeBoolean(state.canControl());
         buffer.writeLong(state.channelRevision());
+        buffer.writeUtf(state.screenId(), MAX_SCREEN_ID_LENGTH);
+        buffer.writeVarInt(state.brightness());
+        buffer.writeBoolean(state.danmakuVisible());
     }
 
     public static WorldUiControlState readWorldUiControlState(FriendlyByteBuf buffer) {
@@ -337,7 +340,8 @@ public final class MtvChannelProtocol {
             throw invalidPacket("world UI control state", "encoded length exceeds " + MAX_CONTROL_STATE_BYTES + " bytes");
         }
         var state = new WorldUiControlState(buffer.readUUID(), buffer.readUtf(MAX_CHANNEL_ID_LENGTH),
-                buffer.readFloat(), buffer.readBoolean(), buffer.readLong());
+                buffer.readFloat(), buffer.readBoolean(), buffer.readLong(),
+                buffer.readUtf(MAX_SCREEN_ID_LENGTH), readNonNegativeInt(buffer, "brightness"), buffer.readBoolean());
         validateWorldUiControlState(state);
         ensureFullyRead(buffer, "world UI control state");
         return state;
@@ -586,7 +590,9 @@ public final class MtvChannelProtocol {
             case SEEK_RELATIVE -> requireArgument(request.argument(), WorldUiControlArgument.PositionUs.class, request.operation());
             case SET_SPEED -> validateScalar(request.argument(), request.operation(), 0.25F, 4.0F);
             case SET_MASTER_VOLUME -> validateScalar(request.argument(), request.operation(), 0.0F, 1.0F);
-            case PLAY_INDEX, REMOVE, MOVE_FRONT, MOVE_BACK -> {
+            case SET_BRIGHTNESS -> validateScalar(request.argument(), request.operation(), 0.0F, 15.0F);
+            case SET_DANMAKU_VISIBLE -> requireArgument(request.argument(), WorldUiControlArgument.BooleanValue.class, request.operation());
+            case PLAY_INDEX, REMOVE, MOVE_FRONT, MOVE_BACK, MOVE_UP, MOVE_DOWN -> {
                 if (requireArgument(request.argument(), WorldUiControlArgument.PlaylistIndex.class, request.operation()).value() < 0) {
                     throw invalidPacket("control request", "playlist index is negative");
                 }
@@ -616,7 +622,9 @@ public final class MtvChannelProtocol {
     private static void validateWorldUiControlState(WorldUiControlState state) {
         if (state == null || state.mtvUuid() == null || state.channelId() == null || state.channelId().isBlank()
                 || state.channelId().length() > MAX_CHANNEL_ID_LENGTH || !Float.isFinite(state.masterVolume())
-                || state.masterVolume() < 0.0F || state.masterVolume() > 1.0F || state.channelRevision() < 0L) {
+                || state.masterVolume() < 0.0F || state.masterVolume() > 1.0F || state.channelRevision() < 0L
+                || state.screenId() == null || state.screenId().isBlank() || state.screenId().length() > MAX_SCREEN_ID_LENGTH
+                || state.brightness() < 0 || state.brightness() > 15) {
             throw invalidPacket("world UI control state", "field is invalid");
         }
     }
@@ -625,10 +633,11 @@ public final class MtvChannelProtocol {
         switch (operation) {
             case TOGGLE_PAUSE, NEXT, PREVIOUS, CLEAR, TOGGLE_MUTE -> { }
             case SEEK_ABSOLUTE, SEEK_RELATIVE -> buffer.writeLong(((WorldUiControlArgument.PositionUs) argument).value());
-            case SET_SPEED, SET_MASTER_VOLUME -> buffer.writeFloat(((WorldUiControlArgument.Scalar) argument).value());
-            case PLAY_INDEX, REMOVE, MOVE_FRONT, MOVE_BACK -> buffer.writeVarInt(((WorldUiControlArgument.PlaylistIndex) argument).value());
+            case SET_SPEED, SET_MASTER_VOLUME, SET_BRIGHTNESS -> buffer.writeFloat(((WorldUiControlArgument.Scalar) argument).value());
+            case PLAY_INDEX, REMOVE, MOVE_FRONT, MOVE_BACK, MOVE_UP, MOVE_DOWN -> buffer.writeVarInt(((WorldUiControlArgument.PlaylistIndex) argument).value());
             case PREPEND, APPEND, INSERT_NEXT, INSERT_AND_PLAY -> buffer.writeUtf(((WorldUiControlArgument.MediaUrl) argument).value(), MAX_MEDIA_URL_LENGTH);
             case SET_PLAY_ORDER -> buffer.writeUtf(((WorldUiControlArgument.PlayOrderMode) argument).value(), MAX_PLAY_ORDER_MODE_LENGTH);
+            case SET_DANMAKU_VISIBLE -> buffer.writeBoolean(((WorldUiControlArgument.BooleanValue) argument).value());
         }
     }
 
@@ -636,10 +645,11 @@ public final class MtvChannelProtocol {
         return switch (operation) {
             case TOGGLE_PAUSE, NEXT, PREVIOUS, CLEAR, TOGGLE_MUTE -> WorldUiControlArgument.None.INSTANCE;
             case SEEK_ABSOLUTE, SEEK_RELATIVE -> new WorldUiControlArgument.PositionUs(buffer.readLong());
-            case SET_SPEED, SET_MASTER_VOLUME -> new WorldUiControlArgument.Scalar(buffer.readFloat());
-            case PLAY_INDEX, REMOVE, MOVE_FRONT, MOVE_BACK -> new WorldUiControlArgument.PlaylistIndex(readNonNegativeInt(buffer, "playlist index"));
+            case SET_SPEED, SET_MASTER_VOLUME, SET_BRIGHTNESS -> new WorldUiControlArgument.Scalar(buffer.readFloat());
+            case PLAY_INDEX, REMOVE, MOVE_FRONT, MOVE_BACK, MOVE_UP, MOVE_DOWN -> new WorldUiControlArgument.PlaylistIndex(readNonNegativeInt(buffer, "playlist index"));
             case PREPEND, APPEND, INSERT_NEXT, INSERT_AND_PLAY -> new WorldUiControlArgument.MediaUrl(readNonBlankUtf(buffer, MAX_MEDIA_URL_LENGTH, "mediaUrl"));
             case SET_PLAY_ORDER -> new WorldUiControlArgument.PlayOrderMode(readPlayOrderMode(buffer));
+            case SET_DANMAKU_VISIBLE -> new WorldUiControlArgument.BooleanValue(buffer.readBoolean());
         };
     }
 

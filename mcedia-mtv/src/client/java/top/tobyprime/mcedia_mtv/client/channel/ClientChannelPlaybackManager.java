@@ -22,14 +22,10 @@ public final class ClientChannelPlaybackManager {
     }
 
     public void onSnapshot(ClientChannelPlaybackSnapshot snapshot) {
-        LOGGER.debug("Routing MTV snapshot: channel={}, revision={}",
-                snapshot == null ? null : snapshot.channelId(), snapshot == null ? null : snapshot.revision());
         applySnapshot(snapshot, false);
     }
 
     public void onSync(ClientChannelPlaybackSnapshot snapshot) {
-        LOGGER.debug("Routing MTV sync: channel={}, revision={}",
-                snapshot == null ? null : snapshot.channelId(), snapshot == null ? null : snapshot.revision());
         applySnapshot(snapshot, true);
     }
 
@@ -43,8 +39,6 @@ public final class ClientChannelPlaybackManager {
         var session = sessions.get(snapshot.channelId());
         if (session != null) {
             session.updateSnapshot(snapshot.receivedNow(ClientChannelSession.currentMonotonicMs()), forceResync);
-            LOGGER.debug("Applied MTV snapshot: channel={}, revision={}, forceResync={}, sessions={}",
-                    snapshot.channelId(), snapshot.revision(), forceResync, sessions.size());
         } else {
             LOGGER.warn("Dropped MTV snapshot without active session: channel={}, revision={}, forceResync={}, sessions={}",
                     snapshot.channelId(), snapshot.revision(), forceResync, sessions.size());

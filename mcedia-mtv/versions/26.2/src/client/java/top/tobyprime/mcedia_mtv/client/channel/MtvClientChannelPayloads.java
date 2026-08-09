@@ -10,11 +10,13 @@ import top.tobyprime.mcedia_mtv.client.HudChannelPlayer;
 import top.tobyprime.mcedia_mtv.client.channel.worldui.MtvWorldUiCapabilitiesPayload;
 import top.tobyprime.mcedia_mtv.client.channel.worldui.MtvWorldUiControlRequestPayload;
 import top.tobyprime.mcedia_mtv.client.channel.worldui.MtvWorldUiControlResultPayload;
+import top.tobyprime.mcedia_mtv.client.channel.worldui.MtvWorldUiControlStatePayload;
 import top.tobyprime.mcedia_mtv.client.channel.worldui.MtvWorldUiPlaylistManifestPayload;
 import top.tobyprime.mcedia_mtv.client.channel.worldui.MtvWorldUiPlaylistPagePayload;
 import top.tobyprime.mcedia_mtv.client.channel.worldui.MtvWorldUiPlaylistPageRequestPayload;
 import top.tobyprime.mcedia_mtv.client.channel.worldui.WorldUiCapabilityState;
 import top.tobyprime.mcedia_mtv.client.channel.worldui.WorldUiControlSender;
+import top.tobyprime.mcedia_mtv.client.channel.worldui.WorldUiControlStateCache;
 import top.tobyprime.mcedia_mtv.client.channel.worldui.WorldUiPlaylistCache;
 import top.tobyprime.mcedia_mtv.client.channel.worldui.MtvWorldUiWatchPayload;
 import top.tobyprime.mcedia_mtv.client.channel.worldui.MtvWorldUiUnwatchPayload;
@@ -36,6 +38,7 @@ public final class MtvClientChannelPayloads {
         PayloadTypeRegistry.clientboundPlay().register(MtvWorldUiPlaylistManifestPayload.TYPE, MtvWorldUiPlaylistManifestPayload.CODEC);
         PayloadTypeRegistry.clientboundPlay().register(MtvWorldUiPlaylistPagePayload.TYPE, MtvWorldUiPlaylistPagePayload.CODEC);
         PayloadTypeRegistry.clientboundPlay().register(MtvWorldUiControlResultPayload.TYPE, MtvWorldUiControlResultPayload.CODEC);
+        PayloadTypeRegistry.clientboundPlay().register(MtvWorldUiControlStatePayload.TYPE, MtvWorldUiControlStatePayload.CODEC);
         PayloadTypeRegistry.serverboundPlay().register(MtvChannelClientSubscribePayload.TYPE, MtvChannelClientSubscribePayload.CODEC);
         PayloadTypeRegistry.serverboundPlay().register(MtvChannelClientUnsubscribePayload.TYPE, MtvChannelClientUnsubscribePayload.CODEC);
         PayloadTypeRegistry.serverboundPlay().register(MtvChannelClientHeartbeatPayload.TYPE, MtvChannelClientHeartbeatPayload.CODEC);
@@ -63,6 +66,9 @@ public final class MtvClientChannelPayloads {
                 safeHandle("playlist_page", payload.page().channelId(), payload.page().revision(), () -> WorldUiPlaylistCache.getInstance().applyPage(payload.page())));
         ClientPlayNetworking.registerGlobalReceiver(MtvWorldUiControlResultPayload.TYPE, (payload, context) ->
                 safeHandle("world_ui_control_result", "", payload.result().revision(), () -> WorldUiControlSender.getInstance().onResult(payload.result())));
+        ClientPlayNetworking.registerGlobalReceiver(MtvWorldUiControlStatePayload.TYPE, (payload, context) ->
+                safeHandle("world_ui_control_state", payload.state().channelId(), payload.state().channelRevision(), () ->
+                        WorldUiControlStateCache.getInstance().apply(payload.state())));
         ClientPlayConnectionEvents.JOIN.register(MtvClientChannelPayloads::onJoin);
         ClientPlayConnectionEvents.DISCONNECT.register(MtvClientChannelPayloads::onDisconnect);
         LOGGER.debug("Registered MTV client channel payloads and connection listeners");
@@ -70,7 +76,6 @@ public final class MtvClientChannelPayloads {
 
     private static void safeHandle(String packetType, String channelId, Long revision, Runnable action) {
         try {
-            LOGGER.debug("Handling MTV {} payload: channel={}, revision={}", packetType, channelId, revision);
             action.run();
         } catch (Exception e) {
             LOGGER.warn("Failed to handle MTV {} packet: channel={}, revision={}", packetType, channelId, revision, e);

@@ -21,6 +21,7 @@ public final class WorldUiInteractionState {
     private String playOrderMode = "SEQUENTIAL";
     private float masterVolume = 1.0F;
     private float savedVolume = 1.0F;
+    private boolean danmakuVisible = true;
 
     public WorldUiInteractionState(ControlSender sender) {
         this.sender = Objects.requireNonNull(sender, "sender");
@@ -47,6 +48,10 @@ public final class WorldUiInteractionState {
         if (masterVolume > 0.0F) savedVolume = masterVolume;
     }
 
+    public void setDanmakuVisible(boolean visible) {
+        danmakuVisible = visible;
+    }
+
     public void onPrimaryPress(Target target, WorldUiHit hit, float u, float v, long durationUs) {
         if (target == null || hit == null) {
             return;
@@ -64,6 +69,7 @@ public final class WorldUiInteractionState {
         activeDrag = switch (hit.kind()) {
             case SEEK -> Drag.SEEK;
             case VOLUME -> Drag.VOLUME;
+            case BRIGHTNESS -> Drag.BRIGHTNESS;
             default -> Drag.NONE;
         };
         if (activeDrag == Drag.NONE) {
@@ -88,9 +94,12 @@ public final class WorldUiInteractionState {
         if (activeDrag == Drag.SEEK) {
             send(expandedTarget, dragU, dragV, WorldUiControlOperation.SEEK_ABSOLUTE,
                     new WorldUiControlArgument.PositionUs(Math.round(Math.max(0L, durationUs) * WorldUiLayout.seekFraction(dragU))));
+        } else if (activeDrag == Drag.BRIGHTNESS) {
+            send(expandedTarget, dragU, dragV, WorldUiControlOperation.SET_BRIGHTNESS,
+                    new WorldUiControlArgument.Scalar(Math.round(15.0F * WorldUiLayout.brightnessFraction(dragV))));
         } else {
             send(expandedTarget, dragU, dragV, WorldUiControlOperation.SET_MASTER_VOLUME,
-                    new WorldUiControlArgument.Scalar(WorldUiLayout.volumeFraction(dragU)));
+                    new WorldUiControlArgument.Scalar(WorldUiLayout.volumeFraction(dragV)));
         }
         activeDrag = Drag.NONE;
     }
@@ -100,7 +109,7 @@ public final class WorldUiInteractionState {
      * The last local preview is still authoritative for this client gesture;
      * no additional hover or network update is required.
      */
-    public void onPrimaryRelease(long durationUs) {
+    public void onPrimaryRelease() {
         onPrimaryRelease(dragU, dragV, dragDurationUs);
     }
 
@@ -129,20 +138,24 @@ public final class WorldUiInteractionState {
             case PREVIOUS -> WorldUiControlOperation.PREVIOUS;
             case SPEED -> WorldUiControlOperation.SET_SPEED;
             case MUTE -> WorldUiControlOperation.SET_MASTER_VOLUME;
+            case DANMAKU -> WorldUiControlOperation.SET_DANMAKU_VISIBLE;
             case PLAYLIST_ITEM -> WorldUiControlOperation.PLAY_INDEX;
             case REMOVE_ITEM -> WorldUiControlOperation.REMOVE;
             case MOVE_FRONT -> WorldUiControlOperation.MOVE_FRONT;
             case MOVE_BACK -> WorldUiControlOperation.MOVE_BACK;
+            case MOVE_UP -> WorldUiControlOperation.MOVE_UP;
+            case MOVE_DOWN -> WorldUiControlOperation.MOVE_DOWN;
             case CLEAR_PLAYLIST -> WorldUiControlOperation.CLEAR;
             case SET_PLAY_ORDER -> WorldUiControlOperation.SET_PLAY_ORDER;
             default -> null;
         };
         if (operation != null) {
             WorldUiControlArgument argument = switch (hit.kind()) {
-                case PLAYLIST_ITEM, REMOVE_ITEM, MOVE_FRONT, MOVE_BACK -> new WorldUiControlArgument.PlaylistIndex(hit.index());
+                case PLAYLIST_ITEM, REMOVE_ITEM, MOVE_FRONT, MOVE_BACK, MOVE_UP, MOVE_DOWN -> new WorldUiControlArgument.PlaylistIndex(hit.index());
                 case SET_PLAY_ORDER -> new WorldUiControlArgument.PlayOrderMode(nextPlayOrderMode());
                 case SPEED -> new WorldUiControlArgument.Scalar(nextSpeed());
                 case MUTE -> new WorldUiControlArgument.Scalar(masterVolume <= 0.0F ? savedVolume : 0.0F);
+                case DANMAKU -> new WorldUiControlArgument.BooleanValue(!danmakuVisible);
                 default -> WorldUiControlArgument.None.INSTANCE;
             };
             send(target, dragU, dragV, operation, argument);
@@ -204,6 +217,7 @@ public final class WorldUiInteractionState {
     private enum Drag {
         NONE,
         SEEK,
-        VOLUME
+        VOLUME,
+        BRIGHTNESS
     }
 }

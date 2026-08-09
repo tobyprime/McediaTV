@@ -271,7 +271,13 @@ public final class MtvChannelNetworkService implements PluginMessageListener, Li
                 publishPlaylistManifest(request.channelId());
             }
             if (result.accepted()) {
-                publishControlState(request.targetMtvUuid());
+                publishControlState(request.targetMtvUuid(), request.screenId());
+                // The requester is normally covered by publishControlState; force a
+                // direct send only when the watch registry dropped it (a transient
+                // entity read failure), otherwise their local UI never sees the change.
+                if (!worldUiWatchRegistry.watchers(request.targetMtvUuid()).contains(player.getUniqueId())) {
+                    sendControlStateTo(player, request.targetMtvUuid(), request.screenId());
+                }
             }
         });
     }
@@ -304,13 +310,17 @@ public final class MtvChannelNetworkService implements PluginMessageListener, Li
             worldUiWatchRegistry.watch(player.getUniqueId(), request.targetMtvUuid());
             removeEmptyWatchedChannels();
             watchedChannelsByMtv.put(request.targetMtvUuid(), binding.channelId());
-            sendControlState(player, target, true);
+            sendControlState(player, target, true, null);
             return Boolean.TRUE;
         }, ignored -> { });
     }
 
     /** Publishes only to players currently watching this MTV; callers invoke this after an actual state change. */
     public void publishControlState(UUID mtvUuid) {
+        publishControlState(mtvUuid, null);
+    }
+
+    public void publishControlState(UUID mtvUuid, String screenId) {
         if (closed || mtvUuid == null) return;
         for (UUID playerId : worldUiWatchRegistry.watchers(mtvUuid)) {
             Player player = Bukkit.getPlayer(playerId);
@@ -319,10 +329,27 @@ public final class MtvChannelNetworkService implements PluginMessageListener, Li
                 if (!target.isPowered()) {
                     return Boolean.FALSE;
                 }
-                sendControlState(player, target, false);
+                sendControlState(player, target, false, screenId);
                 return Boolean.TRUE;
-            }, ignored -> clearMtvWatch(mtvUuid));
+            }, ignored -> { });
         }
+    }
+
+    /**
+     * Always sends the current control state to one player (the requester of an
+     * accepted control), bypassing the watch registry and dedup. The watch
+     * registry can drop a player on a transient entity read failure; without
+     * this the local UI would never observe its own accepted changes.
+     */
+    private void sendControlStateTo(Player player, UUID mtvUuid, String screenId) {
+        if (closed || player == null || mtvUuid == null) return;
+        channelService.getManager().withManagedPlayer(mtvUuid, target -> {
+            if (!target.isPowered()) {
+                return Boolean.FALSE;
+            }
+            sendControlState(player, target, true, screenId);
+            return Boolean.TRUE;
+        }, ignored -> { });
     }
 
     /** Clears world UI watchers and cached state when an MTV entity is deleted. */
@@ -330,14 +357,19 @@ public final class MtvChannelNetworkService implements PluginMessageListener, Li
         clearMtvWatch(mtvUuid);
     }
 
-    private void sendControlState(Player player, top.tobyprime.mcedia_mtv_plugin.model.ManagedMtvPlayer target, boolean force) {
+    private void sendControlState(Player player, top.tobyprime.mcedia_mtv_plugin.model.ManagedMtvPlayer target, boolean force, String screenId) {
         if (player == null || target == null) return;
         var binding = channelService.resolveBinding(target);
         var channel = channelService.ensureChannelState(binding.channelId());
         if (channel == null) return;
+        var screen = screenId == null ? null : target.findScreen(screenId);
+        if (screen == null) screen = target.getScreen();
         var state = new WorldUiControlState(target.getUuid(), binding.channelId(), target.getMasterVolume(),
-                channelService.canControlChannelPlayback(player, channel), channel.getRevision());
-        String key = player.getUniqueId() + ":" + target.getUuid();
+                channelService.canControlChannelPlayback(player, channel), channel.getRevision(),
+                screen.getId(), screen.getMinBrightness(), screen.isDanmakuVisible());
+        // State is now per-screen (brightness/danmaku), so the dedup key must be too;
+        // otherwise two equal states for different screens of the same entity collide.
+        String key = player.getUniqueId() + ":" + target.getUuid() + ":" + screen.getId();
         if (!force && state.equals(lastControlStates.putIfAbsent(key, state))) return;
         lastControlStates.put(key, state);
         runOnPlayer(player, "send world UI control state", () -> player.sendPluginMessage(
@@ -413,12 +445,16 @@ public final class MtvChannelNetworkService implements PluginMessageListener, Li
     }
 
     private ChannelSnapshot toSnapshot(ChannelRuntimeState state, AudienceSessionManager.AudienceSummary audience, long nowMs) {
-        return state.toSnapshot(
-                nowMs,
-                Math.max(0L, audience.resolvedDurationMs() * 1000L),
-                audience.completed(),
-                audience.majoritySuspended()
-        );
+        long audienceDurationUs = Math.max(0L, audience.resolvedDurationMs() * 1000L);
+        // After a seek the channel revision bumps but audience sessions still carry the old
+        // revision, so the majority resolution briefly reads 0. Keep the last known media
+        // duration cached on the channel state instead of showing "--:--" in the client.
+        long cachedDurationUs = Math.max(0L, state.getDurationMs()) * 1000L;
+        long durationUs = audienceDurationUs > 0L ? audienceDurationUs : cachedDurationUs;
+        if (audienceDurationUs > 0L) {
+            state.setDurationMs(audienceDurationUs / 1000L);
+        }
+        return state.toSnapshot(nowMs, durationUs, audience.completed(), audience.majoritySuspended());
     }
 
     private void maybeStartLoadedChannel(ChannelRuntimeState state, long nowMs, AudienceSessionManager.AudienceSummary audience) {
@@ -447,19 +483,17 @@ public final class MtvChannelNetworkService implements PluginMessageListener, Li
     }
 
     private void publishSnapshot(ChannelRuntimeState state, AudienceSessionManager.AudienceSummary audience) {
-        publish(state, audience, this::sendSnapshot, "snapshot");
+        publish(state, audience, this::sendSnapshot);
     }
 
     private void publishSync(ChannelRuntimeState state, AudienceSessionManager.AudienceSummary audience) {
-        publish(state, audience, this::sendSync, "sync");
+        publish(state, audience, this::sendSync);
     }
 
-    private void publish(ChannelRuntimeState state, AudienceSessionManager.AudienceSummary audience, BiConsumer<Player, ChannelSnapshot> sender, String kind) {
+    private void publish(ChannelRuntimeState state, AudienceSessionManager.AudienceSummary audience, BiConsumer<Player, ChannelSnapshot> sender) {
         long nowMs = System.currentTimeMillis();
         var snapshot = toSnapshot(state, audience, nowMs);
-        int recipients = broadcast(snapshot, sender);
-        LOGGER.debug("Published MTV channel {}: channel={}, revision={}, mediaUrl={}, paused={}, completed={}, audienceSuspended={}, recipients={}",
-                kind, snapshot.channelId(), snapshot.revision(), snapshot.mediaUrl(), snapshot.paused(), snapshot.completed(), snapshot.audienceSuspended(), recipients);
+        broadcast(snapshot, sender);
     }
 
     private int broadcastSnapshot(ChannelSnapshot snapshot) {
@@ -545,7 +579,7 @@ public final class MtvChannelNetworkService implements PluginMessageListener, Li
         if (mtvUuid == null) return;
         worldUiWatchRegistry.unwatchMtv(mtvUuid);
         watchedChannelsByMtv.remove(mtvUuid);
-        lastControlStates.keySet().removeIf(key -> key.endsWith(":" + mtvUuid));
+        lastControlStates.keySet().removeIf(key -> key.contains(":" + mtvUuid + ":"));
     }
 
     private void removeEmptyWatchedChannels() {

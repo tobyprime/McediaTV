@@ -81,7 +81,6 @@ public final class MtvClientChannelPayloads {
 
     private static void safeHandle(String packetType, String channelId, Long revision, Runnable action) {
         try {
-            LOGGER.debug("Handling MTV {} payload: channel={}, revision={}", packetType, channelId, revision);
             action.run();
         } catch (Exception e) {
             LOGGER.warn("Failed to handle MTV {} packet: channel={}, revision={}", packetType, channelId, revision, e);
