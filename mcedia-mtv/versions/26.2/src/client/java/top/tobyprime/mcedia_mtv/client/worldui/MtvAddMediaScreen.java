@@ -11,6 +11,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import top.tobyprime.mcedia_mtv.client.channel.worldui.WorldUiControlSender;
 import top.tobyprime.mcedia_mtv.client.metadata.MtvMediaMetadata;
+import top.tobyprime.mcedia_mtv.client.metadata.MtvMediaCover;
 import top.tobyprime.mcedia_mtv.client.metadata.MtvMediaCoverCache;
 
 /** Full-screen local URL preview and bounded playlist insertion controls. */
@@ -50,9 +51,26 @@ public final class MtvAddMediaScreen extends Screen {
 
     private void drawPreviewCover(GuiGraphicsExtractor graphics) {
         MtvMediaMetadata metadata = model.preview();
-        Identifier textureId = metadata == null ? null : MtvWorldUiCoverTextures.texture(metadata.coverUrl());
         int x = width / 2 - 220, y = height / 2 - 45;
         graphics.fill(x, y, x + 64, y + 64, 0xFF333333);
-        if (textureId != null) graphics.blit(RenderPipelines.GUI_TEXTURED, textureId, x, y, 0.0F, 0.0F, 64, 64, 64, 64, 64, 64, -1);
+        if (metadata == null) return;
+        Identifier textureId = MtvWorldUiCoverTextures.texture(metadata.coverUrl());
+        if (textureId == null) return;
+        MtvMediaCover cover = MtvMediaCoverCache.getInstance().cached(metadata.coverUrl());
+        if (cover == null || cover.status() != MtvMediaCover.Status.RESOLVED || cover.width() <= 0 || cover.height() <= 0) return;
+        // Fixed 64x64 frame; the image is contain-fitted (aspect preserved, maximized, centered).
+        int frame = 64;
+        int dw, dh;
+        float aspect = (float) cover.width() / cover.height();
+        if (aspect >= 1.0F) {
+            dw = frame;
+            dh = Math.max(1, Math.round(frame / aspect));
+        } else {
+            dh = frame;
+            dw = Math.max(1, Math.round(frame * aspect));
+        }
+        int dx = x + (frame - dw) / 2, dy = y + (frame - dh) / 2;
+        graphics.blit(RenderPipelines.GUI_TEXTURED, textureId, dx, dy, 0.0F, 0.0F, dw, dh,
+                cover.width(), cover.height(), cover.width(), cover.height(), -1);
     }
 }

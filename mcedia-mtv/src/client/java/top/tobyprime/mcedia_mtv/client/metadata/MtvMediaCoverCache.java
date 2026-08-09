@@ -12,12 +12,17 @@ import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** Bounded, client-only Cover downloader. It never sends cover bytes or metadata to the server. */
 public final class MtvMediaCoverCache {
+    private static final Logger LOGGER = LoggerFactory.getLogger(MtvMediaCoverCache.class);
     private static final int DEFAULT_CAPACITY = 64;
-    private static final int MAX_BYTES = 512 * 1024;
-    private static final int MAX_DIMENSION = 2048;
+    private static final int MAX_BYTES = 2 * 1024 * 1024;
+    /** Covers are drawn on small world-UI quads, so 1024px is more than enough and
+     *  keeps the re-encoded PNG and the uploaded texture small. */
+    private static final int MAX_DIMENSION = 1024;
     private static final int MAX_CONCURRENT = 2;
     private static final Executor DEFAULT_EXECUTOR = Executors.newFixedThreadPool(MAX_CONCURRENT, runnable -> {
         var thread = new Thread(runnable, "mtv-cover-loader");
@@ -50,13 +55,21 @@ public final class MtvMediaCoverCache {
             if (cached != null) return CompletableFuture.completedFuture(cached);
             var pending = inFlight.get(url);
             if (pending != null) return pending;
-            if (inFlight.size() >= MAX_CONCURRENT) return CompletableFuture.completedFuture(MtvMediaCover.failed(url, "cover loader is busy"));
+            // The fixed-size executor already queues excess work; do NOT reject here.
+            // A rejected cover would never be retried (metadata resolution caches the
+            // result), leaving the world UI permanently without that thumbnail.
             var future = new CompletableFuture<MtvMediaCover>();
             inFlight.put(url, future);
             executor.execute(() -> {
                 MtvMediaCover result;
                 try { result = download(url); }
                 catch (Exception e) { result = MtvMediaCover.failed(url, message(e)); }
+                if (result.status() == MtvMediaCover.Status.RESOLVED) {
+                    LOGGER.debug("MTV cover downloaded: url={}, bytes={}, size={}x{}",
+                            url, result.bytes().length, result.width(), result.height());
+                } else {
+                    LOGGER.info("MTV cover download failed: url={}, reason={}", url, result.errorReason());
+                }
                 synchronized (lock) {
                     inFlight.remove(url);
                     entries.put(url, result);
@@ -87,10 +100,35 @@ public final class MtvMediaCoverCache {
     static MtvMediaCover decode(String url, byte[] bytes) throws Exception {
         BufferedImage image = ImageIO.read(new java.io.ByteArrayInputStream(bytes));
         if (image == null) throw new IllegalArgumentException("cover is not a supported image");
-        if (image.getWidth() <= 0 || image.getHeight() <= 0 || image.getWidth() > MAX_DIMENSION || image.getHeight() > MAX_DIMENSION) {
-            throw new IllegalArgumentException("cover dimensions exceed limit");
+        if (image.getWidth() <= 0 || image.getHeight() <= 0) {
+            throw new IllegalArgumentException("cover dimensions are invalid");
         }
-        return new MtvMediaCover(url, bytes, image.getWidth(), image.getHeight(), MtvMediaCover.Status.RESOLVED, "");
+        image = fitWithin(image, MAX_DIMENSION);
+        // Minecraft's NativeImage only decodes PNG, so re-encode any source format
+        // (bilibili covers are JPEG) to PNG; otherwise the world UI can never upload it.
+        var pngOut = new ByteArrayOutputStream();
+        if (!ImageIO.write(image, "png", pngOut)) {
+            throw new IllegalArgumentException("cover could not be re-encoded to PNG");
+        }
+        return new MtvMediaCover(url, pngOut.toByteArray(), image.getWidth(), image.getHeight(), MtvMediaCover.Status.RESOLVED, "");
+    }
+
+    private static BufferedImage fitWithin(BufferedImage image, int maxDimension) {
+        int width = image.getWidth(), height = image.getHeight();
+        if (width <= maxDimension && height <= maxDimension) {
+            return image;
+        }
+        double scale = (double) maxDimension / Math.max(width, height);
+        int scaledWidth = Math.max(1, (int) Math.round(width * scale));
+        int scaledHeight = Math.max(1, (int) Math.round(height * scale));
+        var scaled = new BufferedImage(scaledWidth, scaledHeight, BufferedImage.TYPE_INT_ARGB);
+        var graphics = scaled.createGraphics();
+        try {
+            graphics.drawImage(image, 0, 0, scaledWidth, scaledHeight, null);
+        } finally {
+            graphics.dispose();
+        }
+        return scaled;
     }
 
     private static MtvMediaCover download(String url) throws Exception {
@@ -101,7 +139,8 @@ public final class MtvMediaCoverCache {
         HttpURLConnection connection = (HttpURLConnection) uri.toURL().openConnection();
         connection.setConnectTimeout(3_000);
         connection.setReadTimeout(5_000);
-        connection.setInstanceFollowRedirects(false);
+        connection.setInstanceFollowRedirects(true);
+        connection.setRequestProperty("User-Agent", "Mozilla/5.0");
         connection.setRequestProperty("Accept", "image/*");
         try {
             if (connection.getResponseCode() < 200 || connection.getResponseCode() >= 300) {

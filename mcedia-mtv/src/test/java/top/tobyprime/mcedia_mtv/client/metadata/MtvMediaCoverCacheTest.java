@@ -27,6 +27,35 @@ class MtvMediaCoverCacheTest {
     }
 
     @Test
+    void reEncodesJpegCoversAsPngSoMinecraftCanLoadThem() throws Exception {
+        var image = new BufferedImage(4, 4, BufferedImage.TYPE_INT_RGB);
+        var output = new ByteArrayOutputStream();
+        ImageIO.write(image, "jpg", output);
+
+        var cover = MtvMediaCoverCache.decode("https://example.test/cover.jpg", output.toByteArray());
+
+        assertEquals(MtvMediaCover.Status.RESOLVED, cover.status());
+        byte[] bytes = cover.bytes();
+        assertEquals(0x89, bytes[0] & 0xFF);
+        assertEquals('P', bytes[1]);
+        assertEquals('N', bytes[2]);
+        assertEquals('G', bytes[3]);
+    }
+
+    @Test
+    void downscalesOversizedCoversToTheDimensionLimit() throws Exception {
+        var image = new BufferedImage(3000, 2000, BufferedImage.TYPE_INT_RGB);
+        var output = new ByteArrayOutputStream();
+        ImageIO.write(image, "jpg", output);
+
+        var cover = MtvMediaCoverCache.decode("https://example.test/cover-large.jpg", output.toByteArray());
+
+        assertEquals(MtvMediaCover.Status.RESOLVED, cover.status());
+        assertEquals(1024, cover.width());
+        assertEquals(683, cover.height());
+    }
+
+    @Test
     void rejectsNonImageBytes() {
         assertThrows(Exception.class, () -> MtvMediaCoverCache.decode("https://example.test/cover", new byte[] {1, 2, 3}));
     }

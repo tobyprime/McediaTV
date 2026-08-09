@@ -15,8 +15,11 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public final class MtvMediaMetadataCache {
+    private static final Logger LOGGER = LoggerFactory.getLogger(MtvMediaMetadataCache.class);
     private static final int DEFAULT_CAPACITY = 64;
     private static final Executor DEFAULT_EXECUTOR = Executors.newFixedThreadPool(2, runnable -> {
         var thread = new Thread(runnable, "mtv-metadata-resolver");
@@ -130,7 +133,7 @@ public final class MtvMediaMetadataCache {
         Media media = Objects.requireNonNull(resolver.apply(normalizedUrl), "resolver returned null media");
         MediaInfo info = Objects.requireNonNull(media.getInfo(), "media info is missing");
         String description = info.getExtraMetadata().getOrDefault("description", "");
-        return new MtvMediaMetadata(
+        MtvMediaMetadata metadata = new MtvMediaMetadata(
                 normalizedUrl,
                 info.getTitle(),
                 info.getArtist(),
@@ -140,6 +143,9 @@ public final class MtvMediaMetadataCache {
                 MtvMediaMetadata.Status.RESOLVED,
                 ""
         );
+        LOGGER.debug("MTV metadata resolved: url={}, platform={}, title={}, coverUrl={}",
+                normalizedUrl, info.getPlatform(), info.getTitle(), metadata.coverUrl());
+        return metadata;
     }
 
     private void prefetchCover(MtvMediaMetadata metadata) {

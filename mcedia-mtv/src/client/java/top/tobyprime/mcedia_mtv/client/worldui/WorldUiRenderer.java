@@ -24,6 +24,8 @@ import top.tobyprime.mcedia_mtv.client.channel.worldui.WorldUiControlState;
 import top.tobyprime.mcedia_mtv.client.channel.worldui.WorldUiControlStateCache;
 import top.tobyprime.mcedia_mtv.client.metadata.MtvMediaMetadata;
 import top.tobyprime.mcedia_mtv.client.metadata.MtvMediaMetadataCache;
+import top.tobyprime.mcedia_mtv.client.metadata.MtvMediaCover;
+import top.tobyprime.mcedia_mtv.client.metadata.MtvMediaCoverCache;
 import top.tobyprime.mcedia_mtv.client.entityplayer.EntityPlayerHandle;
 import top.tobyprime.mcedia_mtv.client.entityplayer.MtvScreenPeripheral;
 
@@ -283,8 +285,8 @@ public final class WorldUiRenderer {
             if (present) {
                 if (page != null) {
                     String mediaUrl = page.mediaUrls().get(pageIndex);
-                    drawPlaylistCover(collector, pose, camera, screen, mediaUrl, .71F, top + .001F, .742F, bottom - .001F);
-                    drawMetadataText(collector, pose, camera, screen, mediaUrl, .75F, top + .012F, .0015F, 0xFFE8E8E8, 14);
+                    drawPlaylistCover(collector, pose, camera, screen, mediaUrl, .71F, top + .001F, .77F, bottom - .001F);
+                    drawMetadataText(collector, pose, camera, screen, mediaUrl, .775F, top + .012F, .0015F, 0xFFE8E8E8, 14);
                 }
                 // Up/down moves stack vertically in two tight columns; delete is the far-right strip.
                 quadZ(collector, pose, camera, screen, .895F, top + .004F, .92F, top + .028F, 0xFF3A3A3A, 0.004F);
@@ -304,24 +306,52 @@ public final class WorldUiRenderer {
     private static void drawCover(SubmitNodeCollector collector, PoseStack pose, Vec3 camera, WorldUiScreenRaycast.Screen screen,
                                   ClientChannelPlaybackSnapshot snapshot) {
         MtvMediaMetadata metadata = MtvMediaMetadataCache.getInstance().cached(snapshot.mediaUrl());
-        Identifier textureId = metadata == null ? null : MtvWorldUiCoverTextures.texture(metadata.coverUrl());
-        // Square cover art: .06 u (.24 blocks) by .107 v (.24 blocks) on a 16:9 plane.
-        if (textureId == null) {
-            quad(collector, pose, camera, screen, .04F, .08F, .10F, .187F, 0xFF333333);
-            return;
-        }
-        texturedQuad(collector, pose, camera, screen, textureId, .04F, .08F, .10F, .187F);
+        // Fixed 16:9 frame (0.224 x 0.126 world units) so common video covers fill it;
+        // the image is contain-fitted inside so other ratios never distort.
+        quad(collector, pose, camera, screen, .02F, .075F, .16F, .215F, 0xFF333333);
+        if (metadata == null) return;
+        Identifier textureId = MtvWorldUiCoverTextures.texture(metadata.coverUrl());
+        if (textureId == null) return;
+        MtvMediaCover cover = MtvMediaCoverCache.getInstance().cached(metadata.coverUrl());
+        if (cover == null || cover.status() != MtvMediaCover.Status.RESOLVED) return;
+        // Image sits on a higher z than the frame so its edge never z-fights the backdrop.
+        drawCoverContained(collector, pose, camera, screen, textureId, cover, .02F, .075F, .16F, .215F, 0.004F);
     }
 
     private static void drawPlaylistCover(SubmitNodeCollector collector, PoseStack pose, Vec3 camera, WorldUiScreenRaycast.Screen screen,
                                           String mediaUrl, float left, float top, float right, float bottom) {
         MtvMediaMetadata metadata = MtvMediaMetadataCache.getInstance().cached(mediaUrl);
-        Identifier textureId = metadata == null ? null : MtvWorldUiCoverTextures.texture(metadata.coverUrl());
-        if (textureId == null) {
-            quadZ(collector, pose, camera, screen, left, top, right, bottom, 0xFF414141, 0.004F);
-            return;
+        quadZ(collector, pose, camera, screen, left, top, right, bottom, 0xFF414141, 0.004F);
+        if (metadata == null) return;
+        Identifier textureId = MtvWorldUiCoverTextures.texture(metadata.coverUrl());
+        if (textureId == null) return;
+        MtvMediaCover cover = MtvMediaCoverCache.getInstance().cached(metadata.coverUrl());
+        if (cover == null || cover.status() != MtvMediaCover.Status.RESOLVED) return;
+        // Higher z than the frame keeps the contain-fit image's edge from z-fighting the backdrop.
+        drawCoverContained(collector, pose, camera, screen, textureId, cover, left, top, right, bottom, 0.006F);
+    }
+
+    /** Draws a cover image as large as possible inside the fixed frame while keeping its aspect ratio. */
+    private static void drawCoverContained(SubmitNodeCollector collector, PoseStack pose, Vec3 camera, WorldUiScreenRaycast.Screen screen,
+                                           Identifier textureId, MtvMediaCover cover, float left, float bottom, float right, float top, float z) {
+        float frameWidth = (right - left) * screen.width();
+        float frameHeight = (top - bottom) * screen.height();
+        float imageAspect = cover.width() <= 0 || cover.height() <= 0
+                ? frameWidth / frameHeight : (float) cover.width() / cover.height();
+        float imageWidth, imageHeight;
+        if (frameWidth / frameHeight > imageAspect) {
+            imageHeight = frameHeight;
+            imageWidth = frameHeight * imageAspect;
+        } else {
+            imageWidth = frameWidth;
+            imageHeight = frameWidth / imageAspect;
         }
-        texturedQuadColor(collector, pose, camera, screen, textureId, left, top, right, bottom, 0xFFFFFFFF, 0.004F);
+        float du = imageWidth / screen.width();
+        float dv = imageHeight / screen.height();
+        float cu = (left + right) * 0.5F;
+        float cv = (bottom + top) * 0.5F;
+        texturedQuadColor(collector, pose, camera, screen, textureId,
+                cu - du * 0.5F, cv - dv * 0.5F, cu + du * 0.5F, cv + dv * 0.5F, 0xFFFFFFFF, z);
     }
 
     private static void drawMetadataText(SubmitNodeCollector collector, PoseStack pose, Vec3 camera, WorldUiScreenRaycast.Screen screen,
@@ -485,11 +515,6 @@ public final class WorldUiRenderer {
 
     private static void quad(SubmitNodeCollector collector, PoseStack poseStack, Vec3 camera, WorldUiScreenRaycast.Screen screen, float left, float bottom, float right, float top, int color) {
         texturedQuadColor(collector, poseStack, camera, screen, WHITE_TEXTURE, left, bottom, right, top, color, 0.002F);
-    }
-
-    private static void texturedQuad(SubmitNodeCollector collector, PoseStack poseStack, Vec3 camera, WorldUiScreenRaycast.Screen screen,
-                                     Identifier textureId, float left, float bottom, float right, float top) {
-        texturedQuadColor(collector, poseStack, camera, screen, textureId, left, bottom, right, top, 0xFFFFFFFF, 0.002F);
     }
 
     private static void texturedQuadColor(SubmitNodeCollector collector, PoseStack poseStack, Vec3 camera, WorldUiScreenRaycast.Screen screen,
