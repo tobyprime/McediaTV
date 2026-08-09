@@ -65,7 +65,7 @@ class MtvChannelProtocolWorldUiTest {
 
     @Test
     void controlStateRoundTrips() {
-        var state = new WorldUiControlState(UUID.randomUUID(), "channel", .35F, true, 19L);
+        var state = new WorldUiControlState(UUID.randomUUID(), "channel", .35F, true, 19L, "screen_0", 8, true);
         assertEquals(state, MtvChannelProtocol.decodeWorldUiControlState(MtvChannelProtocol.encodeWorldUiControlState(state)));
     }
 }
