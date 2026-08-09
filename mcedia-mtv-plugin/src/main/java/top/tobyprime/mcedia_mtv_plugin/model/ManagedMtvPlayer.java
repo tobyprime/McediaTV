@@ -25,6 +25,7 @@ public class ManagedMtvPlayer {
     private MtvChannelBinding channelBinding;
     private UUID owner;
     private boolean isPublic = false;
+    private boolean allowOthersControl = true;
     private final List<ScreenPeripheralConfigModel> screens = new ArrayList<>();
     private final List<SpeakerPeripheralConfigModel> speakers = new ArrayList<>();
 
@@ -140,4 +141,7 @@ public class ManagedMtvPlayer {
     public void setOwner(UUID owner) { this.owner = owner; }
     public boolean isPublic() { return isPublic; }
     public void setPublic(boolean isPublic) { this.isPublic = isPublic; }
+    /** 是否允许其他玩家控制此播放器的播放与频道（仅对私有播放器生效）。 */
+    public boolean isAllowOthersControl() { return allowOthersControl; }
+    public void setAllowOthersControl(boolean allowOthersControl) { this.allowOthersControl = allowOthersControl; }
 }

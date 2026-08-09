@@ -22,5 +22,6 @@ public enum WorldUiControlOperation {
     SET_BRIGHTNESS,
     SET_DANMAKU_VISIBLE,
     MOVE_UP,
-    MOVE_DOWN
+    MOVE_DOWN,
+    ADD_COLLECTION
 }

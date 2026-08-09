@@ -4,6 +4,7 @@ import net.kyori.adventure.text.Component;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
+import top.tobyprime.mcedia_mtv_plugin.manager.MtvPlayerManager;
 import top.tobyprime.mcedia_mtv_plugin.model.ManagedMtvPlayer;
 
 import java.util.UUID;
@@ -125,13 +126,23 @@ public class RemoteMenuPage extends GuiPage {
             if (snap == null) return;
             switch (slot) {
                 // ── Row 1: ⚡ 电源 ──
-                case 9 -> context.updateAndRefresh(player, uuid,
-                        done -> context.manager().setPowered(uuid, !snap.isPowered(), done));
+                case 9 -> {
+                    if (!canManage(player, context, snap)) return;
+                    context.updateAndRefresh(player, uuid,
+                            done -> context.manager().setPowered(uuid, !snap.isPowered(), done));
+                }
 
                 // ── Row 2: 📺 播放器 + 右栏音量┐ ──
-                case 18 -> context.navigateTo(player, MtvGui.GuiType.PLAYER_MENU, uuid);
+                case 18 -> {
+                    if (!MtvPlayerManager.canEditPlayer(player, snap)) {
+                        player.sendMessage("这是他人创建的私有 MTV 播放器，你没有权限查看其设置。");
+                        return;
+                    }
+                    context.navigateTo(player, MtvGui.GuiType.PLAYER_MENU, uuid);
+                }
                 // ── Row 1: 🔊 音量+ ──
                 case 17 -> {
+                    if (!canManage(player, context, snap)) return;
                     float step = shiftClick ? 0.25F : 0.1F;
                     float volume = Math.max(0.0F, Math.min(1.0F, snap.getMasterVolume() + step));
                     context.updateAndRefresh(player, uuid,
@@ -140,6 +151,7 @@ public class RemoteMenuPage extends GuiPage {
 
                 // ── Row 3: 📻 频道 + 右栏音量┐ ──
                 case 27 -> {
+                    if (!canManage(player, context, snap)) return;
                     var binding = context.manager().getChannelService().resolveBinding(snap);
                     var st = context.newState();
                     st.put("channel_id", binding.channelId());
@@ -184,6 +196,7 @@ public class RemoteMenuPage extends GuiPage {
                             done -> context.playbackController().playNextManual(uuid, done));
                 }
                 case 35 -> {
+                    if (!canManage(player, context, snap)) return;
                     float step = shiftClick ? -0.25F : -0.1F;
                     float volume = Math.max(0.0F, Math.min(1.0F, snap.getMasterVolume() + step));
                     context.updateAndRefresh(player, uuid,
@@ -213,6 +226,11 @@ public class RemoteMenuPage extends GuiPage {
             context.read(player, uuid, snap -> {
                 if (snap == null) return;
                 var binding = context.manager().getChannelService().resolveBinding(snap);
+                if (binding.isSelf() && !MtvPlayerManager.canControlPlayer(player, snap)) {
+                    context.runOnPlayer(player, () ->
+                            player.sendMessage("这是他人创建的私有 MTV 播放器，你没有权限控制其播放与频道。"));
+                    return;
+                }
                 var channelState = context.manager().getChannelService()
                         .ensureChannelState(binding.channelId());
                 if (!context.manager().getChannelService().canControlChannelPlayback(player, channelState)) {
@@ -238,6 +256,10 @@ public class RemoteMenuPage extends GuiPage {
     private static boolean canManage(Player player, GuiPageContext context,
                                      ManagedMtvPlayer snapshot) {
         var binding = context.manager().getChannelService().resolveBinding(snapshot);
+        if (binding.isSelf() && !MtvPlayerManager.canControlPlayer(player, snapshot)) {
+            player.sendMessage("这是他人创建的私有 MTV 播放器，你没有权限控制其播放与频道。");
+            return false;
+        }
         var state = context.manager().getChannelService().ensureChannelState(binding.channelId());
         if (context.manager().getChannelService().canControlChannelPlayback(player, state)) {
             return true;

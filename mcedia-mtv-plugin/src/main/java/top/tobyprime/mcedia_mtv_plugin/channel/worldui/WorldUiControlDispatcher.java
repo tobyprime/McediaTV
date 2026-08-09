@@ -204,6 +204,8 @@ public final class WorldUiControlDispatcher {
                     normalizedUrl((WorldUiControlArgument.MediaUrl) request.argument()));
             case INSERT_AND_PLAY -> channelService.insertNextAndPlay(channelId,
                     normalizedUrl((WorldUiControlArgument.MediaUrl) request.argument()));
+            case ADD_COLLECTION -> channelService.appendCollectionPlaylistItems(channelId,
+                    ((WorldUiControlArgument.MediaUrlList) request.argument()).urls());
             case REMOVE -> channelService.removePlaylistItem(channelId,
                     ((WorldUiControlArgument.PlaylistIndex) request.argument()).value());
             case MOVE_FRONT -> channelService.movePlaylistItemToFront(channelId,
@@ -252,6 +254,8 @@ public final class WorldUiControlDispatcher {
             case PLAY_INDEX, REMOVE, MOVE_FRONT, MOVE_BACK, MOVE_UP, MOVE_DOWN -> validatePlaylistIndex(request.argument(), state);
             case PREPEND, APPEND, INSERT_NEXT, INSERT_AND_PLAY -> validMediaUrl(request.argument())
                     ? WorldUiControlError.NONE : WorldUiControlError.INVALID_ARGUMENT;
+            case ADD_COLLECTION -> validMediaUrlList(request.argument())
+                    ? WorldUiControlError.NONE : WorldUiControlError.INVALID_ARGUMENT;
             case SET_PLAY_ORDER -> playOrderMode(request.argument()) == null
                     ? WorldUiControlError.INVALID_ARGUMENT : WorldUiControlError.NONE;
         };
@@ -297,6 +301,23 @@ public final class WorldUiControlDispatcher {
         return !normalized.isBlank() && normalized.length() <= MtvChannelProtocol.MAX_MEDIA_URL_LENGTH;
     }
 
+    private static boolean validMediaUrlList(WorldUiControlArgument argument) {
+        if (!(argument instanceof WorldUiControlArgument.MediaUrlList mediaUrlList)) {
+            return false;
+        }
+        var urls = mediaUrlList.urls();
+        if (urls == null || urls.isEmpty() || urls.size() > MtvChannelProtocol.MAX_COLLECTION_URLS) {
+            return false;
+        }
+        for (String url : urls) {
+            String normalized = MediaUrlNormalizer.normalize(url);
+            if (normalized.isBlank() || normalized.length() > MtvChannelProtocol.MAX_MEDIA_URL_LENGTH) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     private static String normalizedUrl(WorldUiControlArgument.MediaUrl argument) {
         return MediaUrlNormalizer.normalize(argument.value());
     }
@@ -329,9 +350,9 @@ public final class WorldUiControlDispatcher {
         return null;
     }
 
-    /** Self channels inherit the owning MTV's existing container-GUI permission policy. */
+    /** Self channels inherit the owning MTV's control permission policy. */
     static boolean canControlTargetBinding(Player player, ManagedMtvPlayer target, MtvChannelBinding binding) {
-        return binding == null || !binding.isSelf() || MtvPlayerManager.canEditPlayer(player, target);
+        return binding == null || !binding.isSelf() || MtvPlayerManager.canControlPlayer(player, target);
     }
 
     /** Watching an MTV's control state uses the same permission policy as sending controls. */

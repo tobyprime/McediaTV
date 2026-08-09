@@ -20,7 +20,7 @@ public final class MtvAddMediaScreen extends Screen {
     private final WorldUiAddMediaModel model;
     private EditBox input;
     private StringWidget previewText;
-    private Button prepend, insertNext, append, playNow;
+    private Button prepend, insertNext, append, playNow, addCollection;
     private MtvAddMediaScreen(WorldUiInteractionState.Target target) { super(Component.translatable("mcedia_mtv.add_media.title")); this.target = target; this.model = new WorldUiAddMediaModel(top.tobyprime.mcedia_mtv.client.metadata.MtvMediaMetadataCache.getInstance()); }
     public static void open(Minecraft client, WorldUiInteractionState.Target target) { if (target != null) client.gui.setScreen(new MtvAddMediaScreen(target)); }
     @Override protected void init() {
@@ -32,12 +32,16 @@ public final class MtvAddMediaScreen extends Screen {
         insertNext = addButton(left + 112, height / 2 + 50, "mcedia_mtv.add_media.insert_next", WorldUiAddMediaModel.AddMode.INSERT_NEXT);
         append = addButton(left + 224, height / 2 + 50, "mcedia_mtv.add_media.append", WorldUiAddMediaModel.AddMode.APPEND);
         playNow = addButton(left + 336, height / 2 + 50, "mcedia_mtv.add_media.play_now", WorldUiAddMediaModel.AddMode.INSERT_AND_PLAY);
-        addRenderableWidget(Button.builder(Component.translatable("mcedia_mtv.add_media.cancel"), button -> minecraft.gui.setScreen(null)).bounds(width / 2 - 52, height / 2 + 78, 104, 20).build());
+        addCollection = addRenderableWidget(Button.builder(Component.translatable("mcedia_mtv.add_media.add_collection"),
+                button -> model.confirmCollection(target, WorldUiControlSender.getInstance())).bounds(left, height / 2 + 78, 440, 20).build());
+        addCollection.visible = false;
+        addRenderableWidget(Button.builder(Component.translatable("mcedia_mtv.add_media.cancel"), button -> minecraft.gui.setScreen(null)).bounds(width / 2 - 52, height / 2 + 100, 104, 20).build());
         input.setFocused(true);
     }
     private Button addButton(int x, int y, String labelKey, WorldUiAddMediaModel.AddMode mode) { return addRenderableWidget(Button.builder(Component.translatable(labelKey), button -> model.confirm(target, WorldUiControlSender.getInstance(), mode)).bounds(x, y, 104, 20).build()); }
     @Override public void tick() {
         super.tick(); boolean enabled = model.canConfirm(); if (prepend != null) { prepend.active = enabled; insertNext.active = enabled; append.active = enabled; playNow.active = enabled; }
+        if (addCollection != null) { addCollection.visible = model.collection() != null; addCollection.active = model.canConfirmCollection(); }
         model.onControlResult(WorldUiControlSender.getInstance().consumeLastResult());
         previewText.setMessage(Component.literal(model.previewMessage()));
         if (model.consumeAccepted()) minecraft.gui.setScreen(null);

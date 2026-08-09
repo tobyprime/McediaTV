@@ -1,6 +1,8 @@
 package top.tobyprime.mcedia_mtv.client.worldui;
 
 import org.junit.jupiter.api.Test;
+import top.tobyprime.mcedia.api.media.MediaCollection;
+import top.tobyprime.mcedia.api.media.MediaCollectionItem;
 import top.tobyprime.mcedia_mtv.client.channel.worldui.WorldUiControlArgument;
 import top.tobyprime.mcedia_mtv.client.channel.worldui.WorldUiControlRequest;
 import top.tobyprime.mcedia_mtv.client.channel.worldui.WorldUiControlError;
@@ -9,6 +11,7 @@ import top.tobyprime.mcedia_mtv.client.metadata.MtvMediaMetadata;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -94,6 +97,89 @@ class WorldUiAddMediaModelTest {
 
         assertEquals(1, resolveCount.get());
         assertEquals("https://example.test/final", model.preview().normalizedUrl());
+    }
+
+    @Test
+    void collectionDetectionEnablesAddCollectionConfirm() {
+        var collectionFuture = new CompletableFuture<Optional<MediaCollection>>();
+        var model = new WorldUiAddMediaModel(
+                url -> CompletableFuture.completedFuture(MtvMediaMetadata.failed(url, "collection not a single media")),
+                url -> collectionFuture,
+                task -> { task.run(); return WorldUiAddMediaModel.Cancellable.NONE; });
+
+        model.setInput("https://www.bilibili.com/bangumi/play/ss47561");
+        assertFalse(model.canConfirmCollection());
+        collectionFuture.complete(Optional.of(new TestCollection("season", List.of(new TestCollectionItem("ep1", "https://www.bilibili.com/bangumi/play/ep1")))));
+
+        assertTrue(model.canConfirmCollection());
+        assertTrue(model.collection() != null);
+    }
+
+    @Test
+    void confirmCollectionSendsAddCollectionWithAllItemTargets() {
+        var sender = new RecordingSender();
+        var model = new WorldUiAddMediaModel(
+                url -> CompletableFuture.completedFuture(MtvMediaMetadata.failed(url, "collection not a single media")),
+                url -> CompletableFuture.completedFuture(Optional.of(new TestCollection("season", List.of(
+                        new TestCollectionItem("ep1", "https://www.bilibili.com/bangumi/play/ep1"),
+                        new TestCollectionItem("ep2", "https://www.bilibili.com/bangumi/play/ep2"))))),
+                task -> { task.run(); return WorldUiAddMediaModel.Cancellable.NONE; });
+        model.setInput("https://www.bilibili.com/bangumi/play/ss47561");
+
+        assertTrue(model.confirmCollection(new WorldUiInteractionState.Target(UUID.randomUUID(), "screen_0", "self:test", 4L), sender));
+        assertFalse(model.canConfirmCollection());
+        assertEquals(1, sender.requests.size());
+        assertEquals("ADD_COLLECTION", sender.requests.getFirst().operation().name());
+        var argument = (WorldUiControlArgument.MediaUrlList) sender.requests.getFirst().argument();
+        assertEquals(List.of("https://www.bilibili.com/bangumi/play/ep1", "https://www.bilibili.com/bangumi/play/ep2"), argument.urls());
+    }
+
+    @Test
+    void confirmCollectionTruncatesToTheProtocolCap() {
+        var sender = new RecordingSender();
+        var manyItems = new ArrayList<MediaCollectionItem>();
+        for (int i = 0; i < 250; i++) {
+            manyItems.add(new TestCollectionItem("ep" + i, "https://www.bilibili.com/bangumi/play/ep" + i));
+        }
+        var model = new WorldUiAddMediaModel(
+                url -> CompletableFuture.completedFuture(MtvMediaMetadata.failed(url, "collection not a single media")),
+                url -> CompletableFuture.completedFuture(Optional.of(new TestCollection("season", manyItems))),
+                task -> { task.run(); return WorldUiAddMediaModel.Cancellable.NONE; });
+        model.setInput("https://www.bilibili.com/bangumi/play/ss47561");
+
+        assertTrue(model.confirmCollection(new WorldUiInteractionState.Target(UUID.randomUUID(), "screen_0", "self:test", 4L), sender));
+        var argument = (WorldUiControlArgument.MediaUrlList) sender.requests.getFirst().argument();
+        assertEquals(200, argument.urls().size());
+        assertEquals("https://www.bilibili.com/bangumi/play/ep0", argument.urls().getFirst());
+        assertEquals("https://www.bilibili.com/bangumi/play/ep199", argument.urls().getLast());
+    }
+
+    private static final class TestCollection implements MediaCollection {
+        private final String title;
+        private final List<MediaCollectionItem> items;
+
+        private TestCollection(String title, List<MediaCollectionItem> items) {
+            this.title = title;
+            this.items = items;
+        }
+
+        @Override public String getTitle() { return title; }
+        @Override public String getCoverUrl() { return null; }
+        @Override public List<MediaCollectionItem> getItems() { return items; }
+    }
+
+    private static final class TestCollectionItem implements MediaCollectionItem {
+        private final String title;
+        private final String resolutionTarget;
+
+        private TestCollectionItem(String title, String resolutionTarget) {
+            this.title = title;
+            this.resolutionTarget = resolutionTarget;
+        }
+
+        @Override public String getTitle() { return title; }
+        @Override public String getCoverUrl() { return null; }
+        @Override public String getResolutionTarget() { return resolutionTarget; }
     }
 
     private static final class RecordingSender implements WorldUiInteractionState.ControlSender {

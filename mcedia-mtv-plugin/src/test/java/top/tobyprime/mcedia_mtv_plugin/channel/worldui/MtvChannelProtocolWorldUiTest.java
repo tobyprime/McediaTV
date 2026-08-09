@@ -8,6 +8,7 @@ import top.tobyprime.mcedia_mtv_plugin.channel.MtvChannelProtocol;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import java.util.List;
 import java.util.UUID;
 
 class MtvChannelProtocolWorldUiTest {
@@ -67,5 +68,39 @@ class MtvChannelProtocolWorldUiTest {
     void controlStateRoundTrips() {
         var state = new WorldUiControlState(UUID.randomUUID(), "channel", .35F, true, 19L, "screen_0", 8, true);
         assertEquals(state, MtvChannelProtocol.decodeWorldUiControlState(MtvChannelProtocol.encodeWorldUiControlState(state)));
+    }
+
+    @Test
+    void addCollectionRoundTripsUrls() {
+        var request = new WorldUiControlRequest(
+                UUID.randomUUID(), "screen_0", "channel", 4L, 8L,
+                0.5F, 0.75F, WorldUiControlOperation.ADD_COLLECTION,
+                new WorldUiControlArgument.MediaUrlList(List.of(
+                        "https://www.bilibili.com/bangumi/play/ep123",
+                        "https://www.bilibili.com/video/BV1pRVF6kEPh")));
+
+        assertEquals(request, MtvChannelProtocol.decodeControlRequest(MtvChannelProtocol.encodeControlRequest(request)));
+    }
+
+    @Test
+    void addCollectionRejectsTrailingBytes() {
+        var buffer = new FriendlyByteBuf(Unpooled.buffer());
+        MtvChannelProtocol.writeControlRequest(buffer, new WorldUiControlRequest(
+                UUID.randomUUID(), "screen_0", "channel", 4L, 8L,
+                0.5F, 0.75F, WorldUiControlOperation.ADD_COLLECTION,
+                new WorldUiControlArgument.MediaUrlList(List.of("https://www.bilibili.com/video/BV1pRVF6kEPh"))));
+        buffer.writeByte(1);
+
+        assertThrows(IllegalArgumentException.class, () -> MtvChannelProtocol.readControlRequest(buffer));
+    }
+
+    @Test
+    void addCollectionRejectsEmptyList() {
+        var request = new WorldUiControlRequest(
+                UUID.randomUUID(), "screen_0", "channel", 4L, 8L,
+                0.5F, 0.75F, WorldUiControlOperation.ADD_COLLECTION,
+                new WorldUiControlArgument.MediaUrlList(List.of()));
+
+        assertThrows(IllegalArgumentException.class, () -> MtvChannelProtocol.encodeControlRequest(request));
     }
 }

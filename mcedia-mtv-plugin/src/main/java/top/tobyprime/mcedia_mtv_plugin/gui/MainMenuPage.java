@@ -4,6 +4,7 @@ import net.kyori.adventure.text.Component;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import top.tobyprime.mcedia_mtv_plugin.channel.PublicChannelSort;
+import top.tobyprime.mcedia_mtv_plugin.manager.MtvPlayerManager;
 
 public class MainMenuPage extends GuiPage {
     @Override
@@ -87,7 +88,12 @@ public class MainMenuPage extends GuiPage {
                                 player.sendMessage("附近 " + (int) MtvGui.NEARBY_RANGE + " 米内没有 MTV 播放器。");
                                 return;
                             }
-                            context.navigateTo(player, MtvGui.GuiType.CHANNEL_MENU, results.get(0).getUuid());
+                            var nearest = results.get(0);
+                            if (!MtvPlayerManager.canControlPlayer(player, nearest)) {
+                                player.sendMessage("这是他人创建的私有 MTV 播放器，你没有权限切换其频道。");
+                                return;
+                            }
+                            context.navigateTo(player, MtvGui.GuiType.CHANNEL_MENU, nearest.getUuid());
                         }));
             }
             case 33 -> context.navigateTo(player, MtvGui.GuiType.PUBLIC_CHANNEL_LIST, null);

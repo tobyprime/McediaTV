@@ -95,6 +95,9 @@ public final class MtvPlaybackController {
 
     public void canControlPlayback(UUID entityUuid, org.bukkit.entity.Player player, Consumer<Boolean> done) {
         manager.withManagedPlayer(entityUuid, managed -> {
+            if (!MtvPlayerManager.canControlPlayer(player, managed)) {
+                return Boolean.FALSE;
+            }
             var binding = channelService.resolveBinding(managed);
             var state = channelService.ensureChannelState(binding.channelId());
             return channelService.canControlChannelPlayback(player, state);

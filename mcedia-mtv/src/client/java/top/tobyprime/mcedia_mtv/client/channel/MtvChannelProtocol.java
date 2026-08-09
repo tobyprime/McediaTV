@@ -39,11 +39,12 @@ public final class MtvChannelProtocol {
     public static final int MAX_PLAYLIST_PAGE_ITEMS = 32;
     public static final int MAX_PLAYLIST_PAGE_BYTES = 24 * 1024;
     public static final int MAX_MEDIA_URL_LENGTH = 2_048;
+    public static final int MAX_COLLECTION_URLS = 200;
 
     private static final int MAX_CHANNEL_ID_LENGTH = 256;
     private static final int MAX_SCREEN_ID_LENGTH = 128;
     private static final int MAX_PLAY_ORDER_MODE_LENGTH = 32;
-    private static final int MAX_CONTROL_REQUEST_BYTES = 4 * 1024;
+    private static final int MAX_CONTROL_REQUEST_BYTES = 64 * 1024;
     private static final int MAX_CONTROL_RESULT_BYTES = 64;
     private static final int MAX_CONTROL_STATE_BYTES = 512;
     private static final int MAX_PAGE_REQUEST_BYTES = 512;
@@ -518,6 +519,7 @@ public final class MtvChannelProtocol {
             case SET_SPEED, SET_MASTER_VOLUME, SET_BRIGHTNESS -> buffer.writeFloat(((WorldUiControlArgument.Scalar) argument).value());
             case PLAY_INDEX, REMOVE, MOVE_FRONT, MOVE_BACK, MOVE_UP, MOVE_DOWN -> buffer.writeVarInt(((WorldUiControlArgument.PlaylistIndex) argument).value());
             case PREPEND, APPEND, INSERT_NEXT, INSERT_AND_PLAY -> buffer.writeUtf(((WorldUiControlArgument.MediaUrl) argument).value(), MAX_MEDIA_URL_LENGTH);
+            case ADD_COLLECTION -> writeMediaUrlList(buffer, ((WorldUiControlArgument.MediaUrlList) argument).urls());
             case SET_PLAY_ORDER -> buffer.writeUtf(((WorldUiControlArgument.PlayOrderMode) argument).value(), MAX_PLAY_ORDER_MODE_LENGTH);
             case SET_DANMAKU_VISIBLE -> buffer.writeBoolean(((WorldUiControlArgument.BooleanValue) argument).value());
         }
@@ -530,6 +532,7 @@ public final class MtvChannelProtocol {
             case SET_SPEED, SET_MASTER_VOLUME, SET_BRIGHTNESS -> new WorldUiControlArgument.Scalar(buffer.readFloat());
             case PLAY_INDEX, REMOVE, MOVE_FRONT, MOVE_BACK, MOVE_UP, MOVE_DOWN -> new WorldUiControlArgument.PlaylistIndex(readNonNegativeInt(buffer, "playlist index"));
             case PREPEND, APPEND, INSERT_NEXT, INSERT_AND_PLAY -> new WorldUiControlArgument.MediaUrl(readNonBlankUtf(buffer, MAX_MEDIA_URL_LENGTH, "mediaUrl"));
+            case ADD_COLLECTION -> new WorldUiControlArgument.MediaUrlList(readMediaUrlList(buffer));
             case SET_PLAY_ORDER -> new WorldUiControlArgument.PlayOrderMode(readPlayOrderMode(buffer));
             case SET_DANMAKU_VISIBLE -> new WorldUiControlArgument.BooleanValue(buffer.readBoolean());
         };
@@ -567,6 +570,7 @@ public final class MtvChannelProtocol {
                     throw invalidPacket("control request", "mediaUrl is invalid");
                 }
             }
+            case ADD_COLLECTION -> validateMediaUrlList(argument, operation);
             case SET_PLAY_ORDER -> validatePlayOrderMode(requireArgument(argument, WorldUiControlArgument.PlayOrderMode.class, operation).value());
         }
     }
@@ -666,6 +670,38 @@ public final class MtvChannelProtocol {
             throw invalidPacket("playlist", field + " is blank");
         }
         return value;
+    }
+
+    private static void writeMediaUrlList(FriendlyByteBuf buffer, List<String> urls) {
+        validateMediaUrlList(new WorldUiControlArgument.MediaUrlList(urls), WorldUiControlOperation.ADD_COLLECTION);
+        buffer.writeVarInt(urls.size());
+        for (String url : urls) {
+            buffer.writeUtf(url, MAX_MEDIA_URL_LENGTH);
+        }
+    }
+
+    private static List<String> readMediaUrlList(FriendlyByteBuf buffer) {
+        int size = readNonNegativeInt(buffer, "collection url count");
+        if (size == 0 || size > MAX_COLLECTION_URLS) {
+            throw invalidPacket("control request", "collection url count is invalid");
+        }
+        var urls = new java.util.ArrayList<String>(size);
+        for (int index = 0; index < size; index++) {
+            urls.add(readNonBlankUtf(buffer, MAX_MEDIA_URL_LENGTH, "collection url"));
+        }
+        return urls;
+    }
+
+    private static void validateMediaUrlList(WorldUiControlArgument argument, WorldUiControlOperation operation) {
+        var urls = requireArgument(argument, WorldUiControlArgument.MediaUrlList.class, operation).urls();
+        if (urls == null || urls.isEmpty() || urls.size() > MAX_COLLECTION_URLS) {
+            throw invalidPacket("control request", "collection url list is invalid");
+        }
+        for (String url : urls) {
+            if (url == null || url.isBlank() || url.length() > MAX_MEDIA_URL_LENGTH) {
+                throw invalidPacket("control request", "collection url is invalid");
+            }
+        }
     }
 
     private static String readPlayOrderMode(FriendlyByteBuf buffer) {

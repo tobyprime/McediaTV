@@ -183,4 +183,28 @@ class WorldUiProtocolTest {
 
         assertEquals(request, MtvChannelProtocol.decodeControlRequest(MtvChannelProtocol.encodeControlRequest(request)));
     }
+
+    @Test
+    void addCollectionRoundTripsItsUrlListArgument() {
+        var request = new WorldUiControlRequest(
+                UUID.randomUUID(), "screen_0", "channel", 1L, 1L, 0.5F, 0.5F,
+                WorldUiControlOperation.ADD_COLLECTION,
+                new WorldUiControlArgument.MediaUrlList(List.of(
+                        "https://www.bilibili.com/bangumi/play/ep123",
+                        "https://www.bilibili.com/video/BV1pRVF6kEPh"))
+        );
+
+        assertEquals(request, MtvChannelProtocol.decodeControlRequest(MtvChannelProtocol.encodeControlRequest(request)));
+    }
+
+    @Test
+    void addCollectionRejectsEmptyList() {
+        var request = new WorldUiControlRequest(
+                UUID.randomUUID(), "screen_0", "channel", 1L, 1L, 0.5F, 0.5F,
+                WorldUiControlOperation.ADD_COLLECTION,
+                new WorldUiControlArgument.MediaUrlList(List.of())
+        );
+
+        assertThrows(IllegalArgumentException.class, () -> MtvChannelProtocol.encodeControlRequest(request));
+    }
 }

@@ -6,7 +6,7 @@ plugins {
 }
 
 group = 'top.tobyprime'
-version = '1.2.1'
+version = '1.2.2'
 
 // ========== 版本切换 ==========
 // 通过 -PserverVersion=26.2 切换目标服务端版本

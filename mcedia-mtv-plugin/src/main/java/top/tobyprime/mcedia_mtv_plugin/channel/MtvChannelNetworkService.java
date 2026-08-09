@@ -27,6 +27,7 @@ import top.tobyprime.mcedia_mtv_plugin.channel.worldui.WorldUiPlaylistPublisher;
 import top.tobyprime.mcedia_mtv_plugin.channel.worldui.WorldUiRateLimiter;
 import top.tobyprime.mcedia_mtv_plugin.channel.worldui.WorldUiWatchRegistry;
 import top.tobyprime.mcedia_mtv_plugin.channel.worldui.WorldUiWatchRequest;
+import top.tobyprime.mcedia_mtv_plugin.manager.MtvPlayerManager;
 
 public final class MtvChannelNetworkService implements PluginMessageListener, Listener {
     private static final Logger LOGGER = LoggerFactory.getLogger(MtvChannelNetworkService.class);
@@ -365,7 +366,7 @@ public final class MtvChannelNetworkService implements PluginMessageListener, Li
         var screen = screenId == null ? null : target.findScreen(screenId);
         if (screen == null) screen = target.getScreen();
         var state = new WorldUiControlState(target.getUuid(), binding.channelId(), target.getMasterVolume(),
-                channelService.canControlChannelPlayback(player, channel), channel.getRevision(),
+                MtvPlayerManager.canControlPlayer(player, target) && channelService.canControlChannelPlayback(player, channel), channel.getRevision(),
                 screen.getId(), screen.getMinBrightness(), screen.isDanmakuVisible());
         // State is now per-screen (brightness/danmaku), so the dedup key must be too;
         // otherwise two equal states for different screens of the same entity collide.

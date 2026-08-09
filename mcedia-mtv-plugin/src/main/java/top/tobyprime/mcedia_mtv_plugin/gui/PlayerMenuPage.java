@@ -7,6 +7,7 @@ import org.bukkit.entity.Player;
 import java.util.UUID;
 import top.tobyprime.mcedia_mtv_plugin.channel.MtvChannelBinding;
 import top.tobyprime.mcedia_mtv_plugin.controller.MtvPeripheralController;
+import top.tobyprime.mcedia_mtv_plugin.manager.MtvPlayerManager;
 
 public class PlayerMenuPage extends GuiPage {
     @Override
@@ -51,6 +52,13 @@ public class PlayerMenuPage extends GuiPage {
                     "§7管理连接的外接显示与音频设备"));
 
             // ── Row 3 (27-35): 🔧 播放器设置 ──
+
+            var controlIcon = snapshot.isAllowOthersControl() ? Material.LIME_DYE : Material.GRAY_DYE;
+            inv.setItem(27, item(controlIcon,
+                    snapshot.isAllowOthersControl() ? "§a🎮 允许他人控制播放" : "§7🎮 禁止他人控制播放",
+                    "§7当前: " + (snapshot.isAllowOthersControl() ? "§a任意玩家可遥控播放/切频道" : "§c仅拥有者或 control.others 可控制"),
+                    "§7点击切换是否允许其他玩家控制此播放器的播放与频道",
+                    "§7（仅影响私有播放器；公开播放器任何玩家均可控制）"));
 
             inv.setItem(29, item(Material.COMPASS,
                     "§6⇕ 位置与朝向",
@@ -147,6 +155,14 @@ public class PlayerMenuPage extends GuiPage {
                 case 15 -> context.navigateTo(player, MtvGui.GuiType.PERIPHERAL_LIST, uuid);
 
                 // ── Row 3: 播放器设置 ──
+                case 27 -> {
+                    if (!MtvPlayerManager.canEditPlayer(player, snap)) {
+                        player.sendMessage("这是他人创建的私有 MTV 播放器，你没有权限修改其控制设置。");
+                        return;
+                    }
+                    context.updateAndRefresh(player, uuid,
+                            done -> context.manager().setAllowOthersControlAsync(uuid, !snap.isAllowOthersControl(), done));
+                }
                 case 29 -> context.navigateTo(player, MtvGui.GuiType.WORLD_TRANSFORM, uuid);
                 case 31 -> {
                     if (!context.manager().canToggleVisibility(player, snap)) {
@@ -161,6 +177,10 @@ public class PlayerMenuPage extends GuiPage {
 
                 // ── Row 5: 频道管理 ──
                 case 47 -> {
+                    if (!MtvPlayerManager.canControlPlayer(player, snap)) {
+                        player.sendMessage("这是他人创建的私有 MTV 播放器，你没有权限切换其频道。");
+                        return;
+                    }
                     if (binding.isBroadcast()) {
                         var st = context.newState();
                         st.put("channel_id", binding.channelId());
@@ -169,9 +189,15 @@ public class PlayerMenuPage extends GuiPage {
                     }
                     context.navigateTo(player, MtvGui.GuiType.CHANNEL_MENU, uuid);
                 }
-                case 49 -> context.navigateTo(player, MtvGui.GuiType.PUBLIC_CHANNEL_LIST, uuid);
+                case 49 -> {
+                    if (!MtvPlayerManager.canControlPlayer(player, snap)) {
+                        player.sendMessage("这是他人创建的私有 MTV 播放器，你没有权限切换其频道。");
+                        return;
+                    }
+                    context.navigateTo(player, MtvGui.GuiType.PUBLIC_CHANNEL_LIST, uuid);
+                }
                 case 51 -> {
-                    if (!MtvPeripheralController.canEdit(player, snap)) return;
+                    if (!MtvPlayerManager.canControlPlayer(player, snap)) return;
                     context.updateAndRefresh(player, uuid,
                             done -> context.manager().updateChannelBinding(uuid, MtvChannelBinding.self(), done));
                 }

@@ -104,6 +104,7 @@ public class MtvPlayerManager {
                 }
             }
             player.setPublic(entityConfig.getBooleanOr("is_public", player.isPublic()));
+            player.setAllowOthersControl(entityConfig.getBooleanOr("allow_others_control", player.isAllowOthersControl()));
 
             var peripherals = entityConfig.getListOrEmpty("peripherals");
             for (int i = 0; i < peripherals.size(); i++) {
@@ -384,6 +385,13 @@ public class MtvPlayerManager {
         }, done);
     }
 
+    public void setAllowOthersControlAsync(UUID uuid, boolean allow, Consumer<Boolean> done) {
+        mutate(uuid, p -> {
+            p.setAllowOthersControl(allow);
+            return true;
+        }, done);
+    }
+
     public void setSpeakerRange(UUID uuid, String periphId, float v, Consumer<Boolean> done) {
         mutate(uuid, p -> {
             var s = p.findSpeaker(periphId);
@@ -648,6 +656,23 @@ public class MtvPlayerManager {
         if (player == null) return false;
         return player.getUniqueId().equals(snapshot.getOwner())
                 || player.hasPermission("mtv.player.edit.others");
+    }
+
+    /**
+     * 判断玩家是否可以控制该 MTV 播放器的播放（切换媒体/暂停/快进/切歌等）以及切换其频道。
+     * <p>
+     * 公开或无主播放器任何玩家均可控制；私有播放器的控制权依次为：
+     * 拥有者本人、拥有 {@code mtv.player.control.others} 权限的玩家、以及该播放器
+     * 「允许他人控制播放」开关开启时的任意玩家。
+     */
+    public static boolean canControlPlayer(Player player, ManagedMtvPlayer snapshot) {
+        if (snapshot == null) return false;
+        if (snapshot.isPublic()) return true;
+        if (snapshot.getOwner() == null) return true;
+        if (player == null) return false;
+        if (player.getUniqueId().equals(snapshot.getOwner())) return true;
+        if (player.hasPermission("mtv.player.control.others")) return true;
+        return snapshot.isAllowOthersControl();
     }
 
     public static boolean canToggleVisibility(Player player, ManagedMtvPlayer snapshot) {

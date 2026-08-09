@@ -26,6 +26,7 @@ public final class ClientChannelSession {
     private boolean errorMedia;
     private boolean forceResyncRequested;
     private boolean lastDecoderSuspended;
+    private long failedResolverStateRevision = -1L;
 
     public ClientChannelSession(String channelId) {
         this.channelId = channelId;
@@ -103,6 +104,7 @@ public final class ClientChannelSession {
         lastDecoderSuspended = false;
         lastAppliedSpeed = Double.NaN;
         lastHeartbeatAtMs = 0L;
+        failedResolverStateRevision = -1L;
         stopMedia();
     }
 
@@ -122,6 +124,7 @@ public final class ClientChannelSession {
         loadingMedia = false;
         errorMedia = false;
         lastAppliedSpeed = Double.NaN;
+        failedResolverStateRevision = -1L;
         stopMedia();
     }
 
@@ -137,13 +140,16 @@ public final class ClientChannelSession {
             lastAppliedSpeed = snapshot.speed();
         }
         boolean mediaChanged = !snapshot.mediaUrl().equals(playingUrl);
-        boolean shouldRetryFailedMedia = forceResync && errorMedia && !loadingMedia;
+        long resolverStateRevision = MediaResolvers.getStateRevision();
+        boolean localResolverStateChanged = errorMedia && failedResolverStateRevision >= 0L && resolverStateRevision != failedResolverStateRevision;
+        boolean shouldRetryFailedMedia = errorMedia && !loadingMedia && (localResolverStateChanged || forceResync);
         if (mediaChanged || shouldRetryFailedMedia) {
             LOGGER.debug("Load MTV media from snapshot: channel={}, revision={}, mediaUrl={}, retry={}",
                     snapshot.channelId(), snapshot.revision(), snapshot.mediaUrl(), shouldRetryFailedMedia);
             playingUrl = snapshot.mediaUrl();
             loadingMedia = true;
             errorMedia = false;
+            failedResolverStateRevision = -1L;
             loadMediaFromChannel(snapshot);
             return;
         }
@@ -175,11 +181,13 @@ public final class ClientChannelSession {
             LOGGER.warn("Host player is not SingleMediaPlayer for channel={}", snapshot.channelId());
             return;
         }
+        long resolverStateRevision = MediaResolvers.getStateRevision();
         try {
             singlePlayer.playAsync(() -> MediaResolvers.resolve(snapshot.mediaUrl()))
                     .thenAccept(mediaPlay -> {
                         loadingMedia = false;
                         errorMedia = false;
+                        failedResolverStateRevision = -1L;
                         long target = computeTargetPositionUs(snapshot);
                         var duration = mediaPlay.getDuration();
                         long seekTarget = duration > 0 ? Math.min(target, duration) : target;
@@ -191,6 +199,7 @@ public final class ClientChannelSession {
                     .exceptionally(throwable -> {
                         loadingMedia = false;
                         errorMedia = true;
+                        failedResolverStateRevision = resolverStateRevision;
                         LOGGER.error("Failed to load media from channel: {}", snapshot.mediaUrl(), throwable);
                         sendHeartbeat(snapshot, System.currentTimeMillis());
                         return null;
@@ -198,6 +207,7 @@ public final class ClientChannelSession {
         } catch (Exception e) {
             loadingMedia = false;
             errorMedia = true;
+            failedResolverStateRevision = resolverStateRevision;
             LOGGER.error("Failed to start media load from channel: {}", snapshot.mediaUrl(), e);
             sendHeartbeat(snapshot, System.currentTimeMillis());
         }

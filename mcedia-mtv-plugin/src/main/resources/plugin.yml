@@ -1,5 +1,5 @@
 name: McediaMtvPlugin
-version: '1.2.1'
+version: '1.2.2'
 main: top.tobyprime.mcedia_mtv_plugin.McediaMtvPlugin
 api-version: '${apiLevel}'
 folia-supported: true
@@ -15,6 +15,7 @@ permissions:
       mtv.player.create: true
       mtv.player.edit: true
       mtv.player.edit.others: true
+      mtv.player.control.others: true
       mtv.player.teleport: true
       mtv.gui: true
       mtv.channel.create: true
@@ -24,6 +25,9 @@ permissions:
       mtv.hud.unsubscribe: true
   mtv.player.edit.others:
     description: 编辑/删除别人创建的私有 MTV 播放器
+    default: op
+  mtv.player.control.others:
+    description: 控制/切换别人创建的私有 MTV 播放器的播放与频道
     default: op
   mtv.player.create:
     description: 创建 MTV 播放器

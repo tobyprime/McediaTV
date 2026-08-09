@@ -6,6 +6,7 @@ import org.bukkit.entity.Player;
 import java.util.UUID;
 import top.tobyprime.mcedia_mtv_plugin.channel.MtvChannelBinding;
 import top.tobyprime.mcedia_mtv_plugin.channel.PublicChannelSort;
+import top.tobyprime.mcedia_mtv_plugin.manager.MtvPlayerManager;
 
 public class PublicChannelListPage extends GuiPage {
     @Override
@@ -112,15 +113,21 @@ public class PublicChannelListPage extends GuiPage {
                 if (globalIndex < 0 || globalIndex >= results.size()) return false;
                 var channel = results.get(globalIndex);
                 if (entityUuid != null && !rightClick) {
-                    context.manager().updateChannelBinding(entityUuid,
-                            MtvChannelBinding.broadcast(channel.getChannelId()),
-                            success -> context.delay(player, () -> {
-                                if (!Boolean.TRUE.equals(success)) {
-                                    player.sendMessage("绑定公共频道失败。");
-                                    return;
-                                }
-                                context.navigateTo(player, MtvGui.GuiType.CHANNEL_MENU, entityUuid);
-                            }));
+                    context.read(player, entityUuid, snap -> {
+                        if (!MtvPlayerManager.canControlPlayer(player, snap)) {
+                            player.sendMessage("这是他人创建的私有 MTV 播放器，你没有权限切换其频道。");
+                            return;
+                        }
+                        context.manager().updateChannelBinding(entityUuid,
+                                MtvChannelBinding.broadcast(channel.getChannelId()),
+                                success -> context.delay(player, () -> {
+                                    if (!Boolean.TRUE.equals(success)) {
+                                        player.sendMessage("绑定公共频道失败。");
+                                        return;
+                                    }
+                                    context.navigateTo(player, MtvGui.GuiType.CHANNEL_MENU, entityUuid);
+                                }));
+                    });
                 } else {
                     var st = MtvGui.publicChannelState(query, page, ownOnly, sort);
                     st.put("channel_id", channel.getChannelId());

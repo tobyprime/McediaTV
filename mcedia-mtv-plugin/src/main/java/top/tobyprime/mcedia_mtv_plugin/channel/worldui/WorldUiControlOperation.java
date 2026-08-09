@@ -23,7 +23,8 @@ public enum WorldUiControlOperation {
     SET_BRIGHTNESS,
     SET_DANMAKU_VISIBLE,
     MOVE_UP,
-    MOVE_DOWN;
+    MOVE_DOWN,
+    ADD_COLLECTION;
 
     public boolean changesChannelRevision() {
         return this != SET_MASTER_VOLUME && this != TOGGLE_MUTE

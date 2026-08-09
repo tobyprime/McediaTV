@@ -8,6 +8,7 @@ import org.bukkit.inventory.Inventory;
 import java.util.UUID;
 import top.tobyprime.mcedia_mtv_plugin.channel.ChannelPlaybackStatus;
 import top.tobyprime.mcedia_mtv_plugin.channel.ChannelRuntimeState;
+import top.tobyprime.mcedia_mtv_plugin.manager.MtvPlayerManager;
 
 public class ChannelMenuPage extends GuiPage {
     private static final String PLAYLIST_OFFSET_KEY = "pl_off";
@@ -297,6 +298,10 @@ public class ChannelMenuPage extends GuiPage {
             context.updateAndRefresh(player, uuid, done ->
                     context.manager().withManagedPlayer(uuid, playerEntity -> {
                         var binding = context.manager().getChannelService().resolveBinding(playerEntity);
+                        if (binding.isSelf() && !MtvPlayerManager.canControlPlayer(player, playerEntity)) {
+                            player.sendMessage("这是他人创建的私有 MTV 播放器，你没有权限控制其播放。");
+                            return false;
+                        }
                         return op.apply(binding.channelId());
                     }, done));
         } else {

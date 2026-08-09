@@ -5,6 +5,8 @@
   "mcedia_mtv.add_media.insert_next": "Insert next",
   "mcedia_mtv.add_media.append": "Append",
   "mcedia_mtv.add_media.play_now": "Play now",
+  "mcedia_mtv.add_media.add_collection": "Add album",
+  "mcedia_mtv.add_media.collection_preview": "Album: %s | %d items",
   "mcedia_mtv.add_media.cancel": "Cancel",
   "mcedia_mtv.add_media.waiting": "Waiting for local preview",
   "mcedia_mtv.add_media.resolving": "Resolving locally...",

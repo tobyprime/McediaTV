@@ -216,6 +216,27 @@ public final class MtvChannelService {
         return mutatePlayback(channelId, state -> addPlaylistItem(state, mediaUrl, false));
     }
 
+    /** Appends every non-blank URL of a resolved collection; returns false when nothing was added. */
+    public boolean appendCollectionPlaylistItems(String channelId, java.util.List<String> mediaUrls) {
+        return mutatePlayback(channelId, state -> {
+            var normalized = new java.util.ArrayList<ChannelPlaylistItem>();
+            for (String mediaUrl : mediaUrls) {
+                var value = MediaUrlNormalizer.normalize(mediaUrl);
+                if (!value.isBlank()) {
+                    normalized.add(new ChannelPlaylistItem(value));
+                }
+            }
+            if (normalized.isEmpty()) {
+                return false;
+            }
+            state.getPlaylist().addAll(normalized);
+            if (state.getPlayState().getMediaUrl().isBlank()) {
+                return selectPlaylistIndex(state, 0, System.currentTimeMillis());
+            }
+            return true;
+        });
+    }
+
     public boolean insertNextPlaylistItem(String channelId, String mediaUrl) {
         return mutatePlayback(channelId, state -> {
             var normalized = MediaUrlNormalizer.normalize(mediaUrl);

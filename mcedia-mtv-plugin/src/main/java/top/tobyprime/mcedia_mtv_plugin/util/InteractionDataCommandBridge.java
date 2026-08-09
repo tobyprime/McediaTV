@@ -45,6 +45,7 @@ public final class InteractionDataCommandBridge {
             entityConfig.putString("owner", player.getOwner().toString());
         }
         entityConfig.putBoolean("is_public", player.isPublic());
+        entityConfig.putBoolean("allow_others_control", player.isAllowOthersControl());
 
         ListTag peripherals = new ListTag();
         for (var s : player.getScreens()) {

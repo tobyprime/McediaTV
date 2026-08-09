@@ -24,6 +24,7 @@ public final class MtvAddMediaScreen extends Screen {
     private Button insertNext;
     private Button append;
     private Button playNow;
+    private Button addCollection;
 
     private MtvAddMediaScreen(WorldUiInteractionState.Target target) {
         super(Component.translatable("mcedia_mtv.add_media.title"));
@@ -47,7 +48,10 @@ public final class MtvAddMediaScreen extends Screen {
         insertNext = addButton(left + 112, height / 2 + 50, "mcedia_mtv.add_media.insert_next", WorldUiAddMediaModel.AddMode.INSERT_NEXT);
         append = addButton(left + 224, height / 2 + 50, "mcedia_mtv.add_media.append", WorldUiAddMediaModel.AddMode.APPEND);
         playNow = addButton(left + 336, height / 2 + 50, "mcedia_mtv.add_media.play_now", WorldUiAddMediaModel.AddMode.INSERT_AND_PLAY);
-        addRenderableWidget(Button.builder(Component.translatable("mcedia_mtv.add_media.cancel"), button -> minecraft.setScreen(null)).bounds(width / 2 - 52, height / 2 + 78, 104, 20).build());
+        addCollection = addRenderableWidget(Button.builder(Component.translatable("mcedia_mtv.add_media.add_collection"),
+                button -> model.confirmCollection(target, WorldUiControlSender.getInstance())).bounds(left, height / 2 + 78, 440, 20).build());
+        addCollection.visible = false;
+        addRenderableWidget(Button.builder(Component.translatable("mcedia_mtv.add_media.cancel"), button -> minecraft.setScreen(null)).bounds(width / 2 - 52, height / 2 + 100, 104, 20).build());
         input.setFocused(true);
     }
 
@@ -60,6 +64,7 @@ public final class MtvAddMediaScreen extends Screen {
         super.tick();
         boolean enabled = model.canConfirm();
         if (prepend != null) { prepend.active = enabled; insertNext.active = enabled; append.active = enabled; playNow.active = enabled; }
+        if (addCollection != null) { addCollection.visible = model.collection() != null; addCollection.active = model.canConfirmCollection(); }
         model.onControlResult(WorldUiControlSender.getInstance().consumeLastResult());
         previewText.setMessage(Component.literal(model.previewMessage()));
         if (model.consumeAccepted()) minecraft.setScreen(null);

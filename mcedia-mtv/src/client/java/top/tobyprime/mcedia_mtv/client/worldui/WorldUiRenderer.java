@@ -13,6 +13,7 @@ import net.minecraft.world.phys.Vec3;
 import org.joml.Vector3f;
 import org.joml.Matrix3f;
 import org.joml.Quaternionf;
+import top.tobyprime.mcedia.api.player.MediaPlay;
 import top.tobyprime.mcedia.api.player.PlaybackState;
 import top.tobyprime.mcedia_core.client.renderer.McediaRenderTypes;
 import top.tobyprime.mcedia_core.client.renderer.PlayerScreenEntityRenderer;
@@ -109,6 +110,7 @@ public final class WorldUiRenderer {
             drawIconCentered(collector, pose, camera, plane, icon("plus"), .93F, .93F, .99F, .99F, 0xFFFFFFFF);
             return;
         }
+        var media = screen.peripheral().getMediaPlay();
         drawMediaHeader(collector, pose, camera, plane, snapshot);
         WorldUiHit hit = PRESENTATION.hit();
         WorldUiHit.Kind hovered = hit.kind();
@@ -119,9 +121,9 @@ public final class WorldUiRenderer {
                 volume,
                 controlState == null || controlState.danmakuVisible(),
                 hovered);
-        drawProgress(collector, pose, camera, plane, snapshot);
+        drawProgress(collector, pose, camera, plane, media);
         drawTransport(collector, pose, camera, plane, hovered);
-        drawControlLabels(collector, pose, camera, plane, snapshot, volume);
+        drawControlLabels(collector, pose, camera, plane, media, snapshot, volume);
         if (WorldUiLayout.showsDetails(plane.width(), plane.height())) {
             drawCover(collector, pose, camera, plane, snapshot);
             if (PRESENTATION.isPlaylistExpanded()) drawPlaylist(collector, pose, camera, plane, snapshot, hit);
@@ -157,9 +159,9 @@ public final class WorldUiRenderer {
         quadZ(collector, pose, camera, screen, left - 0.006F, fillTop - 0.008F, right + 0.006F, fillTop + 0.008F, COLOR_THUMB, 0.006F);
     }
 
-    private static void drawProgress(SubmitNodeCollector collector, PoseStack pose, Vec3 camera, WorldUiScreenRaycast.Screen screen, ClientChannelPlaybackSnapshot snapshot) {
+    private static void drawProgress(SubmitNodeCollector collector, PoseStack pose, Vec3 camera, WorldUiScreenRaycast.Screen screen, MediaPlay media) {
         quadZ(collector, pose, camera, screen, .16F, .945F, .96F, .965F, COLOR_TRACK, 0.004F);
-        float progress = progress(snapshot);
+        float progress = progress(media);
         if (progress > 0F) {
             float endU = .16F + .80F * progress;
             quadZ(collector, pose, camera, screen, .16F, .945F, endU, .965F, COLOR_FILL, 0.005F);
@@ -178,10 +180,10 @@ public final class WorldUiRenderer {
     }
 
     private static void drawControlLabels(SubmitNodeCollector collector, PoseStack pose, Vec3 camera,
-                                          WorldUiScreenRaycast.Screen screen, ClientChannelPlaybackSnapshot snapshot, float volume) {
-        long positionUs = snapshot.anchorMediaTimeUs();
-        if (!snapshot.paused()) positionUs += Math.max(0L, snapshot.elapsedTimeMs()) * 1000L;
-        drawLabel(collector, pose, camera, screen, WorldUiPlaybackPresentation.timeLabel(positionUs, snapshot.resolvedDurationUs()),
+                                          WorldUiScreenRaycast.Screen screen, MediaPlay media, ClientChannelPlaybackSnapshot snapshot, float volume) {
+        long durationUs = mediaDurationUs(media, snapshot);
+        long positionUs = mediaPositionUs(media, snapshot, durationUs);
+        drawLabel(collector, pose, camera, screen, WorldUiPlaybackPresentation.timeLabel(positionUs, durationUs),
                 .03F, .94F, .002F, 0xFFD0D0D0, 0xFF141414, 0.006F);
         drawCenteredText(collector, pose, camera, screen, Math.round(snapshot.speed() * 10.0F) / 10.0F + "x", .20F, .86F, .0018F, 0xFFE0E0E0);
         drawIconCentered(collector, pose, camera, screen, icon("skip-previous"), .26F, .82F, .34F, .90F, 0xFFFFFFFF);
@@ -506,11 +508,32 @@ public final class WorldUiRenderer {
         return resolved;
     }
 
-    private static float progress(ClientChannelPlaybackSnapshot snapshot) {
-        if (snapshot.resolvedDurationUs() <= 0L) return 0F;
-        long position = snapshot.anchorMediaTimeUs();
-        if (!snapshot.paused()) position += Math.max(0L, snapshot.elapsedTimeMs()) * 1000L;
-        return Math.max(0F, Math.min(1F, (float) position / snapshot.resolvedDurationUs()));
+    private static float progress(MediaPlay media) {
+        if (media == null) return 0F;
+        long durationUs = media.getDuration();
+        if (durationUs <= 0L) return 0F;
+        return Math.max(0F, Math.min(1F, (float) media.getEstimatedTime() / durationUs));
+    }
+
+    /** UI playback position: the local ffmpeg clock when media is loaded, else the server snapshot estimate. */
+    private static long mediaPositionUs(MediaPlay media, ClientChannelPlaybackSnapshot snapshot, long durationUs) {
+        if (media != null && media.getEstimatedTime() >= 0L) {
+            long positionUs = media.getEstimatedTime();
+            if (durationUs > 0L) positionUs = Math.min(positionUs, durationUs);
+            return Math.max(0L, positionUs);
+        }
+        long snapshotPositionUs = snapshot.anchorMediaTimeUs();
+        if (!snapshot.paused()) snapshotPositionUs += Math.max(0L, snapshot.elapsedTimeMs()) * 1000L;
+        if (snapshot.resolvedDurationUs() > 0L) snapshotPositionUs = Math.min(snapshotPositionUs, snapshot.resolvedDurationUs());
+        return Math.max(0L, snapshotPositionUs);
+    }
+
+    /** UI media duration: the local ffmpeg duration when loaded, else the server snapshot estimate. */
+    private static long mediaDurationUs(MediaPlay media, ClientChannelPlaybackSnapshot snapshot) {
+        if (media != null && media.getDuration() > 0L) {
+            return media.getDuration();
+        }
+        return snapshot.resolvedDurationUs();
     }
 
     private static void quad(SubmitNodeCollector collector, PoseStack poseStack, Vec3 camera, WorldUiScreenRaycast.Screen screen, float left, float bottom, float right, float top, int color) {

@@ -5,6 +5,8 @@
   "mcedia_mtv.add_media.insert_next": "插入下一首",
   "mcedia_mtv.add_media.append": "追加",
   "mcedia_mtv.add_media.play_now": "立即播放",
+  "mcedia_mtv.add_media.add_collection": "加入专辑",
+  "mcedia_mtv.add_media.collection_preview": "专辑: %s | 共 %d 项",
   "mcedia_mtv.add_media.cancel": "取消",
   "mcedia_mtv.add_media.waiting": "等待本地预览",
   "mcedia_mtv.add_media.resolving": "本地解析中...",
