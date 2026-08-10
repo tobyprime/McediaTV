@@ -24,8 +24,7 @@ public class ManagedMtvPlayer {
     private boolean powered = true;
     private MtvChannelBinding channelBinding;
     private UUID owner;
-    private boolean isPublic = false;
-    private boolean allowOthersControl = true;
+    private ControlAccess controlAccess = ControlAccess.CONTROL;
     private final List<ScreenPeripheralConfigModel> screens = new ArrayList<>();
     private final List<SpeakerPeripheralConfigModel> speakers = new ArrayList<>();
 
@@ -139,9 +138,9 @@ public class ManagedMtvPlayer {
     public void setChannelBinding(MtvChannelBinding channelBinding) { this.channelBinding = channelBinding; }
     public UUID getOwner() { return owner; }
     public void setOwner(UUID owner) { this.owner = owner; }
-    public boolean isPublic() { return isPublic; }
-    public void setPublic(boolean isPublic) { this.isPublic = isPublic; }
-    /** 是否允许其他玩家控制此播放器的播放与频道（仅对私有播放器生效）。 */
-    public boolean isAllowOthersControl() { return allowOthersControl; }
-    public void setAllowOthersControl(boolean allowOthersControl) { this.allowOthersControl = allowOthersControl; }
+    /** 其他玩家的控制权限级别，见 {@link ControlAccess}。 */
+    public ControlAccess getControlAccess() { return controlAccess; }
+    public void setControlAccess(ControlAccess controlAccess) {
+        this.controlAccess = controlAccess == null ? ControlAccess.CONTROL : controlAccess;
+    }
 }

@@ -9,6 +9,7 @@ import org.bukkit.craftbukkit.inventory.CraftItemStack;
 import org.bukkit.entity.ItemDisplay;
 import org.bukkit.inventory.ItemStack;
 import top.tobyprime.mcedia_mtv_plugin.channel.MtvChannelBinding;
+import top.tobyprime.mcedia_mtv_plugin.model.ControlAccess;
 import top.tobyprime.mcedia_mtv_plugin.model.ManagedMtvPlayer;
 import top.tobyprime.mcedia_mtv_plugin.model.ScreenPeripheralConfigModel;
 import top.tobyprime.mcedia_mtv_plugin.model.SpeakerPeripheralConfigModel;
@@ -44,8 +45,8 @@ public final class InteractionDataCommandBridge {
         if (player.getOwner() != null) {
             entityConfig.putString("owner", player.getOwner().toString());
         }
-        entityConfig.putBoolean("is_public", player.isPublic());
-        entityConfig.putBoolean("allow_others_control", player.isAllowOthersControl());
+        entityConfig.putBoolean("is_public", player.getControlAccess() == ControlAccess.PUBLIC);
+        entityConfig.putString("control_access", player.getControlAccess().name());
 
         ListTag peripherals = new ListTag();
         for (var s : player.getScreens()) {

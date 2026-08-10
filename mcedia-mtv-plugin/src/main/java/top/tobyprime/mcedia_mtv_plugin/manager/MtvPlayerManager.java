@@ -17,12 +17,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import top.tobyprime.mcedia_mtv_plugin.channel.MtvChannelBinding;
 import top.tobyprime.mcedia_mtv_plugin.channel.MtvChannelService;
+import top.tobyprime.mcedia_mtv_plugin.model.ControlAccess;
 import top.tobyprime.mcedia_mtv_plugin.model.ManagedMtvPlayer;
 import top.tobyprime.mcedia_mtv_plugin.model.ScreenPeripheralConfigModel;
 import top.tobyprime.mcedia_mtv_plugin.model.SpeakerPeripheralConfigModel;
 import top.tobyprime.mcedia_mtv_plugin.util.InteractionDataCommandBridge;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -103,8 +105,7 @@ public class MtvPlayerManager {
                 } catch (IllegalArgumentException ignored) {
                 }
             }
-            player.setPublic(entityConfig.getBooleanOr("is_public", player.isPublic()));
-            player.setAllowOthersControl(entityConfig.getBooleanOr("allow_others_control", player.isAllowOthersControl()));
+            player.setControlAccess(readControlAccess(entityConfig));
 
             var peripherals = entityConfig.getListOrEmpty("peripherals");
             for (int i = 0; i < peripherals.size(); i++) {
@@ -160,6 +161,26 @@ public class MtvPlayerManager {
         }
     }
 
+    /**
+     * 读取播放权限级别，兼容旧数据：优先 {@code control_access}，
+     * 缺失时按旧字段 {@code is_public} / {@code allow_others_control} 迁移。
+     */
+    private static ControlAccess readControlAccess(CompoundTag entityConfig) {
+        String value = entityConfig.getStringOr("control_access", "");
+        if (!value.isBlank()) {
+            try {
+                return ControlAccess.valueOf(value.toUpperCase(Locale.ROOT));
+            } catch (IllegalArgumentException ignored) {
+            }
+        }
+        boolean wasPublic = entityConfig.getBooleanOr("is_public", false);
+        boolean allowOthers = entityConfig.getBooleanOr("allow_others_control", true);
+        if (wasPublic) {
+            return ControlAccess.PUBLIC;
+        }
+        return allowOthers ? ControlAccess.CONTROL : ControlAccess.PRIVATE;
+    }
+
     private CompoundTag readCustomData(ItemDisplay display) {
         var stack = display.getItemStack();
         if (stack == null || stack.getType().isAir()) {
@@ -207,7 +228,7 @@ public class MtvPlayerManager {
             if (creator != null) {
                 player.setOwner(creator.getUniqueId());
             }
-            player.setPublic(false);
+            player.setControlAccess(ControlAccess.CONTROL);
             // Create the self channel state before exposing the binding to clients.
             channelService.createSelfChannelState(itemDisplay.getUniqueId());
             applyEntityState(itemDisplay, player);
@@ -378,16 +399,9 @@ public class MtvPlayerManager {
         }, done);
     }
 
-    public void setPublicAsync(UUID uuid, boolean isPublic, Consumer<Boolean> done) {
+    public void setControlAccessAsync(UUID uuid, ControlAccess access, Consumer<Boolean> done) {
         mutate(uuid, p -> {
-            p.setPublic(isPublic);
-            return true;
-        }, done);
-    }
-
-    public void setAllowOthersControlAsync(UUID uuid, boolean allow, Consumer<Boolean> done) {
-        mutate(uuid, p -> {
-            p.setAllowOthersControl(allow);
+            p.setControlAccess(access);
             return true;
         }, done);
     }
@@ -649,38 +663,52 @@ public class MtvPlayerManager {
         InteractionDataCommandBridge.apply(itemDisplay, player);
     }
 
+    /**
+     * 判断玩家是否可以编辑该 MTV 播放器的设置（重命名、屏幕/扬声器外设、位置等）。
+     * <p>
+     * 拥有者、无主播放器、拥有 {@code mtv.player.edit.others} 权限的玩家始终可编辑；
+     * 其他玩家仅在播放权限为「公开」时可编辑播放器设置。
+     */
     public static boolean canEditPlayer(Player player, ManagedMtvPlayer snapshot) {
         if (snapshot == null) return false;
-        if (snapshot.isPublic()) return true;
         if (snapshot.getOwner() == null) return true;
         if (player == null) return false;
-        return player.getUniqueId().equals(snapshot.getOwner())
-                || player.hasPermission("mtv.player.edit.others");
+        if (player.getUniqueId().equals(snapshot.getOwner())) return true;
+        if (player.hasPermission("mtv.player.edit.others")) return true;
+        return snapshot.getControlAccess() == ControlAccess.PUBLIC;
     }
 
     /**
      * 判断玩家是否可以控制该 MTV 播放器的播放（切换媒体/暂停/快进/切歌等）以及切换其频道。
      * <p>
-     * 公开或无主播放器任何玩家均可控制；私有播放器的控制权依次为：
-     * 拥有者本人、拥有 {@code mtv.player.control.others} 权限的玩家、以及该播放器
-     * 「允许他人控制播放」开关开启时的任意玩家。
+     * 拥有者、无主播放器、拥有 {@code mtv.player.control.others} 权限的玩家始终可控制；
+     * 其他玩家在播放权限为「公开」或「仅控制」时可控制播放与频道。
      */
     public static boolean canControlPlayer(Player player, ManagedMtvPlayer snapshot) {
         if (snapshot == null) return false;
-        if (snapshot.isPublic()) return true;
         if (snapshot.getOwner() == null) return true;
         if (player == null) return false;
         if (player.getUniqueId().equals(snapshot.getOwner())) return true;
         if (player.hasPermission("mtv.player.control.others")) return true;
-        return snapshot.isAllowOthersControl();
+        return allowsControl(snapshot.getControlAccess());
     }
 
-    public static boolean canToggleVisibility(Player player, ManagedMtvPlayer snapshot) {
-        if (snapshot == null || player == null) return false;
-        if (!snapshot.isPublic()) return canEditPlayer(player, snapshot);
+    /**
+     * 判断玩家是否可以执行播放器的管理操作（删除播放器、修改播放权限）。
+     * <p>
+     * 仅拥有者或拥有 {@code mtv.player.edit.others} 权限的玩家可以，播放权限级别不影响。
+     */
+    public static boolean canManagePlayer(Player player, ManagedMtvPlayer snapshot) {
+        if (snapshot == null) return false;
         if (snapshot.getOwner() == null) return true;
+        if (player == null) return false;
         return player.getUniqueId().equals(snapshot.getOwner())
                 || player.hasPermission("mtv.player.edit.others");
+    }
+
+    /** 公开与仅控制级别均授予其他玩家的播放/频道控制权。 */
+    static boolean allowsControl(ControlAccess access) {
+        return access == ControlAccess.PUBLIC || access == ControlAccess.CONTROL;
     }
 
     private ItemDisplay spawnItemDisplay(Location location) {

@@ -8,6 +8,7 @@ import java.util.UUID;
 import top.tobyprime.mcedia_mtv_plugin.channel.MtvChannelBinding;
 import top.tobyprime.mcedia_mtv_plugin.controller.MtvPeripheralController;
 import top.tobyprime.mcedia_mtv_plugin.manager.MtvPlayerManager;
+import top.tobyprime.mcedia_mtv_plugin.model.ControlAccess;
 
 public class PlayerMenuPage extends GuiPage {
     @Override
@@ -53,12 +54,17 @@ public class PlayerMenuPage extends GuiPage {
 
             // ── Row 3 (27-35): 🔧 播放器设置 ──
 
-            var controlIcon = snapshot.isAllowOthersControl() ? Material.LIME_DYE : Material.GRAY_DYE;
-            inv.setItem(27, item(controlIcon,
-                    snapshot.isAllowOthersControl() ? "§a🎮 允许他人控制播放" : "§7🎮 禁止他人控制播放",
-                    "§7当前: " + (snapshot.isAllowOthersControl() ? "§a任意玩家可遥控播放/切频道" : "§c仅拥有者或 control.others 可控制"),
-                    "§7点击切换是否允许其他玩家控制此播放器的播放与频道",
-                    "§7（仅影响私有播放器；公开播放器任何玩家均可控制）"));
+            var access = snapshot.getControlAccess();
+            boolean canChangeAccess = MtvPlayerManager.canManagePlayer(player, snapshot);
+            var accessLore = new java.util.ArrayList<String>();
+            accessLore.addAll(java.util.List.of(accessDescription(access)));
+            accessLore.add("§7点击切换为: " + accessDisplayName(access.next()));
+            accessLore.add(canChangeAccess
+                    ? "§7点击切换播放权限级别"
+                    : "§7仅创建者可修改播放权限");
+            inv.setItem(27, item(accessIcon(access),
+                    "§f🔑 播放权限: " + accessDisplayName(access),
+                    accessLore.toArray(new String[0])));
 
             inv.setItem(29, item(Material.COMPASS,
                     "§6⇕ 位置与朝向",
@@ -81,15 +87,10 @@ public class PlayerMenuPage extends GuiPage {
 
             var owner = snapshot.getOwner();
             String ownerName = owner == null ? "§7未知" : "§f" + Bukkit.getOfflinePlayer(owner).getName();
-            var publicIcon = snapshot.isPublic() ? Material.LIME_WOOL : Material.RED_WOOL;
-            var publicText = snapshot.isPublic() ? "§a🔓 公开" : "§c🔒 私有";
-            inv.setItem(31, item(publicIcon,
-                    publicText,
-                    "§7拥有者: " + ownerName,
-                    "§7点击切换公开/私有模式",
-                    snapshot.isPublic()
-                            ? "§7仅拥有者或拥有 mtv.player.edit.others 权限的玩家可切回私有"
-                            : "§7只有创建者可以编辑此播放器"));
+            inv.setItem(31, item(Material.PLAYER_HEAD,
+                    "§b👤 拥有者: " + ownerName,
+                    "§7创建者可修改播放权限、删除播放器",
+                    "§7播放权限级别由上方左侧按钮控制"));
 
             // ── Row 5 (45-53): 📡 频道管理 + ⚠️ 危险操作 ──
 
@@ -156,23 +157,15 @@ public class PlayerMenuPage extends GuiPage {
 
                 // ── Row 3: 播放器设置 ──
                 case 27 -> {
-                    if (!MtvPlayerManager.canEditPlayer(player, snap)) {
-                        player.sendMessage("这是他人创建的私有 MTV 播放器，你没有权限修改其控制设置。");
+                    if (!MtvPlayerManager.canManagePlayer(player, snap)) {
+                        player.sendMessage("只有创建者可以修改播放权限。");
                         return;
                     }
                     context.updateAndRefresh(player, uuid,
-                            done -> context.manager().setAllowOthersControlAsync(uuid, !snap.isAllowOthersControl(), done));
+                            done -> context.manager().setControlAccessAsync(uuid, snap.getControlAccess().next(), done));
                 }
                 case 29 -> context.navigateTo(player, MtvGui.GuiType.WORLD_TRANSFORM, uuid);
-                case 31 -> {
-                    if (!context.manager().canToggleVisibility(player, snap)) {
-                        player.sendMessage("当前为公开播放器，只有拥有者或拥有 mtv.player.edit.others 权限的玩家可以切回私有。");
-                        return;
-                    }
-                    boolean next = !snap.isPublic();
-                    context.updateAndRefresh(player, uuid,
-                            done -> context.manager().setPublicAsync(uuid, next, done));
-                }
+                case 31 -> { /* 拥有者信息展示，无可操作项 */ }
                 case 33 -> context.navigateTo(player, MtvGui.GuiType.PLAYER_ACTIVATION_RANGE, uuid);
 
                 // ── Row 5: 频道管理 ──
@@ -205,7 +198,10 @@ public class PlayerMenuPage extends GuiPage {
                 // ── Row 5: 危险操作 ──
                 case 53 -> {
                     if (!MtvPeripheralController.checkPerm(player, "mtv.player.edit")) return;
-                    if (!MtvPeripheralController.canEdit(player, snap)) return;
+                    if (!MtvPlayerManager.canManagePlayer(player, snap)) {
+                        player.sendMessage("只有创建者可以删除此 MTV 播放器。");
+                        return;
+                    }
                     player.closeInventory();
                     context.manager().deletePlayerAsync(uuid, success ->
                             context.delay(player, () -> player.sendMessage(Boolean.TRUE.equals(success)
@@ -238,5 +234,38 @@ public class PlayerMenuPage extends GuiPage {
             default -> { return false; }
         }
         return true;
+    }
+
+    private static Material accessIcon(ControlAccess access) {
+        return switch (access) {
+            case PUBLIC -> Material.LIME_DYE;
+            case CONTROL -> Material.ORANGE_DYE;
+            case PRIVATE -> Material.GRAY_DYE;
+        };
+    }
+
+    private static String accessDisplayName(ControlAccess access) {
+        return switch (access) {
+            case PUBLIC -> "§a公开";
+            case CONTROL -> "§e仅控制";
+            case PRIVATE -> "§c私有";
+        };
+    }
+
+    private static String[] accessDescription(ControlAccess access) {
+        return switch (access) {
+            case PUBLIC -> new String[] {
+                    "§7其他玩家可控制播放并编辑播放器设置",
+                    "§7但不能删除播放器或修改此权限"
+            };
+            case CONTROL -> new String[] {
+                    "§7其他玩家可控制播放、切换频道",
+                    "§7但不能编辑播放器设置"
+            };
+            case PRIVATE -> new String[] {
+                    "§7其他玩家仅可观看，不能控制",
+                    "§7只有创建者可以控制播放"
+            };
+        };
     }
 }
