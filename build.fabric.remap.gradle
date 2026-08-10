@@ -327,6 +327,8 @@ def modrinthProjectId = System.getenv("MODRINTH_${moduleName.toUpperCase().repla
 
 modrinth {
     token = System.getenv('MODRINTH_TOKEN')
+    // Modrinth 上传失败（如网络超时）不阻塞 GitHub Release 发布
+    failSilently.set(true)
 
     if (modrinthProjectId != null && !modrinthProjectId.isEmpty()) {
         projectId = modrinthProjectId
