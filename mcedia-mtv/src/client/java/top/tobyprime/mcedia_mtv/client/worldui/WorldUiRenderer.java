@@ -105,30 +105,47 @@ public final class WorldUiRenderer {
         var target = new WorldUiInteractionState.Target(screen.mtvUuid(), screen.screenId(), screen.channelId(), snapshot.revision());
         if (!PRESENTATION.shouldRender(target)) return;
         WorldUiScreenRaycast.Screen plane = screen.plane();
-        if (!PRESENTATION.isExpanded(target)) {
-            quadZ(collector, pose, camera, plane, .93F, .93F, .99F, .99F, 0xFF282828, 0.003F);
-            drawIconCentered(collector, pose, camera, plane, icon("plus"), .93F, .93F, .99F, .99F, 0xFFFFFFFF);
-            return;
+        // The whole UI is drawn in the screen's local frame: translate to the camera-relative
+        // plane centre once, then submit small local-coordinate vertices. At large world
+        // coordinates (10000+) absolute float positions lose the precision needed to keep the
+        // UI in front of the video quad and to separate the UI's own z-layers; the video layer
+        // is translated the same way (core shifts the quad by world-Y half height then rotates),
+        // so the two frames stay aligned. Quad submission also moves to order(1) so the controls
+        // paint after the order(0) video layer regardless of distance sorting.
+        pose.pushPose();
+        try {
+            pose.translate(
+                    (float) (plane.center().x - camera.x),
+                    (float) (plane.center().y - camera.y),
+                    (float) (plane.center().z - camera.z)
+            );
+            if (!PRESENTATION.isExpanded(target)) {
+                quadZ(collector, pose, camera, plane, .93F, .93F, .99F, .99F, 0xFF282828, 0.003F);
+                drawIconCentered(collector, pose, camera, plane, icon("plus"), .93F, .93F, .99F, .99F, 0xFFFFFFFF);
+                return;
+            }
+            var media = screen.peripheral().getMediaPlay();
+            drawMediaHeader(collector, pose, camera, plane, snapshot);
+            WorldUiHit hit = PRESENTATION.hit();
+            WorldUiHit.Kind hovered = hit.kind();
+            WorldUiControlState controlState = WorldUiControlStateCache.getInstance().state(screen.mtvUuid(), screen.screenId());
+            float volume = controlState == null ? 1.0F : controlState.masterVolume();
+            drawLeftPanel(collector, pose, camera, plane,
+                    controlState == null ? 8 : controlState.brightness(),
+                    volume,
+                    controlState == null || controlState.danmakuVisible(),
+                    hovered);
+            drawProgress(collector, pose, camera, plane, media);
+            drawTransport(collector, pose, camera, plane, hovered);
+            drawControlLabels(collector, pose, camera, plane, media, snapshot, volume);
+            if (WorldUiLayout.showsDetails(plane.width(), plane.height())) {
+                drawCover(collector, pose, camera, plane, snapshot);
+                if (PRESENTATION.isPlaylistExpanded()) drawPlaylist(collector, pose, camera, plane, snapshot, hit);
+            }
+            drawTooltip(collector, pose, camera, plane, hit, snapshot);
+        } finally {
+            pose.popPose();
         }
-        var media = screen.peripheral().getMediaPlay();
-        drawMediaHeader(collector, pose, camera, plane, snapshot);
-        WorldUiHit hit = PRESENTATION.hit();
-        WorldUiHit.Kind hovered = hit.kind();
-        WorldUiControlState controlState = WorldUiControlStateCache.getInstance().state(screen.mtvUuid(), screen.screenId());
-        float volume = controlState == null ? 1.0F : controlState.masterVolume();
-        drawLeftPanel(collector, pose, camera, plane,
-                controlState == null ? 8 : controlState.brightness(),
-                volume,
-                controlState == null || controlState.danmakuVisible(),
-                hovered);
-        drawProgress(collector, pose, camera, plane, media);
-        drawTransport(collector, pose, camera, plane, hovered);
-        drawControlLabels(collector, pose, camera, plane, media, snapshot, volume);
-        if (WorldUiLayout.showsDetails(plane.width(), plane.height())) {
-            drawCover(collector, pose, camera, plane, snapshot);
-            if (PRESENTATION.isPlaylistExpanded()) drawPlaylist(collector, pose, camera, plane, snapshot, hit);
-        }
-        drawTooltip(collector, pose, camera, plane, hit, snapshot);
     }
 
     /** Left-side vertical brightness/volume bars with a danmaku toggle below. */
@@ -369,7 +386,7 @@ public final class WorldUiRenderer {
         if (value == null || value.isBlank()) return;
         Vector3f origin = point(screen, u, v, 0.006F);
         pose.pushPose();
-        pose.translate(origin.x - (float) camera.x, origin.y - (float) camera.y, origin.z - (float) camera.z);
+        pose.translate(origin.x, origin.y, origin.z);
         pose.mulPose(textRotation(screen));
         float poseScale = textScale(screen, scale);
         pose.scale(poseScale, poseScale, poseScale);
@@ -546,13 +563,14 @@ public final class WorldUiRenderer {
         // the upper edge. Map the texture's top row (v=0) there, otherwise every texture
         // (icons, covers) renders vertically flipped.
         Vector3f a = point(screen, left, bottom, z), b = point(screen, right, bottom, z), c = point(screen, right, top, z), d = point(screen, left, top, z);
-        // The whole UI shares the video's translucent unlit render type, so it is drawn
-        // in the same render batch after the video and stays reliably in front of it.
-        collector.submitCustomGeometry(poseStack, McediaRenderTypes.entityTranslucentUnlit(textureId), (pose, vertex) -> {
-            uiVertex(vertex, pose, a.x - (float) camera.x, a.y - (float) camera.y, a.z - (float) camera.z, color, 0F, 0F);
-            uiVertex(vertex, pose, b.x - (float) camera.x, b.y - (float) camera.y, b.z - (float) camera.z, color, 1F, 0F);
-            uiVertex(vertex, pose, c.x - (float) camera.x, c.y - (float) camera.y, c.z - (float) camera.z, color, 1F, 1F);
-            uiVertex(vertex, pose, d.x - (float) camera.x, d.y - (float) camera.y, d.z - (float) camera.z, color, 0F, 1F);
+        // Submitted at order(1) so the controls paint after the order(0) video layer
+        // regardless of distance sorting. Vertices are local to the plane centre, which
+        // drawControls already translated into camera space, so no camera subtraction here.
+        collector.order(1).submitCustomGeometry(poseStack, McediaRenderTypes.entityTranslucentUnlit(textureId), (pose, vertex) -> {
+            uiVertex(vertex, pose, a.x, a.y, a.z, color, 0F, 0F);
+            uiVertex(vertex, pose, b.x, b.y, b.z, color, 1F, 0F);
+            uiVertex(vertex, pose, c.x, c.y, c.z, color, 1F, 1F);
+            uiVertex(vertex, pose, d.x, d.y, d.z, color, 0F, 1F);
         });
     }
 
@@ -561,11 +579,12 @@ public final class WorldUiRenderer {
     }
 
     private static Vector3f point(WorldUiScreenRaycast.Screen screen, float u, float v, float z) {
-        // Offset toward the viewer (right × up is the video front face) so controls
-        // sort in front of the translucent video quad. Distinct z layers keep
+        // Local coordinate relative to the plane centre; drawControls has already translated
+        // the pose there. Offset toward the viewer (right × up is the video front face) so
+        // controls sort in front of the translucent video quad. Distinct z layers keep
         // overlapping UI elements from z-fighting.
         var normal = new Vector3f(screen.right()).cross(screen.up()).normalize().mul(z);
-        return new Vector3f(screen.center()).fma((u - .5F) * screen.width(), screen.right()).fma((.5F - v) * screen.height(), screen.up()).add(normal);
+        return new Vector3f().fma((u - .5F) * screen.width(), screen.right()).fma((.5F - v) * screen.height(), screen.up()).add(normal);
     }
 
     /** Like {@link #quad} but on a dedicated z layer to avoid z-fighting with lower UI. */

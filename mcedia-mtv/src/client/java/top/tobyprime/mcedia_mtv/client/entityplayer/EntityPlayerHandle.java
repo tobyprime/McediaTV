@@ -7,6 +7,7 @@ import net.minecraft.nbt.ListTag;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.Display.ItemDisplay;
 import org.joml.Quaternionf;
+import org.joml.Vector3d;
 import org.joml.Vector3f;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -486,11 +487,16 @@ public class EntityPlayerHandle {
             var rotation = screen.getWorldRotation();
             var right = rotation.transform(new Vector3f(1.0F, 0.0F, 0.0F));
             var up = rotation.transform(new Vector3f(0.0F, 1.0F, 0.0F));
-            var center = new Vector3f(
-                    (float) screen.getPosition().x,
-                    (float) screen.getPosition().y,
-                    (float) screen.getPosition().z
-            ).fma(height * 0.5F, up);
+            // Core's video layer offsets the quad by half its height along the world Y axis
+            // and then rotates around that point (PoseStack.translate happens before mulPose),
+            // so the quad's centre is anchor + (0, h/2, 0), not anchor + R·(0, h/2, 0). The
+            // UI plane must share that centre or it detaches from the video under pitch/roll.
+            // Double precision keeps the centre exact at large world coordinates.
+            var center = new Vector3d(
+                    screen.getPosition().x,
+                    screen.getPosition().y + height * 0.5F,
+                    screen.getPosition().z
+            );
             screens.add(new WorldUiScreen(display.getUUID(), screenRuntime.id(), channelId, powered, screen,
                     new WorldUiScreenRaycast.Screen(screenRuntime.id(), center, right, up, width, height)));
         }

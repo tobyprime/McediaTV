@@ -3,7 +3,7 @@ package top.tobyprime.mcedia_mtv.client.worldui;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.phys.HitResult;
-import org.joml.Vector3f;
+import org.joml.Vector3d;
 import top.tobyprime.mcedia_mtv.client.channel.ClientChannelPlaybackManager;
 import top.tobyprime.mcedia_mtv.client.channel.worldui.WorldUiCapabilityState;
 import top.tobyprime.mcedia_mtv.client.channel.worldui.WorldUiControlSender;
@@ -87,7 +87,7 @@ if (selection != null && MtvWorldUiRenderer.presentation().isPlaylistExpanded())
                 .filter(EntityPlayerHandle.WorldUiScreen::powered)
                 .filter(s -> s.channelId() != null && !s.channelId().isBlank())
                 .toList();
-        var hit = WorldUiScreenRaycast.select(new Vector3f((float) origin.x, (float) origin.y, (float) origin.z), new Vector3f(camera.forwardVector()), screens.stream().map(EntityPlayerHandle.WorldUiScreen::plane).toList()).orElse(null);
+        var hit = WorldUiScreenRaycast.select(new Vector3d(origin.x, origin.y, origin.z), new Vector3d(camera.forwardVector()), screens.stream().map(EntityPlayerHandle.WorldUiScreen::plane).toList()).orElse(null);
         if (hit == null || blockedByBlock(client, origin, hit.distance())) return null;
         for (var screen : screens) if (screen.plane() == hit.screen()) {
             var snapshot = ClientChannelPlaybackManager.getInstance().snapshot(screen.channelId());
