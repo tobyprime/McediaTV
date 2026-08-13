@@ -2,7 +2,6 @@ package top.tobyprime.mcedia_mtv.client.worldui;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderEvents;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.state.level.CameraRenderState;
 import net.minecraft.world.phys.Vec3;
@@ -24,10 +23,9 @@ public final class MtvWorldUiRenderer {
         if (initialized) return;
         initialized = true;
         WorldUiRenderer.initializeResources();
-        LevelRenderEvents.AFTER_SOLID_FEATURES.register(context -> {
-            var camera = Minecraft.getInstance().gameRenderer.mainCamera();
-            if (camera == null) return;
-            Vec3 position = camera.position();
+        // 26.2 prepares the feature frame before passes execute; AFTER_SOLID_FEATURES submits would land one frame late.
+        LevelRenderEvents.COLLECT_SUBMITS.register(context -> {
+            Vec3 position = context.levelState().cameraRenderState.pos;
             var collector = context.submitNodeCollector();
             var pose = context.poseStack();
             var cameraRenderState = context.levelState().cameraRenderState;
