@@ -265,10 +265,10 @@ public class EntityPlayerHandle {
 
         var pos = display.position();
         return new TransformState(
-                new Vector3f(
-                        (float) pos.x() + localOffset.x(),
-                        (float) pos.y() + localOffset.y(),
-                        (float) pos.z() + localOffset.z()
+                new Vector3d(
+                        pos.x() + localOffset.x(),
+                        pos.y() + localOffset.y(),
+                        pos.z() + localOffset.z()
                 ),
                 finalRotation
         );
@@ -648,7 +648,7 @@ public class EntityPlayerHandle {
         }
     }
 
-    private record TransformState(Vector3f position, Quaternionf rotation) {
+    private record TransformState(Vector3d position, Quaternionf rotation) {
     }
 
     public record WorldUiScreen(UUID mtvUuid, String screenId, String channelId, boolean powered,

@@ -9,7 +9,6 @@ import top.tobyprime.mcedia_mtv_plugin.channel.MtvChannelService;
 import top.tobyprime.mcedia_mtv_plugin.manager.MtvPlayerManager;
 import top.tobyprime.mcedia_mtv_plugin.model.ManagedMtvPlayer;
 import top.tobyprime.mcedia_mtv_plugin.util.MediaUrlNormalizer;
-import top.tobyprime.mcedia_mtv_plugin.worldui.WorldUiScreenHitValidator;
 
 import java.util.Locale;
 import java.util.UUID;
@@ -19,6 +18,8 @@ import java.util.function.Consumer;
  * Authoritative entry point for MTV world-screen controls. Network handlers
  * decode a bounded request before calling this class; this class then verifies
  * the current entity snapshot and never trusts client-side channel selection.
+ * Screen hit/occlusion is client-side; server validation covers permissions,
+ * target/channel state, revision and operation arguments.
  */
 public final class WorldUiControlDispatcher {
     private static final long MAX_SEEK_US = 7L * 24L * 60L * 60L * 1_000_000L;
@@ -26,13 +27,11 @@ public final class WorldUiControlDispatcher {
     private final MtvPlayerManager manager;
     private final MtvChannelService channelService;
     private final WorldUiRateLimiter rateLimiter;
-    private final WorldUiScreenHitValidator hitValidator;
 
     public WorldUiControlDispatcher(MtvPlayerManager manager, WorldUiRateLimiter rateLimiter) {
         this.manager = manager;
         this.channelService = manager.getChannelService();
         this.rateLimiter = rateLimiter == null ? new WorldUiRateLimiter() : rateLimiter;
-        this.hitValidator = new WorldUiScreenHitValidator();
     }
 
     public WorldUiControlDispatcher(MtvPlayerManager manager) {
@@ -100,11 +99,6 @@ public final class WorldUiControlDispatcher {
         }
         if (!channelService.canControlChannelPlayback(player, state)) {
             done.accept(rejected(request, WorldUiControlError.PERMISSION_DENIED, revision));
-            return;
-        }
-        var hitValidation = hitValidator.validate(player, target, request.screenId(), request.hitU(), request.hitV());
-        if (!hitValidation.accepted()) {
-            done.accept(rejected(request, hitValidation.error(), revision));
             return;
         }
         if (request.operation().changesChannelRevision() && request.expectedRevision() != revision) {
