@@ -4,6 +4,7 @@ import org.gradle.api.tasks.bundling.Jar
 
 plugins {
     id 'base'
+    id 'com.modrinth.minotaur' version '2.+'
 }
 
 def supportedMcVersions = (findProperty('supported_mc_versions') ?: '').toString()
@@ -21,28 +22,51 @@ def jarEntries = supportedMcVersions.collectMany { mcVersion -> [
 ] }
 def runtimeEntry = 'mcedia-core-runtime.jar'
 
+def resolveGameVersions = { version ->
+    def key = "modrinth_game_versions_${version.replace('.', '_')}"
+    def expanded = rootProject.findProperty(key)?.toString()
+    expanded ? expanded.split(',').collect { it.trim() }.findAll { !it.isEmpty() } : [version]
+}
+
 tasks.register('verifyBundleInputs') {
     inputs.dir(bundleInputDir)
     doLast {
-        def missing = jarEntries.collect { new File(bundleInputDir, it) }.findAll { !it.isFile() }
-        if (!missing.isEmpty()) throw new GradleException("Missing MTV all-in-one bundle inputs: ${missing*.name.join(', ')}")
+        def expected = [runtimeEntry] + jarEntries
+        def missing = expected.collect { new File(bundleInputDir, it) }.findAll { !it.isFile() }
+        if (!missing.isEmpty()) throw new GradleException("Missing MTV versionpack inputs: ${missing*.name.join(', ')}")
     }
 }
 
-tasks.register('bundleJar', Jar) {
+def bundleJar = tasks.register('bundleJar', Jar) {
     group = 'build'
+    description = 'Assembles the cross-version Mcedia MTV Fabric versionpack.'
     dependsOn('verifyBundleInputs')
-    archiveBaseName = 'mcedia-mtv-allinone-bundle'
+    archiveBaseName = 'mcedia-mtv-allinone-versionpack'
     archiveVersion = bundleVersion
     destinationDirectory = rootProject.layout.buildDirectory.dir('libs/bundle')
     from(bundleInputDir) { include(runtimeEntry, *jarEntries); into('META-INF/jars') }
     from('src/main/resources') {
         expand(
             version: bundleVersion,
-            minecraft_version_range: '>=1.21.8',
             nested_jars: JsonOutput.toJson(([runtimeEntry] + jarEntries).collect { [file: "META-INF/jars/${it}"] })
         )
     }
 }
 
-tasks.named('assemble') { dependsOn('bundleJar') }
+tasks.named('assemble') { dependsOn(bundleJar) }
+
+def modrinthProjectId = System.getenv('MODRINTH_MCEDIA_PROJECT_ID')
+modrinth {
+    token = System.getenv('MODRINTH_TOKEN')
+    if (modrinthProjectId) {
+        projectId = modrinthProjectId
+    } else {
+        logger.warn('MODRINTH_MCEDIA_PROJECT_ID not set - Modrinth publish disabled')
+    }
+    versionNumber = "${bundleVersion}-versionpack"
+    uploadFile = bundleJar.get()
+    versionType = 'release'
+    gameVersions = supportedMcVersions.collectMany(resolveGameVersions).unique()
+    loaders = ['fabric']
+    changelog = "Automated build from commit ${System.getenv('GITHUB_SHA')?.take(7) ?: 'local'}."
+}

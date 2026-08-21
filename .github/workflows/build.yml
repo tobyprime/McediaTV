@@ -29,8 +29,13 @@ on:
         required: true
         type: string
       create_release:
-        description: 'Create a GitHub Release with the built artifacts'
+        description: 'Create a GitHub Release and Modrinth version after local loader validation'
         default: false
+        type: boolean
+      local_loader_verified:
+        description: 'Confirm the final versionpack was Loader-tested for every supported Minecraft version'
+        default: false
+        required: true
         type: boolean
       core_ref:
         description: 'McediaCore git ref used as the internal build input'
@@ -150,7 +155,10 @@ jobs:
         run: ./gradlew :mcedia-mtv-plugin:build --configure-on-demand
 
       - name: Publish to Modrinth
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: |
+          github.event_name == 'workflow_dispatch'
+          && github.event.inputs.create_release == 'true'
+          && github.event.inputs.local_loader_verified == 'true'
         env:
           MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
           MODRINTH_MCEDIA_PROJECT_ID: ${{ secrets.MCEDIA_CORE_PROJECT_ID }}
@@ -164,10 +172,11 @@ jobs:
           if-no-files-found: error
 
 
-  # ── Fabric mod: per-version all-in-one ───────────────────────────────
-  # Fabric resolves one real implementation per mod ID. Package one file per
-  # Minecraft version, while embedding the shared runtime only once per file.
-  mcedia-mtv-allinone:
+  # ── Fabric versionpack inputs ─────────────────────────────────────────
+  # Build one real MTV/Core/Platforms implementation per Minecraft version.
+  # The next job combines these mutually exclusive implementations into one
+  # metadata-only Fabric wrapper.
+  mcedia-mtv-version-inputs:
     needs: [discover, mcedia-core-deps]
     runs-on: ubuntu-latest
     strategy:
@@ -201,27 +210,80 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x gradlew
 
-      - name: Build all-in-one for ${{ matrix.mc_version }}
+      - name: Build MTV implementation for ${{ matrix.mc_version }}
         run: |
           ./gradlew :mcedia-mtv-${{ matrix.mc_version }}:buildAndCollect \
-                    -Psupported_mc_versions=${{ matrix.mc_version }} \
-                    -PallInOne=true -x test
+                    -Psupported_mc_versions=${{ matrix.mc_version }} -x test
 
-      - name: Publish Fabric all-in-one to unified Modrinth project
-        if: startsWith(github.ref, 'refs/tags/v')
+      - name: Stage versionpack inputs
+        run: |
+          mkdir -p versionpack-input
+          MC=${{ matrix.mc_version }}
+          cp $(find build/libs/${MC} -name 'mcedia-mtv-*.jar' ! -name '*sources*' -type f | head -1) versionpack-input/mcedia-mtv-${MC}.jar
+          cp $(find ../McediaCore/publish/top/tobyprime/mcedia_core-mc${MC} -name '*.jar' ! -name '*sources*' -type f | head -1) versionpack-input/mcedia-core-${MC}.jar
+          cp $(find ../McediaCore/publish/top/tobyprime/mcedia_cn_platforms-mc${MC} -name '*.jar' ! -name '*sources*' -type f | head -1) versionpack-input/mcedia-platforms-${MC}.jar
+          cp $(find ../McediaCore/publish/top/tobyprime/mcedia-core-runtime -name '*.jar' ! -name '*sources*' -type f | head -1) versionpack-input/mcedia-core-runtime.jar
+
+      - name: Upload versionpack inputs (${{ matrix.mc_version }})
+        uses: actions/upload-artifact@v4
+        with:
+          name: mcedia-mtv-versionpack-input-${{ matrix.mc_version }}
+          path: versionpack-input/
+          if-no-files-found: error
+
+  # ── Fabric versionpack ────────────────────────────────────────────────
+  mcedia-mtv-versionpack:
+    needs: [discover, mcedia-mtv-version-inputs]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 25
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Make gradlew executable
+        run: chmod +x gradlew
+
+      - name: Download versionpack inputs
+        uses: actions/download-artifact@v4
+        with:
+          pattern: mcedia-mtv-versionpack-input-*
+          path: inputs
+
+      - name: Stage versionpack inputs
+        run: |
+          mkdir -p build/bundle-input/mtv-allinone
+          for mc in $(grep '^supported_mc_versions' gradle.properties | cut -d= -f2 | tr ',' ' '); do
+            cp inputs/mcedia-mtv-versionpack-input-${mc}/mcedia-mtv-${mc}.jar build/bundle-input/mtv-allinone/
+            cp inputs/mcedia-mtv-versionpack-input-${mc}/mcedia-core-${mc}.jar build/bundle-input/mtv-allinone/
+            cp inputs/mcedia-mtv-versionpack-input-${mc}/mcedia-platforms-${mc}.jar build/bundle-input/mtv-allinone/
+          done
+          cp inputs/mcedia-mtv-versionpack-input-$(grep '^supported_mc_versions' gradle.properties | cut -d= -f2 | cut -d, -f1)/mcedia-core-runtime.jar build/bundle-input/mtv-allinone/
+
+      - name: Build Fabric versionpack
+        run: ./gradlew :mcedia-mtv-allinone-bundle:bundleJar
+
+      - name: Publish Fabric versionpack to unified Modrinth project
+        if: |
+          github.event_name == 'workflow_dispatch'
+          && github.event.inputs.create_release == 'true'
+          && github.event.inputs.local_loader_verified == 'true'
         env:
           MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
           MODRINTH_MCEDIA_PROJECT_ID: ${{ secrets.MCEDIA_CORE_PROJECT_ID }}
-        run: |
-          ./gradlew :mcedia-mtv-${{ matrix.mc_version }}:modrinth \
-                    -Psupported_mc_versions=${{ matrix.mc_version }} \
-                    -PallInOne=true
+        run: ./gradlew :mcedia-mtv-allinone-bundle:modrinth
 
-      - name: Upload Fabric all-in-one (${{ matrix.mc_version }})
+      - name: Upload Fabric versionpack
         uses: actions/upload-artifact@v4
         with:
-          name: mcedia-mtv-allinone-${{ matrix.mc_version }}
-          path: build/libs/${{ matrix.mc_version }}/mcedia-mtv-allinone-*.jar
+          name: mcedia-mtv-versionpack-final
+          path: build/libs/bundle/mcedia-mtv-allinone-versionpack-*.jar
           if-no-files-found: error
 
   # ── Release ──────────────────────────────────────────────────────────
@@ -231,19 +293,20 @@ jobs:
   #   - workflow_dispatch with create_release=true
   release:
     if: |
-      startsWith(github.ref, 'refs/tags/v')
-      || (github.event_name == 'workflow_dispatch' && github.event.inputs.create_release == 'true')
-    needs: [mcedia-mtv-plugin, mcedia-mtv-allinone]
+      github.event_name == 'workflow_dispatch'
+      && github.event.inputs.create_release == 'true'
+      && github.event.inputs.local_loader_verified == 'true'
+    needs: [mcedia-mtv-plugin, mcedia-mtv-versionpack]
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download Fabric all-in-one artifacts
+      - name: Download Fabric versionpack
         uses: actions/download-artifact@v4
         with:
-          pattern: mcedia-mtv-allinone-*
+          name: mcedia-mtv-versionpack-final
           path: artifacts
 
       - name: Download universal Paper plugin
@@ -285,7 +348,7 @@ jobs:
 
             ## Modules
 
-            - **mcedia-mtv-allinone** — Per-version Fabric client package with bundled Core runtime
+            - **mcedia-mtv-allinone-versionpack** — Single cross-version Fabric client package
             - **mcedia-mtv-plugin** — Paper/Folia plugin for channel management
 
             ## Supported Minecraft Versions

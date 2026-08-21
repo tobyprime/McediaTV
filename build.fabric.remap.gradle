@@ -38,6 +38,7 @@ def coreGav = "top.tobyprime:mcedia_core-mc${mcVersion}:${rootProject.property('
 def apiGav = "top.tobyprime:mcedia-api:${rootProject.property('mcedia_base_version')}"
 def playerGav = "top.tobyprime:mcedia-player:${rootProject.property('mcedia_base_version')}"
 def decoderGav = "top.tobyprime:mcedia-decoder-ffmpeg:${rootProject.property('mcedia_base_version')}"
+def runtimeGav = "top.tobyprime:mcedia-core-runtime:${rootProject.property('mcedia_core_version')}"
 def cnPlatformsGav = "top.tobyprime:mcedia_cn_platforms-mc${mcVersion}:${rootProject.property('mcedia_cn_platforms_version')}"
 def buildTimestamp = rootProject.ext.has('buildTimestamp')
     ? rootProject.ext.buildTimestamp.toString()
@@ -246,6 +247,7 @@ dependencies {
             } else {
                 modImplementation coreGav
             }
+            implementation runtimeGav
             break
         default:
             throw new GradleException("Unsupported Fabric module: ${moduleName}")
