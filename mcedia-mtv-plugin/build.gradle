@@ -73,7 +73,7 @@ tasks.named('test', Test) {
 // ========== 资源处理 ==========
 processResources {
     def props = [
-        version      : version,
+        version      : rootProject.version.toString(),
         apiLevel     : apiLevel
     ]
     inputs.properties props

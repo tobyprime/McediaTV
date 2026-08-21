@@ -126,64 +126,6 @@ jobs:
           path: core-source/publish/
           if-no-files-found: error
 
-  # ── Fabric mod: mcedia-mtv ──────────────────────────────────────────
-  # Entity-synced media player mod. One build per MC version.
-  # Depends on McediaCore published artifacts (from mcedia-core-publish job).
-  # Tests are skipped: they depend on Minecraft's rendering infrastructure
-  # (GL context, OpenAL) not available on CI runners.
-  mcedia-mtv:
-    needs: [discover, mcedia-core-deps]
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        mc_version: ${{ fromJSON(needs.discover.outputs.mc_versions) }}
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Download McediaCore publish directory
-        uses: actions/download-artifact@v4
-        with:
-          name: mcedia-core-publish-${{ matrix.mc_version }}
-          path: ../McediaCore/publish
-
-      - name: Resolve Java version for ${{ matrix.mc_version }}
-        id: jdk
-        run: |
-          PROP="mcedia-mtv/versions/${{ matrix.mc_version }}/gradle.properties"
-          echo "java_version=$(grep '^java_version' "$PROP" | cut -d= -f2)" >> "$GITHUB_OUTPUT"
-
-      - name: Set up JDK ${{ steps.jdk.outputs.java_version }}
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: ${{ steps.jdk.outputs.java_version }}
-
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
-
-      - name: Make gradlew executable
-        run: chmod +x gradlew
-
-      - name: Verify publish directory
-        run: |
-          echo "=== Published mcedia_core artifacts ==="
-          find ../McediaCore/publish -name '*.jar' | sort | head -10
-          echo "=== (count: $(find ../McediaCore/publish -name '*.jar' | wc -l)) ==="
-
-      - name: Build mcedia-mtv for ${{ matrix.mc_version }}
-        run: |
-          ./gradlew :mcedia-mtv-${{ matrix.mc_version }}:buildAndCollect \
-                    -Psupported_mc_versions=${{ matrix.mc_version }} \
-                    -x test
-
-      - name: Upload mcedia-mtv JAR (${{ matrix.mc_version }})
-        uses: actions/upload-artifact@v4
-        with:
-          name: mcedia-mtv-${{ matrix.mc_version }}
-          path: build/libs/${{ matrix.mc_version }}/*.jar
-          if-no-files-found: error
-
   # ── Paper plugin: mcedia-mtv-plugin ─────────────────────────────────
   # One Java 21 artifact targets the Paper 1.21.11 API baseline.
   mcedia-mtv-plugin:
