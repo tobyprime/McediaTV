@@ -37,16 +37,18 @@ def parseMcVersionToNumber = { String mcVersion ->
 include 'mcedia-mtv-plugin'
 include 'mcedia-mtv-allinone-bundle'
 
-versionedModules.each { moduleName ->
-    include moduleName
-    project(":${moduleName}").projectDir = file(moduleName)
+if (providers.gradleProperty('bundle_only').orElse('false').get() != 'true') {
+    versionedModules.each { moduleName ->
+        include moduleName
+        project(":${moduleName}").projectDir = file(moduleName)
 
-    versions.each { mcVersion ->
-        def versionedProjectName = "${moduleName}-${mcVersion}"
-        include versionedProjectName
-        project(":${versionedProjectName}").projectDir = file("${moduleName}/versions/${mcVersion}")
-        project(":${versionedProjectName}").buildFileName = parseMcVersionToNumber(mcVersion) > 260000
-            ? '../../../build.fabric.gradle'
-            : '../../../build.fabric.remap.gradle'
+        versions.each { mcVersion ->
+            def versionedProjectName = "${moduleName}-${mcVersion}"
+            include versionedProjectName
+            project(":${versionedProjectName}").projectDir = file("${moduleName}/versions/${mcVersion}")
+            project(":${versionedProjectName}").buildFileName = parseMcVersionToNumber(mcVersion) > 260000
+                ? '../../../build.fabric.gradle'
+                : '../../../build.fabric.remap.gradle'
+        }
     }
 }

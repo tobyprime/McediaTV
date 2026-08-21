@@ -267,7 +267,7 @@ jobs:
           cp inputs/mcedia-mtv-versionpack-input-$(grep '^supported_mc_versions' gradle.properties | cut -d= -f2 | cut -d, -f1)/mcedia-core-runtime.jar build/bundle-input/mtv-allinone/
 
       - name: Build Fabric versionpack
-        run: ./gradlew :mcedia-mtv-allinone-bundle:bundleJar
+        run: ./gradlew -Pbundle_only=true :mcedia-mtv-allinone-bundle:bundleJar
 
       - name: Publish Fabric versionpack to unified Modrinth project
         if: |
