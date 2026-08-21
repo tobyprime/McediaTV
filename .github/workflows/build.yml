@@ -277,7 +277,7 @@ jobs:
         env:
           MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
           MODRINTH_MCEDIA_PROJECT_ID: ${{ secrets.MCEDIA_CORE_PROJECT_ID }}
-        run: ./gradlew :mcedia-mtv-allinone-bundle:modrinth
+        run: ./gradlew -Pbundle_only=true :mcedia-mtv-allinone-bundle:modrinth
 
       - name: Upload Fabric versionpack
         uses: actions/upload-artifact@v4
