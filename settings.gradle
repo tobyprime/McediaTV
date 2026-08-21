@@ -35,6 +35,7 @@ def parseMcVersionToNumber = { String mcVersion ->
 }
 
 include 'mcedia-mtv-plugin'
+include 'mcedia-mtv-allinone-bundle'
 
 versionedModules.each { moduleName ->
     include moduleName

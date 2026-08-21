@@ -7,66 +7,13 @@ plugins {
 
 group = 'top.tobyprime'
 version = '1.3.1'
-
-// ========== 版本切换 ==========
-// 通过 -PserverVersion=26.2 切换目标服务端版本
-// 默认值可在 gradle.properties 或此处修改
-def serverVersion = findProperty('serverVersion') ?: '1.21.11'
-
-// 版本配置映射 —— 新增版本只需在此添加条目
-def versionConfig = [
-    '1.21.11': [
-        paperBundle : '1.21.11-R0.1-SNAPSHOT',
-        paperApi    : '1.21.11-R0.1-SNAPSHOT',
-        paperVersion: '1.21.11',
-        javaVersion : 21,
-        apiLevel    : '1.21',
-        javaFlags   : [
-            '-XX:+UseG1GC'
-        ]
-    ],
-    '26.1': [
-        paperBundle : '26.1.2.build.69-stable',
-        paperApi    : '26.1.2.build.69-stable',
-        paperVersion: '26.1.2',
-        javaVersion : 25,
-        apiLevel    : '26.1',
-        javaFlags   : [
-            // Microsoft OpenJDK 25.0.3's G1 crashes (g1HeapRegionManager.cpp free-list
-            // safepoint bug), so the 26.x servers run the stable Parallel collector.
-            '-XX:+AlwaysPreTouch', '-XX:+DisableExplicitGC',
-            '-XX:+ParallelRefProcEnabled', '-XX:+PerfDisableSharedMem',
-            '-XX:+UseParallelGC'
-        ]
-    ],
-    '26.2': [
-        paperBundle : '26.2.build.92-stable',
-        paperApi    : '26.2.build.92-stable',
-        paperVersion: '26.2',
-        javaVersion : 25,
-        apiLevel    : '26.2',
-        javaFlags   : [
-            '-XX:+AlwaysPreTouch', '-XX:+DisableExplicitGC',
-            '-XX:+ParallelRefProcEnabled', '-XX:+PerfDisableSharedMem',
-            '-XX:+UseParallelGC'
-        ]
-    ]
-]
-
-def cfg = versionConfig[serverVersion]
-if (cfg == null) {
-    throw new GradleException("Unsupported server version: ${serverVersion}. " +
-            "Supported versions: ${versionConfig.keySet().join(', ')}. " +
-            "Usage: -PserverVersion=<version>")
+base {
+    archivesName = 'mcedia-mtv-plugin-universal'
 }
 
-println "Building for Paper ${serverVersion} (Java ${cfg.javaVersion}, API ${cfg.apiLevel})"
-
-// ========== 版本特定源码目录（可选） ==========
-// 若 versions/<serverVersion>/src/main/java/ 存在，会作为额外的源码目录
-// 用于覆盖共享源码中因 API 变更需要适配的部分
-def versionedSrcDir = file("versions/${serverVersion}/src/main/java")
-def hasVersionedSrc = versionedSrcDir.exists()
+def paperBaseline = '1.21.11-R0.1-SNAPSHOT'
+def apiLevel = '1.21'
+println "Building universal Paper plugin (baseline ${paperBaseline}, Java 21)"
 
 // ========== 仓库 ==========
 repositories {
@@ -79,8 +26,8 @@ repositories {
 
 // ========== 依赖 ==========
 dependencies {
-    paperweight.paperDevBundle(cfg.paperBundle)
-    compileOnly("io.papermc.paper:paper-api:${cfg.paperApi}")
+    paperweight.paperDevBundle(paperBaseline)
+    compileOnly("io.papermc.paper:paper-api:${paperBaseline}")
     compileOnly("com.google.code.gson:gson:2.11.0")
     implementation("org.xerial:sqlite-jdbc:3.45.3.0")
 
@@ -88,25 +35,15 @@ dependencies {
     testRuntimeOnly("org.junit.platform:junit-platform-launcher:1.11.4")
 }
 
-// 如果有版本特定源码，添加到主源码集
-if (hasVersionedSrc) {
-    sourceSets.main.java.srcDirs(versionedSrcDir)
-    println "Including version-specific source: ${versionedSrcDir}"
-}
-
 // ========== 运行为服务端 ==========
 tasks {
     runServer {
-        minecraftVersion(cfg.paperVersion)
-        // The JVM args declared per version (see javaFlags) are applied to the
-        // spawned server process; without this the 26.x servers run the default G1
-        // collector that crashes Microsoft OpenJDK 25.0.3.
-        jvmArgs(cfg.javaFlags)
+        minecraftVersion('1.21.11')
     }
 }
 
 // ========== Java 编译 ==========
-def targetJavaVersion = cfg.javaVersion
+def targetJavaVersion = 21
 java {
     def javaVersion = JavaVersion.toVersion(targetJavaVersion)
     sourceCompatibility = javaVersion
@@ -137,8 +74,7 @@ tasks.named('test', Test) {
 processResources {
     def props = [
         version      : version,
-        serverVersion: serverVersion,
-        apiLevel     : cfg.apiLevel
+        apiLevel     : apiLevel
     ]
     inputs.properties props
     filteringCharset 'UTF-8'
@@ -147,7 +83,8 @@ processResources {
     }
 }
 
-def modrinthProjectId = System.getenv('MODRINTH_MCEDIA_MTV_PLUGIN_PROJECT_ID')
+def modrinthProjectId = System.getenv('MODRINTH_MCEDIA_PROJECT_ID')
+        ?: System.getenv('MODRINTH_MCEDIA_MTV_PLUGIN_PROJECT_ID')
 
 modrinth {
     token = System.getenv('MODRINTH_TOKEN')
@@ -155,13 +92,13 @@ modrinth {
     if (modrinthProjectId != null && !modrinthProjectId.isEmpty()) {
         projectId = modrinthProjectId
     } else {
-        logger.warn('MODRINTH_MCEDIA_MTV_PLUGIN_PROJECT_ID not set — Modrinth publish disabled')
+        logger.warn('MODRINTH_MCEDIA_PROJECT_ID not set — Modrinth publish disabled')
     }
 
-    versionNumber = "${version}+${serverVersion}"
+    versionNumber = "${version}+paper-1.21.11-plus"
     uploadFile = tasks.named('jar').get()
     versionType = 'release'
-    gameVersions = [cfg.paperVersion]
+    gameVersions = ['1.21.11', '26.1', '26.2']
     loaders = ['paper', 'folia']
     changelog = "Automated build from commit ${System.getenv('GITHUB_SHA')?.take(7) ?: 'local'}."
 }

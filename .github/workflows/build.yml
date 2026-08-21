@@ -32,6 +32,11 @@ on:
         description: 'Create a GitHub Release with the built artifacts'
         default: false
         type: boolean
+      core_ref:
+        description: 'McediaCore git ref used as the internal build input'
+        default: 'v1.3.2'
+        required: false
+        type: string
 
 env:
   GRADLE_OPTS: '-Dorg.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=512m -Dfile.encoding=UTF-8'
@@ -62,13 +67,9 @@ jobs:
           echo "mc_versions=$JSON" >> "$GITHUB_OUTPUT"
           echo "Resolved MC versions: $JSON"
 
-  # ── McediaCore dependencies ─────────────────────────────────────────
-  # Downloads McediaCore artifacts (api, player, decoder, core, cn-platforms)
-  # from the latest GitHub Release. No source build.
-  #
-  # Produces two artifacts per MC version:
-  #   mcedia-core-publish-*   — Maven repo layout (publish/) for dep resolution
-  #   mcedia-core-build-libs-* — raw jars (build-libs/) for all-in-one bundling
+  # ── McediaCore build dependencies ─────────────────────────────────────
+  # Core is an internal build input. Build the matching Core source tag instead
+  # of downloading a public Core release.
   mcedia-core-deps:
     needs: discover
     runs-on: ubuntu-latest
@@ -78,85 +79,52 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download McediaCore Release artifacts
-        # curl directly (not gh CLI): GH_TOKEN is scoped to McediaTV and
-        # can't access tobyprime/Mcedia's releases. Public repo so
-        # unauthenticated API access is fine (60 req/hr limit).
-        run: |
-          mkdir -p release-jars
-          TAG="v$(grep '^mcedia_core_version' gradle.properties | cut -d= -f2 | tr -d ' ')"
-          echo "Fetching release $TAG from tobyprime/Mcedia ..."
-          API_JSON=$(curl -sL "https://api.github.com/repos/tobyprime/Mcedia/releases/tags/$TAG")
-          if echo "$API_JSON" | jq -e '.assets | length == 0' > /dev/null 2>&1; then
-            echo "ERROR: no assets found — API response:" >&2
-            echo "$API_JSON" | head -5 >&2
-            exit 1
-          fi
-          # Use name + browser_download_url pairs: API 'name' has real
-          # '+' while the download URL has '%2B' (valid in URLs).
-          echo "$API_JSON" | jq -r '.assets[] | "\(.name)\t\(.browser_download_url)"' | \
-          while IFS=$'\t' read -r name url; do
-            echo "  -> $name"
-            curl -sL "$url" -o "release-jars/$name"
-          done
-          count=$(ls release-jars/*.jar 2>/dev/null | wc -l)
-          echo "Downloaded $count jars from McediaCore $TAG"
-          ls -la release-jars/
+      - name: Check out matching McediaCore source
+        uses: actions/checkout@v4
+        with:
+          repository: tobyprime/Mcedia
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.core_ref || 'v1.3.2' }}
+          path: core-source
 
-      - name: Setup Maven publish/ directory
+      - name: Set up JDK 21 for shared runtime
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build shared Core runtime
+        working-directory: core-source
+        run: ./gradlew --configure-on-demand :mcedia-core-runtime:publishMavenJavaPublicationToMavenRepository
+
+      - name: Resolve Java version for ${{ matrix.mc_version }}
+        id: jdk
         run: |
-          setup_artifact() {
-            local g=$1 a=$2 v=$3 j=$4
-            local d="publish/${g//.//}/$a/$v"
-            mkdir -p "$d"
-            cp "$j" "$d/$a-$v.jar"
-            printf '%s\n' \
-              '<?xml version="1.0" encoding="UTF-8"?>' \
-              '<project xmlns="http://maven.apache.org/POM/4.0.0"' \
-              '         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"' \
-              '         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">' \
-              '  <modelVersion>4.0.0</modelVersion>' \
-              "  <groupId>$g</groupId>" \
-              "  <artifactId>$a</artifactId>" \
-              "  <version>$v</version>" \
-              '</project>' > "$d/$a-$v.pom"
-          }
-          MCV=${{ matrix.mc_version }}
-          for jar in release-jars/*.jar; do
-            name=$(basename "$jar" .jar)
-            case "$name" in
-              mcedia-api-*)
-                setup_artifact top.tobyprime mcedia-api "${name#mcedia-api-}" "$jar" ;;
-              mcedia-player-*)
-                setup_artifact top.tobyprime mcedia-player "${name#mcedia-player-}" "$jar" ;;
-              mcedia-decoder-ffmpeg-*)
-                setup_artifact top.tobyprime mcedia-decoder-ffmpeg "${name#mcedia-decoder-ffmpeg-}" "$jar" ;;
-              mcedia_core-*)
-                rest="${name#mcedia_core-}"; v="${rest%%+*}"
-                # Only publish windows-x86_64 variant (for all-in-one include bundling)
-                echo "$name" | grep -q windows-x86_64 || continue
-                mc=$(echo "${rest#*+}" | sed 's/\.[a-zA-Z].*//')
-                [ "$mc" != "$MCV" ] && continue
-                aid="mcedia_core-mc$mc"
-                [ -f "publish/top.tobyprime/$aid/$v/$aid-$v.jar" ] || \
-                  setup_artifact top.tobyprime "$aid" "$v" "$jar"
-                ;;
-              mcedia_cn_platforms-*)
-                rest="${name#mcedia_cn_platforms-}"; v="${rest%%+*}"
-                mc=$(echo "${rest#*+}" | sed 's/\.[a-zA-Z].*//')
-                [ "$mc" != "$MCV" ] && continue
-                aid="mcedia_cn_platforms-mc$mc"
-                [ -f "publish/top.tobyprime/$aid/$v/$aid-$v.jar" ] || \
-                  setup_artifact top.tobyprime "$aid" "$v" "$jar"
-                ;;
-            esac
-          done
+          PROP="core-source/mcedia-core/versions/${{ matrix.mc_version }}/gradle.properties"
+          echo "java_version=$(grep '^java_version' "$PROP" | cut -d= -f2)" >> "$GITHUB_OUTPUT"
+
+      - name: Set up target JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ steps.jdk.outputs.java_version }}
+
+      - name: Build Core dependencies for ${{ matrix.mc_version }}
+        working-directory: core-source
+        run: |
+          ./gradlew --configure-on-demand \
+                    :mcedia-core-${{ matrix.mc_version }}:publishMavenJavaPublicationToMavenRepository \
+                    :mcedia-cn-platforms-${{ matrix.mc_version }}:publishMavenJavaPublicationToMavenRepository \
+                    -Psupported_mc_versions=${{ matrix.mc_version }} -x test
 
       - name: Upload publish directory
         uses: actions/upload-artifact@v4
         with:
           name: mcedia-core-publish-${{ matrix.mc_version }}
-          path: publish/
+          path: core-source/publish/
+          if-no-files-found: error
 
   # ── Fabric mod: mcedia-mtv ──────────────────────────────────────────
   # Entity-synced media player mod. One build per MC version.
@@ -209,16 +177,6 @@ jobs:
                     -Psupported_mc_versions=${{ matrix.mc_version }} \
                     -x test
 
-      - name: Publish to Modrinth
-        if: startsWith(github.ref, 'refs/tags/v')
-        env:
-          MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
-          MODRINTH_MCEDIA_MTV_PROJECT_ID: ${{ secrets.MODRINTH_FABRIC_PROJECT_ID }}
-          MCEDIA_CORE_PROJECT_ID: ${{ secrets.MCEDIA_CORE_PROJECT_ID }}
-        run: |
-          ./gradlew :mcedia-mtv-${{ matrix.mc_version }}:modrinth \
-                    -Psupported_mc_versions=${{ matrix.mc_version }}
-
       - name: Upload mcedia-mtv JAR (${{ matrix.mc_version }})
         uses: actions/upload-artifact@v4
         with:
@@ -227,31 +185,18 @@ jobs:
           if-no-files-found: error
 
   # ── Paper plugin: mcedia-mtv-plugin ─────────────────────────────────
-  # Channel management Paper plugin. Builds for each supported Paper
-  # server version. No McediaCore dependency.
+  # One Java 21 artifact targets the Paper 1.21.11 API baseline.
   mcedia-mtv-plugin:
     needs: discover
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        server_version: ${{ fromJSON(needs.discover.outputs.mc_versions) }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Resolve Java version for Paper ${{ matrix.server_version }}
-        id: jdk
-        run: |
-          if [ '${{ matrix.server_version }}' = '26.1' ] || [ '${{ matrix.server_version }}' = '26.2' ]; then
-            echo "java_version=25" >> "$GITHUB_OUTPUT"
-          else
-            echo "java_version=21" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Set up JDK ${{ steps.jdk.outputs.java_version }}
+      - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: ${{ steps.jdk.outputs.java_version }}
+          java-version: '21'
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
@@ -259,36 +204,27 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x gradlew
 
-      - name: Build plugin for Paper ${{ matrix.server_version }}
-        # --configure-on-demand avoids configuring Fabric projects (which
-        # require McediaCore's publish directory) when only building the plugin.
-        run: |
-          ./gradlew :mcedia-mtv-plugin:build \
-                    -PserverVersion=${{ matrix.server_version }} \
-                    --configure-on-demand
+      - name: Build universal Paper plugin
+        run: ./gradlew :mcedia-mtv-plugin:build --configure-on-demand
 
       - name: Publish to Modrinth
         if: startsWith(github.ref, 'refs/tags/v')
         env:
           MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
-          MODRINTH_MCEDIA_MTV_PLUGIN_PROJECT_ID: ${{ secrets.MODRINTH_PLUGIN_PROJECT_ID }}
-        run: |
-          ./gradlew :mcedia-mtv-plugin:modrinth \
-                    -PserverVersion=${{ matrix.server_version }} \
-                    --configure-on-demand
+          MODRINTH_MCEDIA_PROJECT_ID: ${{ secrets.MCEDIA_CORE_PROJECT_ID }}
+        run: ./gradlew :mcedia-mtv-plugin:modrinth --configure-on-demand
 
-      - name: Upload plugin JAR (${{ matrix.server_version }})
+      - name: Upload universal plugin JAR
         uses: actions/upload-artifact@v4
         with:
-          name: mcedia-mtv-plugin-${{ matrix.server_version }}
-          path: mcedia-mtv-plugin/build/libs/*.jar
+          name: mcedia-mtv-plugin-universal
+          path: mcedia-mtv-plugin/build/libs/mcedia-mtv-plugin-universal-*.jar
           if-no-files-found: error
 
-  # ── Fabric mod: mcedia-mtv all-in-one ────────────────────────────────
-  # Builds mcedia-mtv with mcedia-core (Windows native) bundled via
-  # Fabric Loom's include mechanism. The core is resolved from the
-  # publish directory (already filtered to windows-x86_64 by mcedia-core-deps).
-  # The output jar has "-allinone" in the filename automatically.
+
+  # ── Fabric mod: per-version all-in-one ───────────────────────────────
+  # Fabric resolves one real implementation per mod ID. Package one file per
+  # Minecraft version, while embedding the shared runtime only once per file.
   mcedia-mtv-allinone:
     needs: [discover, mcedia-core-deps]
     runs-on: ubuntu-latest
@@ -308,7 +244,8 @@ jobs:
       - name: Resolve Java version for ${{ matrix.mc_version }}
         id: jdk
         run: |
-          echo "java_version=$(grep '^java_version' "mcedia-mtv/versions/${{ matrix.mc_version }}/gradle.properties" | cut -d= -f2)" >> "$GITHUB_OUTPUT"
+          PROP="mcedia-mtv/versions/${{ matrix.mc_version }}/gradle.properties"
+          echo "java_version=$(grep '^java_version' "$PROP" | cut -d= -f2)" >> "$GITHUB_OUTPUT"
 
       - name: Set up JDK ${{ steps.jdk.outputs.java_version }}
         uses: actions/setup-java@v4
@@ -319,29 +256,23 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Make gradlew executable
-        run: chmod +x gradlew
-
       - name: Build all-in-one for ${{ matrix.mc_version }}
-        # Uses Loom's include to bundle core into the mod jar
         run: |
           ./gradlew :mcedia-mtv-${{ matrix.mc_version }}:buildAndCollect \
                     -Psupported_mc_versions=${{ matrix.mc_version }} \
-                    -PallInOne=true \
-                    -x test
+                    -PallInOne=true -x test
 
-      - name: Publish all-in-one to Modrinth
+      - name: Publish Fabric all-in-one to unified Modrinth project
         if: startsWith(github.ref, 'refs/tags/v')
         env:
           MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
-          MODRINTH_MCEDIA_MTV_PROJECT_ID: ${{ secrets.MODRINTH_FABRIC_PROJECT_ID }}
-          MCEDIA_CORE_PROJECT_ID: ${{ secrets.MCEDIA_CORE_PROJECT_ID }}
+          MODRINTH_MCEDIA_PROJECT_ID: ${{ secrets.MCEDIA_CORE_PROJECT_ID }}
         run: |
           ./gradlew :mcedia-mtv-${{ matrix.mc_version }}:modrinth \
                     -Psupported_mc_versions=${{ matrix.mc_version }} \
                     -PallInOne=true
 
-      - name: Upload all-in-one JAR (${{ matrix.mc_version }})
+      - name: Upload Fabric all-in-one (${{ matrix.mc_version }})
         uses: actions/upload-artifact@v4
         with:
           name: mcedia-mtv-allinone-${{ matrix.mc_version }}
@@ -357,17 +288,23 @@ jobs:
     if: |
       startsWith(github.ref, 'refs/tags/v')
       || (github.event_name == 'workflow_dispatch' && github.event.inputs.create_release == 'true')
-    needs: [mcedia-mtv, mcedia-mtv-plugin, mcedia-mtv-allinone]
+    needs: [mcedia-mtv-plugin, mcedia-mtv-allinone]
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download final build artifacts (skip intermediate core-deps)
+      - name: Download Fabric all-in-one artifacts
         uses: actions/download-artifact@v4
         with:
-          pattern: mcedia-mtv-*
+          pattern: mcedia-mtv-allinone-*
+          path: artifacts
+
+      - name: Download universal Paper plugin
+        uses: actions/download-artifact@v4
+        with:
+          name: mcedia-mtv-plugin-universal
           path: artifacts
 
       - name: Gather JAR files
@@ -403,8 +340,8 @@ jobs:
 
             ## Modules
 
-            - **mcedia-mtv** — Fabric mod for entity-synced media playback
-            - **mcedia-mtv-plugin** — Paper plugin for channel management
+            - **mcedia-mtv-allinone** — Per-version Fabric client package with bundled Core runtime
+            - **mcedia-mtv-plugin** — Paper/Folia plugin for channel management
 
             ## Supported Minecraft Versions
 

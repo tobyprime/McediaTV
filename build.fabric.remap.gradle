@@ -83,6 +83,15 @@ def syncVersionedClientSources = tasks.register('syncVersionedClientSources', Sy
     }
     from(new File(moduleRoot, 'src/client/java')) {
         into('java')
+        if (mcVersion == '1.21.8') {
+            exclude '**/worldui/WorldUiRenderer.java', '**/worldui/MtvWorldUiCoverTextures.java', '**/worldui/MtvAddMediaScreen.java', '**/mixin/MixinMinecraftWorldUiInput.java'
+            filter { String line ->
+                line.replace('net.minecraft.resources.Identifier', 'net.minecraft.resources.ResourceLocation')
+                    .replace('Identifier.', 'ResourceLocation.')
+                    .replace('Identifier ', 'ResourceLocation ')
+                    .replace('<Identifier>', '<ResourceLocation>')
+            }
+        }
     }
     from(new File(moduleRoot, 'src/client/resources')) {
         into('resources')
@@ -233,12 +242,10 @@ dependencies {
             if (allInOne) {
                 include modImplementation(coreGav)
                 include implementation(cnPlatformsGav)
+                include implementation("top.tobyprime:mcedia-core-runtime:${rootProject.property('mcedia_core_version')}")
             } else {
                 modImplementation coreGav
             }
-            implementation apiGav
-            implementation playerGav
-            runtimeOnly decoderGav
             break
         default:
             throw new GradleException("Unsupported Fabric module: ${moduleName}")
@@ -323,7 +330,8 @@ def resolveGameVersions(version) {
     return [version]
 }
 
-def modrinthProjectId = System.getenv("MODRINTH_${moduleName.toUpperCase().replace('-', '_')}_PROJECT_ID")
+def modrinthProjectId = System.getenv('MODRINTH_MCEDIA_PROJECT_ID')
+        ?: System.getenv("MODRINTH_${moduleName.toUpperCase().replace('-', '_')}_PROJECT_ID")
 
 modrinth {
     token = System.getenv('MODRINTH_TOKEN')
@@ -344,11 +352,9 @@ modrinth {
     changelog = "Automated build from commit ${System.getenv('GITHUB_SHA')?.take(7) ?: 'local'}."
 
     dependencies {
-        def coreId = System.getenv('MCEDIA_CORE_PROJECT_ID')
-        if (coreId) {
-            if (project.findProperty('allInOne')?.toBoolean()) {
-                embedded.project coreId
-            } else {
+        if (!project.findProperty('allInOne')?.toBoolean()) {
+            def coreId = System.getenv('MCEDIA_CORE_PROJECT_ID')
+            if (coreId) {
                 required.project coreId
             }
         }
