@@ -164,7 +164,7 @@ jobs:
 
       - name: Build native archive for ${{ matrix.platform }}
         working-directory: core-source
-        run: ./gradlew :mcedia-core-runtime:nativeArchive -PruntimeNativePlatform=${{ matrix.platform }} -x test
+        run: ./gradlew --configure-on-demand :mcedia-core-runtime:nativeArchive -PruntimeNativePlatform=${{ matrix.platform }} -x test
 
       - name: Generate checksum
         working-directory: core-source
@@ -267,7 +267,7 @@ jobs:
           cp $(find build/libs/${MC} -name 'mcedia-mtv-*.jar' ! -name '*sources*' -type f | head -1) versionpack-input/mcedia-mtv-${MC}.jar
           cp $(find ../McediaCore/publish/top/tobyprime/mcedia_core-mc${MC} -name '*.jar' ! -name '*sources*' -type f | head -1) versionpack-input/mcedia-core-${MC}.jar
           cp $(find ../McediaCore/publish/top/tobyprime/mcedia_cn_platforms-mc${MC} -name '*.jar' ! -name '*sources*' -type f | head -1) versionpack-input/mcedia-platforms-${MC}.jar
-          RUNTIME=$(find ../McediaCore/publish/top/tobyprime/mcedia-core-runtime -maxdepth 1 -type f -name 'mcedia-core-runtime-*.jar' | sort | head -1)
+          RUNTIME=$(find ../McediaCore/publish/top/tobyprime/mcedia-core-runtime -type f -name 'mcedia-core-runtime-*.jar' ! -name '*sources*' | sort | head -1)
           test -n "$RUNTIME"
           cp "$RUNTIME" versionpack-input/mcedia-core-runtime.jar
           unzip -l versionpack-input/mcedia-core-runtime.jar | grep -q 'org/bytedeco/ffmpeg/windows-x86_64/'
