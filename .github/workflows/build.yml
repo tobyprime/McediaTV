@@ -370,6 +370,7 @@ jobs:
           pattern: mcedia-native-*
           path: artifacts/native
 
+      - name: Stage release assets
         run: |
           mkdir -p release-assets
           find artifacts -name '*.jar' -type f | while read jar; do
