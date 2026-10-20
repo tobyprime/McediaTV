@@ -98,7 +98,7 @@ modrinth {
     versionNumber = "${version}+paper-1.21.11-plus"
     uploadFile = tasks.named('jar').get()
     versionType = 'release'
-    gameVersions = ['1.21.11', '26.1', '26.2']
+    gameVersions = ['1.21.11', '26.1', '26.2', '26.3']
     loaders = ['paper', 'folia']
     changelog = "Automated build from commit ${System.getenv('GITHUB_SHA')?.take(7) ?: 'local'}."
 }

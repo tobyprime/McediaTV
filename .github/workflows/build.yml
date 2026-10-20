@@ -39,7 +39,7 @@ on:
         type: boolean
       core_ref:
         description: 'McediaCore git ref used as the internal build input'
-        default: 'v1.3.2'
+        default: 'v1.3.3'
         required: false
         type: string
 
@@ -88,7 +88,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: tobyprime/Mcedia
-          ref: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.core_ref || 'v1.3.2' }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.core_ref || 'v1.3.3' }}
           path: core-source
 
       - name: Set up JDK 21 for shared runtime
@@ -100,9 +100,9 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Build shared Core runtime
+      - name: Build shared Core runtime (Windows x86_64)
         working-directory: core-source
-        run: ./gradlew --configure-on-demand :mcedia-core-runtime:publishMavenJavaPublicationToMavenRepository
+        run: ./gradlew --configure-on-demand :mcedia-core-runtime:publishMavenJavaPublicationToMavenRepository -PruntimeNativePlatform=windows-x86_64
 
       - name: Resolve Java version for ${{ matrix.mc_version }}
         id: jdk
@@ -131,7 +131,52 @@ jobs:
           path: core-source/publish/
           if-no-files-found: error
 
-  # ── Paper plugin: mcedia-mtv-plugin ─────────────────────────────────
+  # ── Downloadable native libraries ─────────────────────────────────────
+  mcedia-native-archives:
+    needs: discover
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [linux-x86_64, linux-arm64, macosx-x86_64, macosx-arm64]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check out matching McediaCore source
+        uses: actions/checkout@v4
+        with:
+          repository: tobyprime/Mcedia
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.core_ref || 'v1.3.3' }}
+          path: core-source
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Make Gradle executable
+        working-directory: core-source
+        run: chmod +x gradlew
+
+      - name: Build native archive for ${{ matrix.platform }}
+        working-directory: core-source
+        run: ./gradlew :mcedia-core-runtime:nativeArchive -PruntimeNativePlatform=${{ matrix.platform }} -x test
+
+      - name: Generate checksum
+        working-directory: core-source
+        run: sha256sum mcedia-core-runtime/build/native-archives/*.zip > mcedia-core-runtime/build/native-archives/SHA256SUMS-${{ matrix.platform }}
+
+      - name: Upload native archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: mcedia-native-${{ matrix.platform }}
+          path: core-source/mcedia-core-runtime/build/native-archives/
+          if-no-files-found: error
+
   # One Java 21 artifact targets the Paper 1.21.11 API baseline.
   mcedia-mtv-plugin:
     needs: discover
@@ -222,7 +267,11 @@ jobs:
           cp $(find build/libs/${MC} -name 'mcedia-mtv-*.jar' ! -name '*sources*' -type f | head -1) versionpack-input/mcedia-mtv-${MC}.jar
           cp $(find ../McediaCore/publish/top/tobyprime/mcedia_core-mc${MC} -name '*.jar' ! -name '*sources*' -type f | head -1) versionpack-input/mcedia-core-${MC}.jar
           cp $(find ../McediaCore/publish/top/tobyprime/mcedia_cn_platforms-mc${MC} -name '*.jar' ! -name '*sources*' -type f | head -1) versionpack-input/mcedia-platforms-${MC}.jar
-          cp $(find ../McediaCore/publish/top/tobyprime/mcedia-core-runtime -name '*.jar' ! -name '*sources*' -type f | head -1) versionpack-input/mcedia-core-runtime.jar
+          RUNTIME=$(find ../McediaCore/publish/top/tobyprime/mcedia-core-runtime -maxdepth 1 -type f -name 'mcedia-core-runtime-*.jar' | sort | head -1)
+          test -n "$RUNTIME"
+          cp "$RUNTIME" versionpack-input/mcedia-core-runtime.jar
+          unzip -l versionpack-input/mcedia-core-runtime.jar | grep -q 'org/bytedeco/ffmpeg/windows-x86_64/'
+          ! unzip -l versionpack-input/mcedia-core-runtime.jar | grep -Eq 'org/bytedeco/ffmpeg/(linux|macosx)-'
 
       - name: Upload versionpack inputs (${{ matrix.mc_version }})
         uses: actions/upload-artifact@v4
@@ -296,7 +345,7 @@ jobs:
       github.event_name == 'workflow_dispatch'
       && github.event.inputs.create_release == 'true'
       && github.event.inputs.local_loader_verified == 'true'
-    needs: [mcedia-mtv-plugin, mcedia-mtv-versionpack]
+    needs: [mcedia-mtv-plugin, mcedia-mtv-versionpack, mcedia-native-archives]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -315,13 +364,19 @@ jobs:
           name: mcedia-mtv-plugin-universal
           path: artifacts
 
-      - name: Gather JAR files
+      - name: Download native archives
+        uses: actions/download-artifact@v4
+        with:
+          pattern: mcedia-native-*
+          path: artifacts/native
+
         run: |
           mkdir -p release-assets
           find artifacts -name '*.jar' -type f | while read jar; do
             echo "Collected: $jar"
             cp "$jar" release-assets/
           done
+          find artifacts/native -type f \( -name '*.zip' -o -name 'SHA256SUMS' \) -exec cp {} release-assets/ \;
           echo "---"
           ls -lh release-assets/
 
@@ -354,5 +409,5 @@ jobs:
             ## Supported Minecraft Versions
 
             ${{ needs.discover.outputs.mc_versions }}
-          files: release-assets/*.jar
+          files: release-assets/*
           fail_on_unmatched_files: true

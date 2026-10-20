@@ -28,5 +28,13 @@
   "mcedia_mtv.tooltip.collapse": "Collapse",
   "mcedia_mtv.tooltip.brightness": "Brightness",
   "mcedia_mtv.tooltip.volume": "Volume",
-  "mcedia_mtv.tooltip.danmaku": "Danmaku"
+  "mcedia_mtv.native_runtime.title": "Mcedia native runtime",
+  "mcedia_mtv.native_runtime.message": "This platform needs native libraries. No other Mod is required.",
+  "mcedia_mtv.native_runtime.platform": "Platform: %s",
+  "mcedia_mtv.native_runtime.ready": "Ready to download",
+  "mcedia_mtv.native_runtime.downloading": "Downloading and loading native libraries...",
+  "mcedia_mtv.native_runtime.success": "Native libraries loaded. Media playback is ready.",
+  "mcedia_mtv.native_runtime.failed": "Download or load failed. Try again.",
+  "mcedia_mtv.native_runtime.download": "Download native libraries",
+  "mcedia_mtv.native_runtime.close": "Close"
 }

@@ -14,6 +14,10 @@ import top.tobyprime.mcedia_mtv_plugin.model.ManagedMtvPlayer;
 import top.tobyprime.mcedia_mtv_plugin.model.ScreenPeripheralConfigModel;
 import top.tobyprime.mcedia_mtv_plugin.model.SpeakerPeripheralConfigModel;
 
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+
 public final class InteractionDataCommandBridge {
     public static final String PLAYER_TAG = "mcedia_mtv";
     public static final String ENTITY_CONFIG_KEY = "entity_config";
@@ -75,7 +79,46 @@ public final class InteractionDataCommandBridge {
         var stack = new ItemStack(Material.PAINTING);
         var nmsStack = CraftItemStack.asNMSCopy(stack);
         nmsStack.set(DataComponents.CUSTOM_DATA, CustomData.of(root));
-        itemDisplay.setItemStack(CraftItemStack.asBukkitCopy(nmsStack));
+        itemDisplay.setItemStack(toBukkitCopy(nmsStack));
+    }
+
+    /**
+     * Paper 26.3 把 {@code CraftItemStack.asBukkitCopy(net.minecraft.world.item.ItemStack)} 的参数
+     * 收窄为新的 {@code ItemInstance} 接口并移除了 ItemStack 重载（26.2 及更早版本则只有 ItemStack 重载）。
+     * 单一静态签名无法同时链接 1.21.11 / 26.2 / 26.3，因此按运行期参数类型解析后反射调用；
+     * Paper 的插件重映射会把 NMS 类字面量与运行期映射保持一致，跨映射命名空间仍然成立。
+     */
+    private static final Method AS_BUKKIT_COPY = resolveAsBukkitCopy();
+
+    private static Method resolveAsBukkitCopy() {
+        Method compatible = null;
+        for (Method method : CraftItemStack.class.getMethods()) {
+            if (!Modifier.isStatic(method.getModifiers()) || !method.getName().equals("asBukkitCopy")) {
+                continue;
+            }
+            Class<?>[] params = method.getParameterTypes();
+            if (params.length != 1 || method.getReturnType() != ItemStack.class) {
+                continue;
+            }
+            if (params[0] == net.minecraft.world.item.ItemStack.class) {
+                return method;
+            }
+            if (params[0].isAssignableFrom(net.minecraft.world.item.ItemStack.class)) {
+                compatible = method;
+            }
+        }
+        return compatible;
+    }
+
+    private static ItemStack toBukkitCopy(net.minecraft.world.item.ItemStack nmsStack) {
+        if (AS_BUKKIT_COPY == null) {
+            throw new IllegalStateException("CraftItemStack.asBukkitCopy(ItemStack-compatible) not found on this server");
+        }
+        try {
+            return (ItemStack) AS_BUKKIT_COPY.invoke(null, nmsStack);
+        } catch (IllegalAccessException | InvocationTargetException e) {
+            throw new IllegalStateException("Failed to invoke CraftItemStack.asBukkitCopy", e);
+        }
     }
 
     private static CompoundTag buildScreenTag(ScreenPeripheralConfigModel screen) {
